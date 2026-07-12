@@ -5,6 +5,7 @@ export type {
   FieldType,
   FormConfig,
   FormField,
-  FormSchema,
+  FormFields,
+  FormProps,
   SelectOption,
 } from './types.ts';

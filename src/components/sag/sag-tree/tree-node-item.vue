@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-vue-next';
-import type { Catalog } from '../../types';
-
-interface TreeNode extends Catalog {
-  children?: TreeNode[];
-}
+import type { TreeNode } from './types';
 
 const props = withDefaults(defineProps<{
   node: TreeNode;

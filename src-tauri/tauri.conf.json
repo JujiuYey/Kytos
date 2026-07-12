@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "bridge-app",
+  "productName": "ip-creator",
   "version": "0.1.0",
-  "identifier": "bridge-app",
+  "identifier": "com.anomalyco.ip-creator",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "bridge-app",
+        "title": "ip-creator",
         "width": 1200,
         "height": 800,
         "minWidth": 800,

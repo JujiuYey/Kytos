@@ -12,7 +12,7 @@ import { GalleryVerticalEnd } from 'lucide-vue-next';
         <component :is="GalleryVerticalEnd" class="size-4" />
       </div>
       <div class="grid flex-1 text-sm leading-tight text-left">
-        <span class="font-semibold truncate">Bridge-demo</span>
+        <span class="font-semibold truncate">ip-creator</span>
       </div>
     </SidebarMenuButton>
   </SidebarHeader>

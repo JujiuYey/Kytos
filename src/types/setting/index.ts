@@ -4,11 +4,3 @@ export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   storagePath: string;
 }
-
-export interface OllamaServerConfig {
-  ollamaUrl: string;
-  selectedModel: string;
-  temperature: number;
-  maxTokens: number;
-  systemPrompt: string;
-}
