@@ -27,6 +27,8 @@ export const useGachaStore = defineStore('gacha', () => {
   const isLoading = ref(false);
   const isSaving = ref(false);
   const isDrawing = ref(false);
+  const lastDrawResult = ref<DrawResult | null>(null);
+  const lastTaskId = ref<string>('');
 
   function pushLog(level: LogEntry['level'], message: string) {
     logs.value.push({ timestamp: Date.now(), level, message });
@@ -116,6 +118,8 @@ export const useGachaStore = defineStore('gacha', () => {
     }
     try {
       const result = await invoke<DrawResult>('draw', { req });
+      lastDrawResult.value = result;
+      lastTaskId.value = result.task_id;
       pushLog('info', `抽卡完成: task=${result.task_id}, saved=${result.saved.length}/${result.urls.length}`);
       return result;
     } catch (e) {
@@ -139,6 +143,7 @@ export const useGachaStore = defineStore('gacha', () => {
         mdPath: selectedPrompt.value.prompt.md_path,
         taskId,
       });
+      lastDrawResult.value = result;
       pushLog('info', `取回完成: task=${result.task_id}, saved=${result.saved.length}/${result.urls.length}`);
       return result;
     } catch (e) {
@@ -163,6 +168,8 @@ export const useGachaStore = defineStore('gacha', () => {
     isLoading,
     isSaving,
     isDrawing,
+    lastDrawResult,
+    lastTaskId,
     scanProject,
     selectPrompt,
     savePrompt,

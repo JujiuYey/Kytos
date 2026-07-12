@@ -16,11 +16,37 @@ function imageSrc(path: string, mtime: number): string {
 
 const hoveringPath = ref<string | null>(null);
 
-async function setBaseline(imagePath: string, target: '定妆照' | '角色表') {
-  if (!store.projectRoot) {
+interface PendingBaseline {
+  imagePath: string;
+  target: '定妆照' | '角色表';
+  baselinePath: string;
+}
+
+const pending = ref<PendingBaseline | null>(null);
+
+function requestSetBaseline(imagePath: string, target: '定妆照' | '角色表') {
+  // The baseline file is at `<root>/角色/<target>.png`. We don't know root
+  // here, but the project scan fills `store.project.baselines.{dingzhuangzhao,jiaosebiao}`.
+  const baseline = target === '定妆照'
+    ? store.project?.baselines.dingzhuangzhao
+    : store.project?.baselines.jiaosebiao;
+  pending.value = {
+    imagePath,
+    target,
+    baselinePath: baseline?.path ?? `角色/${target}.png`,
+  };
+}
+
+async function confirmBaseline() {
+  if (!pending.value) {
     return;
   }
-  await store.setBaseline(imagePath, target);
+  await store.setBaseline(pending.value.imagePath, pending.value.target);
+  pending.value = null;
+}
+
+function cancelBaseline() {
+  pending.value = null;
 }
 </script>
 
@@ -65,7 +91,7 @@ async function setBaseline(imagePath: string, target: '定妆照' | '角色表')
               size="sm"
               variant="secondary"
               class="h-6 text-xs flex-1 px-2"
-              @click="setBaseline(image.path, '定妆照')"
+              @click="requestSetBaseline(image.path, '定妆照')"
             >
               <Star class="size-3" />
               定妆照
@@ -74,7 +100,7 @@ async function setBaseline(imagePath: string, target: '定妆照' | '角色表')
               size="sm"
               variant="secondary"
               class="h-6 text-xs flex-1 px-2"
-              @click="setBaseline(image.path, '角色表')"
+              @click="requestSetBaseline(image.path, '角色表')"
             >
               <Star class="size-3" />
               角色表
@@ -95,5 +121,38 @@ async function setBaseline(imagePath: string, target: '定妆照' | '角色表')
         <span v-else class="text-red-600">未配置（去设置里填）</span>
       </div>
     </footer>
+
+    <Dialog :open="pending !== null" @update:open="(v: boolean) => { if (!v) cancelBaseline() }">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>覆盖基准图？</DialogTitle>
+          <DialogDescription>
+            这一步不可逆 —— 原文件会被覆盖。
+          </DialogDescription>
+        </DialogHeader>
+        <div v-if="pending" class="text-sm space-y-2">
+          <div>
+            把 <code class="bg-muted px-1 rounded">{{ pending.imagePath }}</code>
+          </div>
+          <div>
+            设为 <strong>{{ pending.target }}</strong>，覆盖：
+          </div>
+          <code class="block bg-muted px-2 py-1 rounded font-mono text-xs break-all">
+            {{ pending.baselinePath }}
+          </code>
+          <p class="text-xs text-muted-foreground pt-2">
+            覆盖之后，所有后续抽卡都会以这张图为角色参照。
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="cancelBaseline">
+            取消
+          </Button>
+          <Button @click="confirmBaseline">
+            确认覆盖
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
