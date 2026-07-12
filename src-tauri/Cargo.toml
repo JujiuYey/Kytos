@@ -1,14 +1,12 @@
 [package]
 name = "app"
 version = "0.1.0"
-description = "A Tauri App"
+description = "ip-creator: desktop tooling for character gacha"
 authors = ["you"]
 license = ""
 repository = ""
 edition = "2021"
 rust-version = "1.77.2"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 name = "app_lib"
@@ -26,3 +24,7 @@ tauri-plugin-log = "2.0.0"
 tauri-plugin-shell = "2.0.0"
 tauri-plugin-fs = "2.0.0"
 tauri-plugin-dialog = "2.0.0"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+base64 = "0.22"
+regex = "1"
+tokio = { version = "1", features = ["time", "fs", "macros", "rt-multi-thread"] }
