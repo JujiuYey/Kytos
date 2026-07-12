@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteRecordRaw, RouteComponent } from 'vue-router';
 import type { Component } from 'vue';
 import Layout from '@/layout/index.vue';
-import { dashboardMenus, basicMenus, reportMenus, aiMenus, systemMenus } from '@/data/menu-data';
+import { dashboardMenus, aiMenus, systemMenus } from '@/data/menu-data';
 import type { MenuItem } from '@/data/menu-data';
 
 type LazyComponent = () => Promise<RouteComponent>;
@@ -87,7 +87,7 @@ function generateRoutes(menus: MenuItem[], parentPath = ''): RouteRecordRaw[] {
 }
 
 // 合并所有菜单
-const allMenus = [...dashboardMenus, ...basicMenus, ...reportMenus, ...aiMenus, ...systemMenus];
+const allMenus = [...dashboardMenus, ...aiMenus, ...systemMenus];
 
 // 生成路由配置
 const routes: RouteRecordRaw[] = [

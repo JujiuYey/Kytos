@@ -2,7 +2,7 @@
 import { useRoute, useRouter } from 'vue-router';
 import { computed } from 'vue';
 import type { MenuItem } from '../../../data/menu-data';
-import { dashboardMenus, basicMenus, reportMenus, aiMenus, systemMenus } from '../../../data/menu-data';
+import { dashboardMenus, aiMenus, systemMenus } from '../../../data/menu-data';
 
 const router = useRouter();
 const route = useRoute();
@@ -30,46 +30,6 @@ const getMenuButtonClass = computed(() => (key: string) => ({
         <SidebarMenu>
           <SidebarMenuItem
             v-for="item of dashboardMenus"
-            :key="item.key"
-            @click="handleClick(item)"
-          >
-            <SidebarMenuButton as-child :class="getMenuButtonClass(item.key)">
-              <span>
-                <component :is="item.icon" />
-                <span>{{ item.title }}</span>
-              </span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
-
-    <SidebarGroup>
-      <SidebarGroupLabel>基本数据</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          <SidebarMenuItem
-            v-for="item of basicMenus"
-            :key="item.key"
-            @click="handleClick(item)"
-          >
-            <SidebarMenuButton as-child :class="getMenuButtonClass(item.key)">
-              <span>
-                <component :is="item.icon" />
-                <span>{{ item.title }}</span>
-              </span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
-
-    <SidebarGroup>
-      <SidebarGroupLabel>报告</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          <SidebarMenuItem
-            v-for="item of reportMenus"
             :key="item.key"
             @click="handleClick(item)"
           >
