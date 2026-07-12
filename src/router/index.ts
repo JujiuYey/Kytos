@@ -80,7 +80,12 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: Layout,
+    redirect: '/gacha',
     children: [
+      {
+        path: '',
+        redirect: '/gacha',
+      },
       ...generateRoutes(allMenus),
     ],
   },
