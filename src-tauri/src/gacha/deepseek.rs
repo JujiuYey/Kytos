@@ -13,20 +13,16 @@ use crate::gacha::error::ApiMartError;
 use crate::gacha::project;
 
 pub const DEFAULT_BASE_URL: &str = "https://api.deepseek.com";
-pub const DEFAULT_MODEL: &str = "deepseek-chat";
-pub const REASONER_MODEL: &str = "deepseek-reasoner";
 pub const HTTP_TIMEOUT_SECS: u64 = 300;
 
 const USER_AGENT: &str = "Mozilla/5.0";
 
 /// `temperature: 1.3` per DeepSeek's "general / creative" recommendation.
-/// `deepseek-reasoner` does not accept this parameter and the caller
-/// strips it before issuing the request.
 pub const TEMPERATURE: f32 = 1.3;
 
 /// Build the request body for a chat completion. `messages` should be
-/// produced by [`build_messages`]. `temperature` is `None` for the
-/// reasoner model (it isn't a configurable parameter there).
+/// produced by [`build_messages`]. `temperature` is always passed — the
+/// caller controls it via [`TEMPERATURE`].
 pub fn build_payload(model: &str, messages: Vec<Value>, temperature: Option<f32>, stream: bool) -> Value {
     let mut body = json!({
         "model": model,
@@ -325,15 +321,14 @@ mod tests {
     }
 
     #[test]
-    fn build_payload_adds_temperature_for_chat_only() {
+    fn build_payload_includes_model_messages_stream_and_temperature() {
         let body = build_payload("deepseek-chat", vec![json!({"role": "user", "content": "hi"})], Some(TEMPERATURE), true);
         let t = body["temperature"].as_f64().expect("temperature present");
         assert!((t - 1.3).abs() < 1e-6, "temperature ≈ 1.3, got {t}");
         assert_eq!(body["model"], "deepseek-chat");
         assert_eq!(body["stream"], true);
-
-        let body = build_payload("deepseek-reasoner", vec![json!({"role": "user", "content": "hi"})], None, true);
-        assert!(body.get("temperature").is_none(), "reasoner omits temperature");
+        assert_eq!(body["messages"][0]["role"], "user");
+        assert_eq!(body["messages"][0]["content"], "hi");
     }
 
     #[test]

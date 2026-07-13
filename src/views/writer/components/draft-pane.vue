@@ -41,7 +41,7 @@ function onToggle(e: Event) {
     </header>
 
     <div v-if="!isReasoner && writer.reasoning" class="border-b bg-muted/10 text-xs text-muted-foreground px-4 py-1 italic">
-      （deepseek-chat 不输出思维链）
+      （当前模型没返回思维链）
     </div>
 
     <details

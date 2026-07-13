@@ -7,6 +7,7 @@ pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
+    .plugin(tauri_plugin_shell::init())
     .invoke_handler(tauri::generate_handler![
       gacha::scan_project,
       gacha::read_prompt,
@@ -14,6 +15,8 @@ pub fn run() {
       gacha::set_baseline,
       gacha::read_api_key,
       gacha::write_api_key,
+      gacha::delete_api_key,
+      gacha::delete_env_key,
       gacha::draw,
       gacha::fetch_task,
       gacha::read_context,

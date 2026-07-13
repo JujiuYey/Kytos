@@ -38,7 +38,7 @@ function applyCategory(name: unknown) {
   }
 }
 
-const isReasoner = computed(() => app.settings.deepseekModel === 'deepseek-reasoner');
+const isReasoner = computed(() => /reasoner/i.test(app.settings.deepseekModel));
 
 const canSave = computed(() =>
   Boolean(gacha.projectRoot)

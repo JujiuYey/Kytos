@@ -326,6 +326,35 @@ pub async fn write_api_key(root: &Path, key: &str) -> Result<(), ApiMartError> {
     write_env_key(root, APIMART_API_KEY_NAME, key).await
 }
 
+/// Remove a key from `<root>/.env`. Preserves other lines. No-op if the
+/// file or the key is absent. A missing `.env` is treated as success so
+/// the settings UI's "clear" action never errors on a fresh project.
+pub async fn delete_env_key(root: &Path, name: &str) -> Result<(), ApiMartError> {
+    let env_path = root.join(ENV_FILE);
+    let Ok(content) = fs::read_to_string(&env_path).await else {
+        return Ok(());
+    };
+    let kept: Vec<&str> = content
+        .lines()
+        .filter(|line| {
+            line.split_once('=')
+                .map(|(line_name, _)| line_name.trim() != name)
+                .unwrap_or(true)
+        })
+        .collect();
+    if kept.len() == content.lines().count() {
+        return Ok(());
+    }
+    let body = kept.join("\n") + "\n";
+    fs::write(&env_path, body).await.map_err(|e| ApiMartError(format!("写 .env 失败: {e}")))?;
+    Ok(())
+}
+
+/// Remove the project-level APIMart key from `<root>/.env`.
+pub async fn delete_api_key(root: &Path) -> Result<(), ApiMartError> {
+    delete_env_key(root, APIMART_API_KEY_NAME).await
+}
+
 /// Read a prompt md and return the detail struct the editor needs.
 pub async fn read_prompt(md_path: &Path) -> Result<PromptDetail, ApiMartError> {
     let raw = fs::read_to_string(md_path).await.map_err(|e| ApiMartError(format!("读取 prompt 失败: {e}")))?;
@@ -618,6 +647,44 @@ mod tests {
         rt.block_on(write_env_key(&dir, "DEEPSEEK_API_KEY", "sk-new")).unwrap();
         let body = std::fs::read_to_string(dir.join(".env")).unwrap();
         assert_eq!(body, "DEEPSEEK_API_KEY=sk-new\nAPIMART_API_KEY=sk-img\n");
+    }
+
+    #[test]
+    fn delete_env_key_removes_matching_line_and_keeps_others() {
+        let dir = tempdir();
+        std::fs::write(dir.join(".env"), "DEEPSEEK_API_KEY=sk-deep\nAPIMART_API_KEY=sk-img\n").unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        rt.block_on(delete_env_key(&dir, "APIMART_API_KEY")).unwrap();
+        let body = std::fs::read_to_string(dir.join(".env")).unwrap();
+        assert_eq!(body, "DEEPSEEK_API_KEY=sk-deep\n");
+    }
+
+    #[test]
+    fn delete_env_key_is_noop_when_key_absent() {
+        let dir = tempdir();
+        std::fs::write(dir.join(".env"), "DEEPSEEK_API_KEY=sk-deep\n").unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        rt.block_on(delete_env_key(&dir, "APIMART_API_KEY")).unwrap();
+        let body = std::fs::read_to_string(dir.join(".env")).unwrap();
+        assert_eq!(body, "DEEPSEEK_API_KEY=sk-deep\n");
+    }
+
+    #[test]
+    fn delete_env_key_is_noop_when_env_file_missing() {
+        let dir = tempdir();
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        rt.block_on(delete_env_key(&dir, "APIMART_API_KEY")).unwrap();
+        assert!(!dir.join(".env").exists());
+    }
+
+    #[test]
+    fn delete_api_key_removes_apimart_line() {
+        let dir = tempdir();
+        std::fs::write(dir.join(".env"), "APIMART_API_KEY=sk-img\nDEEPSEEK_API_KEY=sk-deep\n").unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        rt.block_on(delete_api_key(&dir)).unwrap();
+        let body = std::fs::read_to_string(dir.join(".env")).unwrap();
+        assert_eq!(body, "DEEPSEEK_API_KEY=sk-deep\n");
     }
 
     #[test]

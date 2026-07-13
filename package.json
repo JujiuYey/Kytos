@@ -21,6 +21,7 @@
     "@tauri-apps/cli": "2.8.0",
     "@tauri-apps/plugin-dialog": "^2.4.0",
     "@tauri-apps/plugin-fs": "^2.4.2",
+    "@tauri-apps/plugin-shell": "^2.3.5",
     "@types/uuid": "^11.0.0",
     "@vee-validate/rules": "^4.15.1",
     "@vueuse/core": "^13.5.0",

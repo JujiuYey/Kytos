@@ -91,6 +91,21 @@ pub async fn write_api_key(root: String, key: String) -> Result<(), String> {
     project::write_api_key(Path::new(&root), &key).await.map_err(|e| e.to_string())
 }
 
+/// Remove the project-level API key from `<root>/.env`. Other keys are
+/// preserved. Missing file or missing key is a no-op.
+#[tauri::command]
+pub async fn delete_api_key(root: String) -> Result<(), String> {
+    project::delete_api_key(Path::new(&root)).await.map_err(|e| e.to_string())
+}
+
+/// Remove an arbitrary key from `<root>/.env`. Used by the settings UI
+/// for non-APIMart keys (e.g. DeepSeek). Missing file or missing key is
+/// a no-op.
+#[tauri::command]
+pub async fn delete_env_key(root: String, name: String) -> Result<(), String> {
+    project::delete_env_key(Path::new(&root), &name).await.map_err(|e| e.to_string())
+}
+
 /// Submit a generation request and download the resulting image(s) into the
 /// prompt's `images/` directory. Emits `draw://progress` events throughout.
 ///
@@ -352,11 +367,7 @@ async fn generate_prompt_inner(app: AppHandle, req: GenerateRequest) -> Result<G
     let examples = project::load_examples(&root, &req.category, 2).await?;
     let messages = deepseek::build_messages(&ctx.ip, &ctx.agents, &examples, &req.category, &req.name, &req.intent);
 
-    let temperature = if req.model == deepseek::REASONER_MODEL {
-        None
-    } else {
-        Some(deepseek::TEMPERATURE)
-    };
+    let temperature = Some(deepseek::TEMPERATURE);
     let payload = deepseek::build_payload(&req.model, messages, temperature, true);
 
     let client = deepseek::build_http_client();

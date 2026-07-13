@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import { Key, Loader2, Save } from 'lucide-vue-next';
+import { open } from '@tauri-apps/plugin-shell';
+import { ExternalLink, Loader2, Save, Trash2 } from 'lucide-vue-next';
 import { useGachaStore } from '@/stores/gacha';
+import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 
 const store = useGachaStore();
 
@@ -10,6 +12,8 @@ const deepseekKeyInput = ref('');
 const deepseekKeyMasked = ref('');
 const deepseekKeyStatus = ref<'unknown' | 'set' | 'unset'>('unknown');
 const isSavingDeepseek = ref(false);
+const isClearingDeepseek = ref(false);
+const isConfirmOpen = ref(false);
 
 async function refreshDeepseekStatus() {
   if (!store.projectRoot) {
@@ -43,7 +47,40 @@ async function saveDeepseekKey() {
   }
 }
 
+async function clearDeepseekKey() {
+  if (!store.projectRoot || deepseekKeyStatus.value !== 'set') {
+    return;
+  }
+  isConfirmOpen.value = true;
+}
+
+async function confirmClearDeepseek() {
+  if (!store.projectRoot) {
+    return;
+  }
+  isClearingDeepseek.value = true;
+  try {
+    await invoke('delete_env_key', {
+      root: store.projectRoot,
+      name: 'DEEPSEEK_API_KEY',
+    });
+    await refreshDeepseekStatus();
+    await store.scanProject();
+  } finally {
+    isClearingDeepseek.value = false;
+    isConfirmOpen.value = false;
+  }
+}
+
 const canSaveDeepseek = computed(() => Boolean(store.projectRoot) && deepseekKeyInput.value.trim().length > 0);
+
+async function openDeepseekLink() {
+  try {
+    await open('https://platform.deepseek.com/');
+  } catch (err) {
+    console.error('打开链接失败', err);
+  }
+}
 
 watch(
   () => store.projectRoot,
@@ -68,6 +105,14 @@ watch(
         <span v-if="deepseekKeyStatus === 'set'" class="font-mono">{{ deepseekKeyMasked }}</span>
         <span v-else-if="deepseekKeyStatus === 'unset'" class="text-red-600">未配置</span>
         <span v-else class="text-muted-foreground">读取中…</span>
+        <button
+          type="button"
+          class="ml-2 inline-flex items-center gap-1 text-primary hover:underline"
+          @click="openDeepseekLink"
+        >
+          查看完整 key
+          <ExternalLink class="size-3" />
+        </button>
       </div>
       <div class="flex gap-2">
         <Input
@@ -81,11 +126,25 @@ watch(
           <Save v-else class="size-4" />
           保存
         </Button>
+        <Button
+          v-if="deepseekKeyStatus === 'set'"
+          variant="outline"
+          :disabled="isClearingDeepseek"
+          @click="clearDeepseekKey"
+        >
+          <Loader2 v-if="isClearingDeepseek" class="size-4 animate-spin" />
+          <Trash2 v-else class="size-4" />
+          清空
+        </Button>
       </div>
-      <p class="text-xs text-muted-foreground flex items-center gap-1">
-        <Key class="size-3" />
-        写入同一份 <code>.env</code>（<code>DEEPSEEK_API_KEY</code>），画图 key 不动。
-      </p>
     </template>
+    <SagConfirmDialog
+      v-model:open="isConfirmOpen"
+      title="清空 DeepSeek key？"
+      description="将从项目 .env 删除该行。"
+      confirm-text="清空"
+      :loading="isClearingDeepseek"
+      @confirm="confirmClearDeepseek"
+    />
   </section>
 </template>

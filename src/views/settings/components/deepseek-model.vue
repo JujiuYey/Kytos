@@ -7,7 +7,7 @@ const app = useAppStore();
 
 const deepseekModel = computed({
   get: () => app.settings.deepseekModel,
-  set: v => app.updateSettings({ deepseekModel: v }),
+  set: v => app.updateSettings({ deepseekModel: v.trim() }),
 });
 </script>
 
@@ -16,19 +16,23 @@ const deepseekModel = computed({
     <h2 class="text-sm font-medium text-muted-foreground">
       DeepSeek 模型
     </h2>
-    <Select v-model="deepseekModel">
-      <SelectTrigger class="font-mono text-sm">
-        <Cpu class="size-4 mr-2" />
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="deepseek-chat">
-          deepseek-chat（快，几分钱一张）
-        </SelectItem>
-        <SelectItem value="deepseek-reasoner">
-          deepseek-reasoner（慢，但更稳）
-        </SelectItem>
-      </SelectContent>
-    </Select>
+    <div class="relative">
+      <Cpu class="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+      <Input
+        v-model="deepseekModel"
+        class="pl-9 font-mono text-sm"
+        placeholder="例如 deepseek-v4-pro"
+      />
+    </div>
+    <p class="text-xs text-muted-foreground">
+      点击
+      <a
+        href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="text-primary hover:underline"
+      >官方模型列表</a>
+      看当前最新可用模型。
+    </p>
   </section>
 </template>

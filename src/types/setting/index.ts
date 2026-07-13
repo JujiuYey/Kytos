@@ -3,5 +3,5 @@ export interface AppSettings {
   autoSave: boolean;
   theme: 'light' | 'dark' | 'system';
   storagePath: string;
-  deepseekModel: 'deepseek-chat' | 'deepseek-reasoner';
+  deepseekModel: string;
 }
