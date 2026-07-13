@@ -98,6 +98,22 @@ pub async fn delete_api_key(root: String) -> Result<(), String> {
     project::delete_api_key(Path::new(&root)).await.map_err(|e| e.to_string())
 }
 
+/// Read an arbitrary key from `<root>/.env`. Used by the settings UI
+/// for non-APIMart keys (e.g. DeepSeek). Returns `None` if the file or
+/// the key is missing.
+#[tauri::command]
+pub async fn read_env_key(root: String, name: String) -> Result<Option<String>, String> {
+    project::read_env_key(Path::new(&root), &name).await.map_err(|e| e.to_string())
+}
+
+/// Write or replace an arbitrary key in `<root>/.env`. Used by the
+/// settings UI for non-APIMart keys (e.g. DeepSeek). Preserves other
+/// lines.
+#[tauri::command]
+pub async fn write_env_key(root: String, name: String, value: String) -> Result<(), String> {
+    project::write_env_key(Path::new(&root), &name, &value).await.map_err(|e| e.to_string())
+}
+
 /// Remove an arbitrary key from `<root>/.env`. Used by the settings UI
 /// for non-APIMart keys (e.g. DeepSeek). Missing file or missing key is
 /// a no-op.

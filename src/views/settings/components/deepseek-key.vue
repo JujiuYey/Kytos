@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
+import { toast } from 'vue-sonner';
 import { ExternalLink, Loader2, Save, Trash2 } from 'lucide-vue-next';
 import { useGachaStore } from '@/stores/gacha';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
@@ -20,12 +21,18 @@ async function refreshDeepseekStatus() {
     deepseekKeyStatus.value = 'unknown';
     return;
   }
-  const key = await invoke<string | null>('read_env_key', {
-    root: store.projectRoot,
-    name: 'DEEPSEEK_API_KEY',
-  });
-  deepseekKeyStatus.value = key ? 'set' : 'unset';
-  deepseekKeyMasked.value = key ? `sk-****${key.slice(-4)}` : '';
+  try {
+    const key = await invoke<string | null>('read_env_key', {
+      root: store.projectRoot,
+      name: 'DEEPSEEK_API_KEY',
+    });
+    deepseekKeyStatus.value = key ? 'set' : 'unset';
+    deepseekKeyMasked.value = key ? `sk-****${key.slice(-4)}` : '';
+  } catch (err) {
+    deepseekKeyStatus.value = 'unset';
+    deepseekKeyMasked.value = '';
+    toast.error(`读取 DeepSeek key 失败: ${err}`);
+  }
 }
 
 async function saveDeepseekKey() {
@@ -42,6 +49,9 @@ async function saveDeepseekKey() {
     deepseekKeyInput.value = '';
     await refreshDeepseekStatus();
     await store.scanProject();
+    toast.success('DeepSeek key 已保存');
+  } catch (err) {
+    toast.error(`保存失败: ${err}`);
   } finally {
     isSavingDeepseek.value = false;
   }
@@ -66,6 +76,9 @@ async function confirmClearDeepseek() {
     });
     await refreshDeepseekStatus();
     await store.scanProject();
+    toast.success('DeepSeek key 已清空');
+  } catch (err) {
+    toast.error(`清空失败: ${err}`);
   } finally {
     isClearingDeepseek.value = false;
     isConfirmOpen.value = false;

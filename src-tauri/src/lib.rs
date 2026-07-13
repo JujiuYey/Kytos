@@ -16,6 +16,8 @@ pub fn run() {
       gacha::read_api_key,
       gacha::write_api_key,
       gacha::delete_api_key,
+      gacha::read_env_key,
+      gacha::write_env_key,
       gacha::delete_env_key,
       gacha::draw,
       gacha::fetch_task,
