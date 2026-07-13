@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { RefreshCw, Sparkles } from 'lucide-vue-next';
 import { useGachaStore } from '@/stores/gacha';
 import { useChatStore } from '@/stores/chat';
+import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ai-elements/conversation';
+import { Message, MessageContent } from '@/components/ai-elements/message';
+import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning';
+import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputSubmit } from '@/components/ai-elements/prompt-input';
+import { Loader } from '@/components/ai-elements/loader';
+import MarkdownRenderer from '@/components/markdown-renderer.vue';
 
 const project = useGachaStore();
 const chat = useChatStore();
@@ -25,6 +31,8 @@ const canSummarize = computed(
   () => chat.phase === 'idle' && assistantCount.value > 0 && !noProject.value && !noKey.value,
 );
 
+const draft = ref('');
+
 onMounted(async () => {
   if (project.projectRoot) {
     await chat.enterChat(project.projectRoot);
@@ -43,6 +51,22 @@ function onNewSession() {
     if (project.projectRoot) {
       void chat.enterChat(project.projectRoot);
     }
+  }
+}
+
+async function onSend() {
+  const text = draft.value.trim();
+  if (!text || busy.value || noKey.value) {
+    return;
+  }
+  draft.value = '';
+  await chat.sendUserMessage(text);
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    void onSend();
   }
 }
 </script>
@@ -89,10 +113,61 @@ function onNewSession() {
         还没配 DeepSeek key，去「设置」里加
       </div>
 
-      <!-- placeholder for Conversation + PromptInput (Task 8 fills this in) -->
-      <div class="flex-1 p-6 text-sm text-muted-foreground">
-        对话区占位（下一步填）。chat messages: {{ chat.messages.length }}, phase: {{ chat.phase }}.
-      </div>
+      <Conversation class="flex-1">
+        <ConversationContent>
+          <div
+            v-if="chat.messages.length === 0"
+            class="flex items-center justify-center h-full text-sm text-muted-foreground"
+          >
+            让 DeepSeek 主动开场问第一个问题…
+          </div>
+          <Message
+            v-for="msg of chat.messages"
+            :key="msg.id"
+            :from="msg.role"
+          >
+            <MessageContent>
+              <Reasoning v-if="msg.reasoning" :is-streaming="chat.phase === 'streaming-chat' && msg === chat.messages[chat.messages.length - 1]">
+                <ReasoningTrigger />
+                <ReasoningContent :content="msg.reasoning" />
+              </Reasoning>
+              <MarkdownRenderer
+                v-if="msg.role === 'assistant'"
+                :content="msg.content"
+                :is-streaming="chat.phase !== 'idle' && msg === chat.messages[chat.messages.length - 1] && !msg.failed"
+              />
+              <div
+                v-else
+                class="whitespace-pre-wrap break-words"
+              >
+                {{ msg.content }}
+              </div>
+              <div
+                v-if="msg.failed"
+                class="text-xs text-destructive mt-1"
+              >
+                {{ msg.content }}
+              </div>
+            </MessageContent>
+          </Message>
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
+
+      <PromptInput class="border-t" @submit="onSend">
+        <PromptInputBody>
+          <PromptInputTextarea
+            v-model="draft"
+            placeholder="跟 DeepSeek 聊聊这位角色…  (Enter 发送 / Shift+Enter 换行)"
+            :disabled="busy || noKey"
+            @keydown="onKeydown"
+          />
+          <PromptInputSubmit :disabled="busy || !draft.trim() || noKey">
+            <Loader v-if="busy" class="size-4 animate-spin" />
+            <span v-else>发送</span>
+          </PromptInputSubmit>
+        </PromptInputBody>
+      </PromptInput>
 
       <div
         v-if="chat.lastError"
