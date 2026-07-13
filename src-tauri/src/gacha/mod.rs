@@ -11,6 +11,7 @@ use tauri::{AppHandle, Emitter};
 use crate::gacha::error::ApiMartError;
 
 pub mod apimart;
+pub mod character_chat;
 pub mod deepseek;
 pub mod error;
 pub mod project;
@@ -310,10 +311,21 @@ async fn fetch_task_inner(app: AppHandle, root: String, md_path: String, task_id
 }
 
 /// Payload sent to the frontend over `deepseek://delta`.
+///
+/// `mode` discriminates the kind of generation: `"prompt"` for writer's
+/// one-shot prompt generation, `"chat"` and `"summary"` for the new
+/// 「角色」conversation tab. `request_id` is a per-round identifier the
+/// frontend generates and uses to route streaming deltas to the right
+/// assistant placeholder message. Writer doesn't read it; serde defaults
+/// keep `#[serde(default)]` for forward compatibility.
 #[derive(Debug, Clone, Serialize)]
 pub struct DeepSeekDelta {
     pub content: String,
     pub reasoning: String,
+    #[serde(default)]
+    pub mode: String,
+    #[serde(default)]
+    pub request_id: String,
 }
 
 /// Arguments to `generate_prompt`.
@@ -330,6 +342,168 @@ pub struct GenerateRequest {
 pub struct GenerateResult {
     pub md: String,
     pub model: String,
+}
+
+/// Arguments to `chat_ip`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChatIpRequest {
+    pub root: String,
+    /// Full chat history including the new user message as the last entry.
+    /// Each item is `{"role": "user|assistant", "content": "..."}`.
+    pub history: Vec<ChatMessage>,
+    pub model: String,
+    #[serde(default)]
+    pub request_id: String,
+}
+
+/// One message in the chat history (subset of `Value` shape).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ChatMessage {
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CharacterChatResult {
+    pub md: String,
+    pub model: String,
+}
+
+/// Read `project_label` heuristically from the project root's directory
+/// name. Falls back to "IP" if the path has no usable name.
+fn project_label_from_root(root: &Path) -> String {
+    root.file_name()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "IP".to_string())
+}
+
+/// Stream one chat round for the 「角色」conversation tab. Mirrors
+/// `generate_prompt` but routes deltas under `mode="chat"` and echoes
+/// the frontend-supplied `request_id` so the UI can append to the right
+/// placeholder message.
+#[tauri::command]
+pub async fn chat_ip(app: AppHandle, req: ChatIpRequest) -> Result<CharacterChatResult, String> {
+    let outcome = chat_ip_inner(app.clone(), req).await;
+    if let Err(err) = &outcome {
+        let _ = app.emit(
+            "deepseek://error",
+            serde_json::json!({ "message": err.to_string() }),
+        );
+    }
+    outcome.map_err(|e| e.to_string())
+}
+
+async fn chat_ip_inner(app: AppHandle, req: ChatIpRequest) -> Result<CharacterChatResult, ApiMartError> {
+    let root = PathBuf::from(&req.root);
+    let project_label = project_label_from_root(&root);
+    let ctx = project::read_context(&root).await?;
+    let api_key = deepseek::api_key_from_env()
+        .or(project::read_env_key(&root, project::DEEPSEEK_API_KEY_NAME).await?)
+        .ok_or_else(|| {
+            ApiMartError(
+                "没找到 DeepSeek key。两种办法二选一：\n  1) export DEEPSEEK_API_KEY=sk-xxx\n  2) 在项目根目录的 .env 里写一行 DEEPSEEK_API_KEY=sk-xxx".to_string(),
+            )
+        })?;
+    let base_url = std::env::var("DEEPSEEK_BASE_URL").unwrap_or_else(|_| deepseek::DEFAULT_BASE_URL.to_string());
+
+    let history_pairs: Vec<(String, String)> = req
+        .history
+        .iter()
+        .take(req.history.len().saturating_sub(1))
+        // Drop empty-content placeholders so DeepSeek doesn't see them as
+        // a real-but-empty assistant turn. Errors are filled in by the
+        // frontend into content, so a non-empty "[error: ...]" string
+        // survives — that's intentional, the model can react to it.
+        .filter(|m| !m.content.trim().is_empty())
+        .map(|m| (m.role.clone(), m.content.clone()))
+        .collect();
+    let user_msg = req
+        .history
+        .last()
+        .map(|m| m.content.clone())
+        .unwrap_or_default();
+
+    let messages = character_chat::build_chat_messages(&project_label, &ctx.ip, &history_pairs, &user_msg);
+    let payload = character_chat::build_chat_payload(&req.model, &messages);
+
+    let client = deepseek::build_http_client();
+    let app_for_emit = app.clone();
+    let request_id = req.request_id.clone();
+    let md = deepseek::stream_chat(&client, &base_url, &api_key, &payload, move |delta| {
+        let _ = app_for_emit.emit(
+            "deepseek://delta",
+            DeepSeekDelta {
+                content: delta.content,
+                reasoning: delta.reasoning,
+                mode: "chat".to_string(),
+                request_id: request_id.clone(),
+            },
+        );
+    })
+    .await?;
+
+    let cleaned = deepseek::strip_fences(&md);
+    Ok(CharacterChatResult { md: cleaned, model: req.model })
+}
+
+/// Stream one summary (总结) round for the 「角色」tab. Same shape as
+/// `chat_ip` but uses the summary system prompt and `mode="summary"`.
+#[tauri::command]
+pub async fn summarize_ip(app: AppHandle, req: ChatIpRequest) -> Result<CharacterChatResult, String> {
+    let outcome = summarize_ip_inner(app.clone(), req).await;
+    if let Err(err) = &outcome {
+        let _ = app.emit(
+            "deepseek://error",
+            serde_json::json!({ "message": err.to_string() }),
+        );
+    }
+    outcome.map_err(|e| e.to_string())
+}
+
+async fn summarize_ip_inner(app: AppHandle, req: ChatIpRequest) -> Result<CharacterChatResult, ApiMartError> {
+    let root = PathBuf::from(&req.root);
+    let ctx = project::read_context(&root).await?;
+    let api_key = deepseek::api_key_from_env()
+        .or(project::read_env_key(&root, project::DEEPSEEK_API_KEY_NAME).await?)
+        .ok_or_else(|| {
+            ApiMartError(
+                "没找到 DeepSeek key。两种办法二选一：\n  1) export DEEPSEEK_API_KEY=sk-xxx\n  2) 在项目根目录的 .env 里写一行 DEEPSEEK_API_KEY=sk-xxx".to_string(),
+            )
+        })?;
+    let base_url = std::env::var("DEEPSEEK_BASE_URL").unwrap_or_else(|_| deepseek::DEFAULT_BASE_URL.to_string());
+
+    let transcript: Vec<(String, String)> = req
+        .history
+        .iter()
+        // Drop the trailing empty-content placeholder assistant that the
+        // frontend pushes so deltas can route to it. Without this filter
+        // the transcript reads like "助手：\n\n助手：\n\n...".
+        .filter(|m| !m.content.trim().is_empty())
+        .map(|m| (m.role.clone(), m.content.clone()))
+        .collect();
+
+    let messages = character_chat::build_summary_messages(&ctx.ip, &transcript);
+    let payload = character_chat::build_summary_payload(&req.model, &messages);
+
+    let client = deepseek::build_http_client();
+    let app_for_emit = app.clone();
+    let request_id = req.request_id.clone();
+    let md = deepseek::stream_chat(&client, &base_url, &api_key, &payload, move |delta| {
+        let _ = app_for_emit.emit(
+            "deepseek://delta",
+            DeepSeekDelta {
+                content: delta.content,
+                reasoning: delta.reasoning,
+                mode: "summary".to_string(),
+                request_id: request_id.clone(),
+            },
+        );
+    })
+    .await?;
+
+    let cleaned = deepseek::strip_fences(&md);
+    Ok(CharacterChatResult { md: cleaned, model: req.model })
 }
 
 /// Read `ip.md` and `AGENTS.md` from the project root, plus their absolute
@@ -394,6 +568,8 @@ async fn generate_prompt_inner(app: AppHandle, req: GenerateRequest) -> Result<G
             DeepSeekDelta {
                 content: delta.content,
                 reasoning: delta.reasoning,
+                mode: "prompt".to_string(),
+                request_id: String::new(),
             },
         );
     })

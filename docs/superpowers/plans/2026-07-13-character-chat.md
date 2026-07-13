@@ -64,17 +64,35 @@ pub struct DeepSeekDelta {
 }
 ```
 
-- [ ] **Step 2: Build to confirm the struct change compiles**
+- [ ] **Step 2: Update the existing `generate_prompt` emit closure to fill the new fields**
+
+Find the `DeepSeekDelta { content: ..., reasoning: ... }` constructor inside `generate_prompt`'s `on_delta` closure (around `mod.rs:402-410`). It currently constructs named fields without `..Default::default()`, so adding new fields would break compile. Set both new fields explicitly here:
+
+```rust
+            let _ = app_for_emit.emit(
+                "deepseek://delta",
+                DeepSeekDelta {
+                    content: delta.content,
+                    reasoning: delta.reasoning,
+                    mode: "prompt".to_string(),
+                    request_id: String::new(),
+                },
+            );
+```
+
+Writer's frontend (`stores/writer.ts`) doesn't read `mode` or `request_id`, so emitting `mode="prompt"` and `request_id=""` is purely additive. The empty `request_id` is fine — the writer never sets `pendingRequestId`, so its chat-store-style delta filter (added in Task 5) would naturally drop those events if it ever listened.
+
+- [ ] **Step 3: Build to confirm the struct change + call site compiles**
 
 Run: `cd src-tauri && cargo build --lib`
 Expected: build succeeds, no warnings on the struct.
 
-- [ ] **Step 3: Run the existing test suite — must stay green**
+- [ ] **Step 4: Run the existing test suite — must stay green**
 
 Run: `cd src-tauri && cargo test --lib -- --quiet`
 Expected: All existing deepseek.rs / project.rs tests pass. New fields default to empty strings; no test asserts on `DeepSeekDelta` directly.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src-tauri/src/gacha/mod.rs
