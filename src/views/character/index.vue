@@ -17,7 +17,7 @@ onMounted(async () => {
 <template>
   <ContextEditor
     kind="ip"
-    label="角色"
-    helper-text="阿九是谁、他该演什么。写卡时作为 system prompt 发给 DeepSeek。"
+    label="特征"
+    helper-text="你的人物形象是谁、ta该演什么。写卡时作为 system prompt 发给 DeepSeek。"
   />
 </template>

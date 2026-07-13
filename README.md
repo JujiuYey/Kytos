@@ -1,37 +1,35 @@
 # ip-creator
 
-给个人 IP 出图的桌面 app（Tauri 2 + Vue 3 + Rust）。
+一个独立的桌面 app（Tauri 2 + Vue 3 + Rust），干两件事：
+
+1. **写卡**——给一句意图，让 DeepSeek 照着角色设定和写作规范，写出一张提示词 md。
+2. **抽卡**——把这张 md 连同角色参考图发给 gpt-image-2 出图，人挑中哪张，升级成新的基准。
 
 **写提示词用 DeepSeek，画图用 gpt-image-2。** 两个模型、两个 key、两条完全独立的路。
 
 ---
 
-## 最重要的一件事：工具和数据是两个仓库
+## 项目目录
 
-| | 是什么 | 在哪 |
-|---|---|---|
-| **ip-creator**（本仓库） | 工具。界面、API 客户端、路径推导。 | `~/Projects/ip-creator` |
-| **角色抽卡** | 数据。角色设定、提示词、抽出来的图、API key。 | `~/Desktop/角色抽卡`（独立 git 仓库） |
-
-**app 不搬内容，只是指过去。** 项目目录在「设置」里选，存 localStorage（`gacha` store 的 `projectRoot`）。以后做第二个 IP 就再开一个目录，代码一行不改。
-
-改这个仓库的代码之前，先去数据仓库里看一眼 `ip.md` 和 `AGENTS.md`——那两份文件不是文档，是**喂给 DeepSeek 的 system prompt**（见下面）。
-
-### 数据目录长这样
+app 本身不存内容。它在一个**项目目录**上工作——一个 IP 一个目录，在「设置」里选，路径存 localStorage（`gacha` store 的 `projectRoot`）。要做第二个 IP，就再开一个目录，代码不用改。
 
 ```
-<项目根>/
-  ip.md            阿九是谁、识别锚点、他该演什么   ← 「角色」页读写这个
-  AGENTS.md        提示词四段结构 + 写作四规则       ← 「策略」页读写这个
-  角色/            prompt/*.md  images/  定妆照.png  角色表.png
-  表情/            prompt/*.md  images/
-  动作场景/         prompt/*.md  images/
+<项目目录>/
+  ip.md            角色设定：他是谁、识别锚点、他该演什么   ← 「角色」页读写这个
+  AGENTS.md        写作规范：提示词的段落结构和规则        ← 「策略」页读写这个
+  <类目>/
+    prompt/*.md    提示词，一张卡一个 md
+    images/        抽出来的图，<卡名>-01.png、-02.png……
+  角色/
+    定妆照.png      角色基准图之一（每次出图都作为参考图发过去）
+    角色表.png      角色基准图之二（正面/侧面/背面/特写）
   .env             APIMART_API_KEY=sk-xxx    ← 生图
                    DEEPSEEK_API_KEY=sk-xxx   ← 写字
-  scripts/draw.py  老的命令行入口，还留着，和 app 共用同一份 md 和 .env
 ```
 
-**类目是扫出来的，不是写死的。** 根目录下任何含 `prompt/` 子目录的文件夹就算一个类目。以后加「道具」「分镜」不用改代码。
+**类目是扫出来的，不是写死的。** 根目录下任何含 `prompt/` 子目录的文件夹就算一个类目（`project.rs::scan_project`）。加「道具」「分镜」不用改代码——建个文件夹就行。
+
+`角色/定妆照.png` 和 `角色/角色表.png` **不在 `images/` 里，这是故意的**。它们是基准资产，不是某次抽卡的产物。抽卡结果落在 `images/`，人挑中哪张再「设为基准」覆盖过去。
 
 ---
 
@@ -52,9 +50,9 @@
 
 **每次出图都会把 `角色/定妆照.png` 和 `角色/角色表.png` 作为 `image_urls` 发过去。** 角色长什么样由这两张图携带。
 
-所以**提示词里一个字都不要描述他的长相**——脸、眼睛、发型、身材、衣服。文字一描述就会跟参考图抢方向盘，把画面拽偏。这条约束同时约束着 DeepSeek（写在 system prompt 的硬约束里）和写 md 的人。
+所以**提示词里一个字都不要描述他的长相**——脸、眼睛、发型、身材、衣服。文字一描述就会跟参考图抢方向盘，把画面拽偏。这条同时约束着 DeepSeek（写在 system prompt 的硬约束里）和手写 md 的人。
 
-唯一的例外：`角色/prompt/00-定妆照.md`（重抽角色形象本身）默认**不带**参考图——带了的话新形象会被旧定妆照拽回去。这个默认值写死在 `views/gacha/components/prompt-editor.vue` 里。
+唯一的例外：重抽角色形象本身那张卡（`角色/prompt/00-定妆照.md`）默认**不带**参考图——带了的话新形象会被旧定妆照拽回去。
 
 ---
 
@@ -63,26 +61,35 @@
 | 页面 | 干什么 |
 |---|---|
 | **抽卡** | 三栏：选卡 / 改 md + 抽 / 看抽出来的图。挑中一张可以「设为定妆照 / 角色表」。 |
-| **写卡** | 两栏：填类目 + 卡名 + 意图 → DeepSeek 流式写出四段 md → 人改 → 「保存并去抽卡」。 |
-| **角色** | 编辑数据仓库里的 `ip.md`。 |
-| **策略** | 编辑数据仓库里的 `AGENTS.md`。 |
+| **写卡** | 两栏：填类目 + 卡名 + 意图 → DeepSeek 流式写出 md → 人改 → 「保存并去抽卡」。 |
+| **角色** | 编辑项目目录里的 `ip.md`。 |
+| **策略** | 编辑项目目录里的 `AGENTS.md`。 |
 | **设置** | 项目目录、两个 API key、DeepSeek 模型名。 |
 
-侧边栏分三组（抽卡 / 写卡 / 系统），由 `src/data/menu-data.ts` 驱动，路由是从菜单自动生成的（`src/router/index.ts`）。加页面 = 往 `menus` 数组里加一项 + 在 `src/views/` 下建对应文件。
+侧边栏分三组（抽卡 / 写卡 / 系统），由 `src/data/menu-data.ts` 驱动，路由从菜单自动生成（`src/router/index.ts`）。加页面 = 往 `menus` 数组里加一项 + 在 `src/views/` 下建对应文件。
 
-### DeepSeek 的 system prompt 怎么拼
+### `ip.md` 和 `AGENTS.md` 不是文档，是 system prompt
 
-`deepseek.rs::build_messages()`，五块，按顺序：
+这是整个设计的枢纽，最容易被误解的一点：
 
-1. 任务声明（「你是『表情』类目的提示词作者」）
+| 文件 | 内容 | 身份 |
+|---|---|---|
+| `ip.md` | 角色是谁、识别锚点、他该演什么 | **决定画面里发生什么** |
+| `AGENTS.md` | 提示词的段落结构、写作规则 | **决定提示词长什么样** |
+
+它们不是给人看的说明书，是**每次生成时原样塞进 DeepSeek system prompt 的上下文**。所以 app 里有「角色」和「策略」两个页面直接编辑它们——**改这两个文件等于改模型的行为。**
+
+`deepseek.rs::build_messages()` 把 system prompt 拼成五块：
+
+1. 任务声明（「你是『<类目>』类目的提示词作者」）
 2. **`ip.md` 全文**，一字不改
 3. **`AGENTS.md` 全文**，一字不改
 4. **同类目的 2 个现成 md 当范例**（`project.rs::load_examples`，不够就从别的类目补）
 5. 硬约束复述 + 输出要求
 
-**第 4 块不是锦上添花，是必须的。** 【1. 身份锁定】那一段是逐字照抄的样板（「参考图里的这个人，就是要画的人……不要复制参考图的背景和排版，只把这个人搬过来」）。`AGENTS.md` 里只有个模板片段，模型看了会自己发挥、会漏掉「不要复制背景」那句——而那句是必须有的。范例里有原文，让它照抄最省事。
+**第 4 块不是锦上添花，是必须的。** 提示词里的「身份锁定」段是逐字照抄的样板（「参考图里的这个人，就是要画的人……不要复制参考图的背景和排版，只把这个人搬过来」）。`AGENTS.md` 里只有个模板片段，模型看了会自己发挥、会漏掉「不要复制背景」那句——而那句是必须有的。范例里有原文，让它照抄最省事。
 
-新类目下面一个 md 都没有时，范例从别的类目借——否则模型没有身份锁定原文可抄。`build_messages` 有回归测试盯着这几条。
+新类目下面一个 md 都没有时，范例从别的类目借——否则模型没有身份锁定的原文可抄。`build_messages` 有回归测试盯着这几条。
 
 ---
 
@@ -106,7 +113,24 @@
 9. **生成完不自动抽卡。** 人看一眼、改一改、按保存，自己去点抽卡。
 10. **DeepSeek 不看图。**
 
-贯穿全部十条的一句话：**人挑卡，模型不挑；人拍板，模型不拍板。**
+贯穿这十条的一句话：**人挑卡，模型不挑；人拍板，模型不拍板。**
+
+---
+
+## 当前写死的假设
+
+下面这些名字**眼下是硬编码的**，不是从项目目录里读出来的。换一个 IP、换一套目录命名，会撞上它们。**动泛化之前先知道它们在哪：**
+
+| 写死的东西 | 在哪 |
+|---|---|
+| 参考图路径 `角色/定妆照.png`、`角色/角色表.png` | `project.rs::CHARACTER_REFS`、`read_baselines` |
+| 基准图只有两张、且叫这两个名 | `project.rs::set_baseline`、`Baselines { dingzhuangzhao, jiaosebiao }` |
+| 上下文文件名 `ip.md` / `AGENTS.md` | `project.rs::ContextKind` |
+| 「表情」类目默认 `1:1`，其他 `16:9` | `stores/writer.ts::setCategory` |
+| 「`00-定妆照`」这张卡默认不带参考图 | `views/gacha/components/prompt-editor.vue` |
+| 前端类型里的 `dingzhuangzhao` / `jiaosebiao` 字段名 | `types/gacha/index.ts`、`image-gallery.vue` |
+
+**目录扫描本身已经是通用的**（含 `prompt/` 就算类目），泛化的工作量都集中在上面这张表里。
 
 ---
 
@@ -178,7 +202,7 @@ pnpm build                  # vue-tsc + vite build，提 PR 前必须过
 cd src-tauri && cargo test  # Rust 单测（纯函数，不调 API、不花钱）
 ```
 
-第一次跑：进「设置」选项目目录（`~/Desktop/角色抽卡`），填两个 API key，填 DeepSeek 模型名。
+第一次跑：进「设置」选项目目录，填两个 API key，填 DeepSeek 模型名。
 
 ---
 
@@ -186,9 +210,8 @@ cd src-tauri && cargo test  # Rust 单测（纯函数，不调 API、不花钱�
 
 - **抽卡花钱。** 验证用 `draw` 的 `dry_run: true`（不调 API、不扣费，只回 payload 预览）。**真抽卡交给人点。**
 - **图没下下来，别重抽。** 任务已经完成、钱已经花了。用界面上的「用 task_id 取回」（`fetch_task`），不重复扣费。
-- **DeepSeek 模型名是手填的，没有默认值。** 设置里空着就会拿空字符串去请求，DeepSeek 报 400。`src/views/settings/components/deepseek-model.vue` 里给了官方模型列表的链接。
+- **DeepSeek 模型名是手填的，没有默认值。** 设置里空着就会拿空字符串去请求，DeepSeek 报 400。`views/settings/components/deepseek-model.vue` 里给了官方模型列表的链接。
 - **SSE 缓冲区必须是 `Vec<u8>`，不能是 `String`。** HTTP chunk 会从任意字节切开，一个中文字 3 个字节，按 `String::from_utf8_lossy(&chunk)` 逐块拼会把切在边界上的汉字拼成 `�`。`deepseek.rs::stream_chat` 里是字节缓冲、按 `\n` 切出完整行、**对完整的行**才解码 UTF-8。别改回去。
-- **`scripts/draw.py` 还留着**，没删。它和 app 共用同一份 md、同一个 `.env`、同一套路径约定，天然兼容。**app 写出来的 md 必须能被它跑通**——这是「写卡页只是个更快的编辑器」这句话的底线。
 
 ---
 
@@ -201,4 +224,4 @@ cd src-tauri && cargo test  # Rust 单测（纯函数，不调 API、不花钱�
 | [docs/spec-写卡.md](docs/spec-写卡.md) | 写卡：DeepSeek 接入、system prompt 拼法、约定 6-10 |
 | [docs/plan-写卡.md](docs/plan-写卡.md) | 写卡的实施步骤和验收 |
 
-数据仓库里的 `AGENTS.md` 和 `ip.md` 也读一遍。**改那两个文件等于改模型的行为**——它们是 system prompt，不是说明书。
+这四份 spec/plan 写在项目还挂着外部数据仓库的时候，里面提到的 `~/Desktop/角色抽卡`、`draw.py` 兼容、「工具和数据是两个仓库」都已经不作数了——**约定和契约仍然有效，外部依赖那部分请无视。**
