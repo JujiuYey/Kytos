@@ -55,6 +55,86 @@ pub fn build_chat_messages(
     messages
 }
 
+/// Temperature for the summary flow. Lower than chat so the model sticks
+/// to the structure template instead of improvising voice.
+pub const SUMMARY_TEMPERATURE: f32 = 0.7;
+
+/// Build the message array for the summary (总结) round.
+///
+/// `transcript` is the full chat history (user/assistant pairs, oldest
+/// first). `ip_md` is the disk snapshot at the moment of summary.
+/// Returned `Vec<Value>` starts with one system message and appends the
+/// transcript as-is. The system prompt embeds `SUMMARY_SYSTEM_PROMPT`
+/// (inlined verbatim from spec §4.2) with `{n_turns}`, `{transcript}`,
+/// and `{ip_md_or_empty}` substituted.
+#[allow(unused_variables)]
+pub fn build_summary_messages(
+    project_label: &str,
+    ip_md: &str,
+    transcript: &[(String, String)],
+) -> Vec<Value> {
+    let ip_md_substituted = if ip_md.trim().is_empty() {
+        "（空 — 还没有 ip.md）".to_string()
+    } else {
+        ip_md.to_string()
+    };
+    let n_turns = transcript.iter().filter(|(r, _)| r == "user").count();
+    let transcript_text = transcript
+        .iter()
+        .map(|(role, content)| match role.as_str() {
+            "user" => format!("用户：{content}"),
+            "assistant" => format!("助手：{content}"),
+            _ => content.clone(),
+        })
+        .collect::<Vec<String>>()
+        .join("\n\n");
+
+    let system = format!(
+        "你是 IP 角色设定书的下笔人。根据你和用户从 {n_turns} 轮对话中得到的信息，按以下结构整理出一份 ip.md。\n\n\
+         # 结构\n\
+         1. 他是谁。给一个名字（或者代号）、一句概括他是「什么人」、一个引起阅读欲的排比或名字原因。\n\
+         2. 识别锚点。列出 3–5 条「只能是他 / 不这样就不会被别人记住」的视觉 / 人物描述锚点。\n\
+         3. 三个表演工具。三个他通用的「句子」——什么身份、住在什么境地、做什么事。\n\
+         4. 禁区。两个他不能被拿走的点。\n\n\
+         # 输出要求\n\
+         - 用 markdown 文档。\n\
+         - 不要代码围栏。\n\
+         - 不要「以下是 ip.md」之类开场白。\n\
+         - 不要「希望你喜欢」之类收尾。\n\
+         - 不要重复用户说过的话，只纯化、对齐、添加不可以。\n\n\
+         # 完整对话\n\
+         {transcript_text}\n\n\
+         # 现存的 ip.md（仅参考，不是你的依据；如果与对话冲突从对话）\n\
+         {ip_md_substituted}",
+    );
+
+    let mut messages: Vec<Value> = vec![json!({ "role": "system", "content": system })];
+    for (role, content) in transcript {
+        messages.push(json!({ "role": role, "content": content }));
+    }
+    messages
+}
+
+/// Wrap pre-built chat `messages` into the chat API payload JSON.
+pub fn build_chat_payload(model: &str, messages: &[Value]) -> Value {
+    json!({
+        "model": model,
+        "messages": messages,
+        "stream": true,
+        "temperature": CHAT_TEMPERATURE,
+    })
+}
+
+/// Wrap pre-built summary `messages` into the summary API payload JSON.
+pub fn build_summary_payload(model: &str, messages: &[Value]) -> Value {
+    json!({
+        "model": model,
+        "messages": messages,
+        "stream": true,
+        "temperature": SUMMARY_TEMPERATURE,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,5 +191,51 @@ mod tests {
         let msgs = build_chat_messages("p", "", &[], "从零开始");
         let sys = last_system(&msgs);
         assert!(sys.contains("（空 — 还没有 ip.md）") || sys.contains("（空"), "empty ip.md labeled in system prompt");
+    }
+
+    #[test]
+    fn build_summary_messages_system_specifies_structure_and_includes_transcript() {
+        let transcript = vec![
+            ("user".to_string(), "他叫阿九".to_string()),
+            ("assistant".to_string(), "知道了。继续？".to_string()),
+        ];
+        let msgs = build_summary_messages("阿九", "ip content", &transcript);
+        assert_eq!(msgs.len(), 1 + transcript.len());
+        let sys = last_system(&msgs);
+        assert!(sys.contains("ip.md"), "mentions ip.md in structure");
+        assert!(sys.contains("ip content"), "existing ip.md shown");
+        assert!(sys.contains("阿九"), "transcript content included verbatim");
+        assert!(sys.contains("# 结构"), "structure block header present");
+        assert!(sys.contains("禁区"), "structural item present");
+        assert!(sys.contains("用户：他叫阿九"), "transcript labeled with role prefix");
+        assert!(sys.contains("1 轮对话"), "n_turns substituted");
+    }
+
+    #[test]
+    fn build_summary_messages_empty_transcript_has_1_message() {
+        let msgs = build_summary_messages("p", "", &[]);
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0]["role"], "system");
+    }
+
+    #[test]
+    fn build_chat_payload_uses_chat_temperature_and_streams() {
+        let msgs = build_chat_messages("p", "", &[], "hi");
+        let body = build_chat_payload("deepseek-chat", &msgs);
+        assert_eq!(body["model"], "deepseek-chat");
+        assert_eq!(body["stream"], true);
+        let t = body["temperature"].as_f64().expect("temperature present");
+        assert!((t - deepseek::TEMPERATURE as f64).abs() < 1e-6);
+    }
+
+    #[test]
+    fn build_summary_payload_uses_lower_temperature_and_streams() {
+        let msgs = build_summary_messages("p", "", &[]);
+        let body = build_summary_payload("deepseek-chat", &msgs);
+        assert_eq!(body["model"], "deepseek-chat");
+        assert_eq!(body["stream"], true);
+        let t = body["temperature"].as_f64().expect("temperature present");
+        assert!((t - SUMMARY_TEMPERATURE as f64).abs() < 1e-6, "got {t}");
+        assert!(SUMMARY_TEMPERATURE < deepseek::TEMPERATURE);
     }
 }
