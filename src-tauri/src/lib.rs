@@ -16,6 +16,10 @@ pub fn run() {
       gacha::write_api_key,
       gacha::draw,
       gacha::fetch_task,
+      gacha::read_context,
+      gacha::write_context,
+      gacha::generate_prompt,
+      gacha::create_prompt,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

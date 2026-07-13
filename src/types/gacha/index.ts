@@ -35,6 +35,7 @@ export interface Project {
   categories: Category[];
   baselines: Baselines;
   has_api_key: boolean;
+  has_deepseek_key: boolean;
 }
 
 export interface PromptDetail {
