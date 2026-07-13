@@ -1,5 +1,5 @@
 import type { Component } from 'vue';
-import { Sparkles, PenLine, User, BookText, Settings } from 'lucide-vue-next';
+import { Sparkles, PenLine, User, BookText, Settings, Wand2 } from 'lucide-vue-next';
 
 export interface MenuItem {
   title: string;
@@ -13,7 +13,7 @@ export interface MenuItem {
 
 export const menus: MenuItem[] = [
   {
-    title: '角色',
+    title: 'ip形象',
     key: 'writer',
     group: '创作',
     icon: PenLine,
@@ -29,9 +29,17 @@ export const menus: MenuItem[] = [
     component: 'gacha/index',
   },
   {
+    title: '初始',
+    key: 'initial',
+    group: 'ip形象',
+    icon: Wand2,
+    path: '/initial',
+    component: 'initial/index',
+  },
+  {
     title: '特征',
     key: 'character',
-    group: '角色',
+    group: 'ip形象',
     icon: User,
     path: '/character',
     component: 'character/index',
@@ -39,7 +47,7 @@ export const menus: MenuItem[] = [
   {
     title: '策略',
     key: 'strategy',
-    group: '角色',
+    group: 'ip形象',
     icon: BookText,
     path: '/strategy',
     component: 'strategy/index',
@@ -56,7 +64,7 @@ export const menus: MenuItem[] = [
 
 /** Legacy exports — kept so existing imports keep working during the migration. */
 export const gachaMenus = menus.filter(m => m.group === '创作');
-export const writerMenus = menus.filter(m => m.group === '角色');
+export const writerMenus = menus.filter(m => m.group === 'ip形象');
 export const systemMenus = menus.filter(m => m.group === '系统');
 
 export interface MenuGroup {
@@ -64,9 +72,9 @@ export interface MenuGroup {
   items: MenuItem[];
 }
 
-/** Sidebar order: 创作 → 角色 → 系统. */
+/** Sidebar order: 创作 → ip形象 → 系统. */
 export const menuGroups: MenuGroup[] = (() => {
-  const order = ['创作', '角色', '系统'];
+  const order = ['创作', 'ip形象', '系统'];
   return order.map(label => ({
     label,
     items: menus.filter(m => m.group === label),
