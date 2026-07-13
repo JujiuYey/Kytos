@@ -11,6 +11,7 @@ use tauri::{AppHandle, Emitter};
 use crate::gacha::error::ApiMartError;
 
 pub mod apimart;
+pub mod character_chat;
 pub mod deepseek;
 pub mod error;
 pub mod project;
