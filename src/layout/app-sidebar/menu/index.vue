@@ -1,8 +1,8 @@
 <script lang="ts" setup>
 import { useRoute, useRouter } from 'vue-router';
 import { computed } from 'vue';
-import type { MenuItem } from '../../../data/menu-data';
-import { gachaMenus, systemMenus } from '../../../data/menu-data';
+import { menuGroups } from '@/data/menu-data';
+import type { MenuItem } from '@/data/menu-data';
 
 const router = useRouter();
 const route = useRoute();
@@ -24,32 +24,12 @@ const getMenuButtonClass = computed(() => (key: string) => ({
 
 <template>
   <SidebarContent>
-    <SidebarGroup>
-      <SidebarGroupLabel>抽卡</SidebarGroupLabel>
+    <SidebarGroup v-for="group of menuGroups" :key="group.label">
+      <SidebarGroupLabel>{{ group.label }}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           <SidebarMenuItem
-            v-for="item of gachaMenus"
-            :key="item.key"
-            @click="handleClick(item)"
-          >
-            <SidebarMenuButton as-child :class="getMenuButtonClass(item.key)">
-              <span>
-                <component :is="item.icon" />
-                <span>{{ item.title }}</span>
-              </span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
-
-    <SidebarGroup>
-      <SidebarGroupLabel>系统</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          <SidebarMenuItem
-            v-for="item of systemMenus"
+            v-for="item of group.items"
             :key="item.key"
             @click="handleClick(item)"
           >

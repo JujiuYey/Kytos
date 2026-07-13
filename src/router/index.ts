@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteRecordRaw, RouteComponent } from 'vue-router';
 import type { Component } from 'vue';
 import Layout from '@/layout/index.vue';
-import { gachaMenus, systemMenus } from '@/data/menu-data';
+import { menus } from '@/data/menu-data';
 import type { MenuItem } from '@/data/menu-data';
 
 type LazyComponent = () => Promise<RouteComponent>;
@@ -28,8 +28,8 @@ function dynamicImport(componentPath: string): LazyComponent {
   return modules[moduleKey] as LazyComponent;
 }
 
-function generateRoutes(menus: MenuItem[], parentPath = ''): RouteRecordRaw[] {
-  return menus.flatMap(menu => {
+function generateRoutes(items: MenuItem[], parentPath = ''): RouteRecordRaw[] {
+  return items.flatMap(menu => {
     const normalizedParentPath = parentPath.endsWith('/')
       ? parentPath.slice(0, -1)
       : parentPath;
@@ -64,7 +64,7 @@ function generateRoutes(menus: MenuItem[], parentPath = ''): RouteRecordRaw[] {
       }
     }
 
-    const childRoutes = menu.children ? generateRoutes(menu.children, routePath) : [];
+    const childRoutes: RouteRecordRaw[] = [];
 
     if (!route.component && childRoutes.length > 0) {
       return childRoutes;
@@ -74,7 +74,7 @@ function generateRoutes(menus: MenuItem[], parentPath = ''): RouteRecordRaw[] {
   });
 }
 
-const allMenus = [...gachaMenus, ...systemMenus];
+const allMenus = menus;
 
 const routes: RouteRecordRaw[] = [
   {
