@@ -67,9 +67,7 @@ pub const SUMMARY_TEMPERATURE: f32 = 0.7;
 /// transcript as-is. The system prompt embeds `SUMMARY_SYSTEM_PROMPT`
 /// (inlined verbatim from spec §4.2) with `{n_turns}`, `{transcript}`,
 /// and `{ip_md_or_empty}` substituted.
-#[allow(unused_variables)]
 pub fn build_summary_messages(
-    project_label: &str,
     ip_md: &str,
     transcript: &[(String, String)],
 ) -> Vec<Value> {
@@ -199,7 +197,7 @@ mod tests {
             ("user".to_string(), "他叫阿九".to_string()),
             ("assistant".to_string(), "知道了。继续？".to_string()),
         ];
-        let msgs = build_summary_messages("阿九", "ip content", &transcript);
+        let msgs = build_summary_messages("ip content", &transcript);
         assert_eq!(msgs.len(), 1 + transcript.len());
         let sys = last_system(&msgs);
         assert!(sys.contains("ip.md"), "mentions ip.md in structure");
@@ -213,7 +211,7 @@ mod tests {
 
     #[test]
     fn build_summary_messages_empty_transcript_has_1_message() {
-        let msgs = build_summary_messages("p", "", &[]);
+        let msgs = build_summary_messages("", &[]);
         assert_eq!(msgs.len(), 1);
         assert_eq!(msgs[0]["role"], "system");
     }
@@ -230,7 +228,7 @@ mod tests {
 
     #[test]
     fn build_summary_payload_uses_lower_temperature_and_streams() {
-        let msgs = build_summary_messages("p", "", &[]);
+        let msgs = build_summary_messages("", &[]);
         let body = build_summary_payload("deepseek-chat", &msgs);
         assert_eq!(body["model"], "deepseek-chat");
         assert_eq!(body["stream"], true);
