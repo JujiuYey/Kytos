@@ -10,6 +10,10 @@ import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputSubmit } 
 import { Loader } from '@/components/ai-elements/loader';
 import MarkdownRenderer from '@/components/markdown-renderer.vue';
 
+import ChatSummaryPreview from './chat-summary-preview.vue';
+
+const emit = defineEmits<{ (e: 'accepted'): void }>();
+
 const project = useGachaStore();
 const chat = useChatStore();
 
@@ -68,6 +72,14 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault();
     void onSend();
   }
+}
+
+function onAcceptPreview() {
+  chat.acceptSummary();
+  emit('accepted');
+}
+function onCancelPreview() {
+  chat.cancelPreview();
 }
 </script>
 
@@ -153,6 +165,12 @@ function onKeydown(e: KeyboardEvent) {
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
+
+      <ChatSummaryPreview
+        v-if="chat.phase === 'preview'"
+        @accept="onAcceptPreview"
+        @cancel="onCancelPreview"
+      />
 
       <PromptInput class="border-t" @submit="onSend">
         <PromptInputBody>
