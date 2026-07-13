@@ -310,10 +310,21 @@ async fn fetch_task_inner(app: AppHandle, root: String, md_path: String, task_id
 }
 
 /// Payload sent to the frontend over `deepseek://delta`.
+///
+/// `mode` discriminates the kind of generation: `"prompt"` for writer's
+/// one-shot prompt generation, `"chat"` and `"summary"` for the new
+/// 「角色」conversation tab. `request_id` is a per-round identifier the
+/// frontend generates and uses to route streaming deltas to the right
+/// assistant placeholder message. Writer doesn't read it; serde defaults
+/// keep `#[serde(default)]` for forward compatibility.
 #[derive(Debug, Clone, Serialize)]
 pub struct DeepSeekDelta {
     pub content: String,
     pub reasoning: String,
+    #[serde(default)]
+    pub mode: String,
+    #[serde(default)]
+    pub request_id: String,
 }
 
 /// Arguments to `generate_prompt`.
@@ -394,6 +405,8 @@ async fn generate_prompt_inner(app: AppHandle, req: GenerateRequest) -> Result<G
             DeepSeekDelta {
                 content: delta.content,
                 reasoning: delta.reasoning,
+                mode: "prompt".to_string(),
+                request_id: String::new(),
             },
         );
     })
