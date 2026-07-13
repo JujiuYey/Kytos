@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { Copy, Loader2, Save, Sparkles, RotateCw, X } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { useGachaStore } from '@/stores/gacha';
+import { syncDirectives } from '@/utils/prompt-directives';
 
 const store = useGachaStore();
 
@@ -36,15 +37,6 @@ const dirty = computed(() => {
     || draftSize.value !== store.promptDetail.size
     || draftResolution.value !== store.promptDetail.resolution;
 });
-
-function syncDirectives(raw: string, size: string, resolution: string): string {
-  const sizeLine = `<!-- size: ${size} -->`;
-  const resolutionLine = `<!-- resolution: ${resolution} -->`;
-  const updated = raw
-    .replace(/^<!--\s*size\s*:\s*\S+?\s*-->\s*/m, '')
-    .replace(/^<!--\s*resolution\s*:\s*\S+?\s*-->\s*/m, '');
-  return `${sizeLine}\n${resolutionLine}\n\n${updated.replace(/^\n+/, '')}`;
-}
 
 async function save() {
   const finalRaw = syncDirectives(draftRaw.value, draftSize.value, draftResolution.value);

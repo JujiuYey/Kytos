@@ -24,7 +24,8 @@ tauri-plugin-log = "2.0.0"
 tauri-plugin-shell = "2.0.0"
 tauri-plugin-fs = "2.0.0"
 tauri-plugin-dialog = "2.0.0"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
 base64 = "0.22"
 regex = "1"
 tokio = { version = "1", features = ["time", "fs", "macros", "rt-multi-thread"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }

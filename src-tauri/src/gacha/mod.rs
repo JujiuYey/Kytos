@@ -11,6 +11,7 @@ use tauri::{AppHandle, Emitter};
 use crate::gacha::error::ApiMartError;
 
 pub mod apimart;
+pub mod deepseek;
 pub mod error;
 pub mod project;
 
@@ -275,6 +276,113 @@ async fn fetch_task_inner(app: AppHandle, root: String, md_path: String, task_id
         failed,
         payload_preview: None,
     })
+}
+
+/// Payload sent to the frontend over `deepseek://delta`.
+#[derive(Debug, Clone, Serialize)]
+pub struct DeepSeekDelta {
+    pub content: String,
+    pub reasoning: String,
+}
+
+/// Arguments to `generate_prompt`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct GenerateRequest {
+    pub root: String,
+    pub category: String,
+    pub name: String,
+    pub intent: String,
+    pub model: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GenerateResult {
+    pub md: String,
+    pub model: String,
+}
+
+/// Read `ip.md` and `AGENTS.md` from the project root, plus their absolute
+/// paths so the UI can show "正在改 `<path>`".
+#[tauri::command]
+pub async fn read_context(root: String) -> Result<project::Context, String> {
+    project::read_context(Path::new(&root)).await.map_err(|e| e.to_string())
+}
+
+/// Overwrite one of the context files. `kind` is `"ip"` or `"agents"`.
+#[tauri::command]
+pub async fn write_context(root: String, kind: String, content: String) -> Result<(), String> {
+    let parsed = match kind.as_str() {
+        "ip" => project::ContextKind::Ip,
+        "agents" => project::ContextKind::Agents,
+        other => return Err(format!("未知的上下文类型: {other}")),
+    };
+    project::write_context(Path::new(&root), parsed, &content).await.map_err(|e| e.to_string())
+}
+
+/// Generate a new prompt md via DeepSeek. Streams `deepseek://delta`
+/// events as the model writes; returns the full markdown when complete.
+/// Does not write any file — the user reviews the draft and presses
+/// "保存" themselves.
+#[tauri::command]
+pub async fn generate_prompt(app: AppHandle, req: GenerateRequest) -> Result<GenerateResult, String> {
+    let outcome = generate_prompt_inner(app.clone(), req).await;
+    if let Err(err) = &outcome {
+        let _ = app.emit(
+            "deepseek://error",
+            serde_json::json!({ "message": err.to_string() }),
+        );
+    }
+    outcome.map_err(|e| e.to_string())
+}
+
+async fn generate_prompt_inner(app: AppHandle, req: GenerateRequest) -> Result<GenerateResult, ApiMartError> {
+    let root = PathBuf::from(&req.root);
+    let ctx = project::read_context(&root).await?;
+
+    let api_key = deepseek::api_key_from_env()
+        .or(project::read_env_key(&root, project::DEEPSEEK_API_KEY_NAME).await?)
+        .ok_or_else(|| {
+            ApiMartError(
+                "没找到 DeepSeek key。两种办法二选一：\n  1) export DEEPSEEK_API_KEY=sk-xxx\n  2) 在项目根目录的 .env 里写一行 DEEPSEEK_API_KEY=sk-xxx".to_string(),
+            )
+        })?;
+
+    let base_url = std::env::var("DEEPSEEK_BASE_URL").unwrap_or_else(|_| deepseek::DEFAULT_BASE_URL.to_string());
+
+    let examples = project::load_examples(&root, &req.category, 2).await?;
+    let messages = deepseek::build_messages(&ctx.ip, &ctx.agents, &examples, &req.category, &req.name, &req.intent);
+
+    let temperature = if req.model == deepseek::REASONER_MODEL {
+        None
+    } else {
+        Some(deepseek::TEMPERATURE)
+    };
+    let payload = deepseek::build_payload(&req.model, messages, temperature, true);
+
+    let client = deepseek::build_http_client();
+    let app_for_emit = app.clone();
+    let md = deepseek::stream_chat(&client, &base_url, &api_key, &payload, move |delta| {
+        let _ = app_for_emit.emit(
+            "deepseek://delta",
+            DeepSeekDelta {
+                content: delta.content,
+                reasoning: delta.reasoning,
+            },
+        );
+    })
+    .await?;
+
+    let cleaned = deepseek::strip_fences(&md);
+    Ok(GenerateResult { md: cleaned, model: req.model })
+}
+
+/// Save a freshly-written prompt md to disk. Errors on collision —
+/// existing files are never overwritten.
+#[tauri::command]
+pub async fn create_prompt(root: String, category: String, name: String, raw: String) -> Result<String, String> {
+    project::create_prompt(Path::new(&root), &category, &name, &raw)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Drop-in stand-in for an `AppHandle` in tests where Tauri isn't running.

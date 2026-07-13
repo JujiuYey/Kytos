@@ -6,6 +6,7 @@ const defaultSettings: AppSettings = {
   autoSave: true,
   theme: 'system',
   storagePath: '',
+  deepseekModel: 'deepseek-chat',
 };
 
 export const useAppStore = defineStore('app', () => {
