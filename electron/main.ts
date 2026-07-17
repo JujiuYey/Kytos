@@ -13,7 +13,7 @@ import {
   shell,
 } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
-import type { SaveFileRequest, SavedFileResult } from '../src/types/desktop';
+import type { SaveFileRequest, SavedFileResult } from '../shared/desktop';
 
 const APP_SCHEME = 'app';
 const APP_HOST = 'bundle';

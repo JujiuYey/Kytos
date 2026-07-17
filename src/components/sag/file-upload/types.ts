@@ -1,1 +1,1 @@
-export type { SavedFileResult as UploadResult } from '@/types/desktop';
+export type { SavedFileResult as UploadResult } from '@/types';

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { DesktopApi } from '../src/types/desktop';
+import type { DesktopApi } from '../shared/desktop';
 
 const desktopApi: DesktopApi = {
   selectDirectory: () => ipcRenderer.invoke('dialog:select-directory'),
