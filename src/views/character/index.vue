@@ -185,7 +185,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="flex h-full min-h-0 flex-col bg-background">
+  <main class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
     <CharacterChatHeader
       v-model:mobile-pane="mobilePane"
       :busy="isBusy"
@@ -205,9 +205,14 @@ onMounted(() => {
       </AlertDescription>
     </Alert>
 
-    <div class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
+    <div
+      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]"
+    >
       <section
-        :class="['min-h-0 flex-col lg:flex', mobilePane === 'chat' ? 'flex' : 'hidden']"
+        :class="[
+          'min-h-0 min-w-0 flex-col overflow-hidden lg:flex',
+          mobilePane === 'chat' ? 'flex' : 'hidden',
+        ]"
         aria-label="角色共创对话"
       >
         <CharacterChatMessages :messages="messages" :status="chatStatus" @suggest="send" />
@@ -220,7 +225,10 @@ onMounted(() => {
       </section>
 
       <aside
-        :class="['min-h-0 border-l flex-col lg:flex', mobilePane === 'draft' ? 'flex' : 'hidden']"
+        :class="[
+          'min-h-0 min-w-0 flex-col overflow-hidden border-l lg:flex',
+          mobilePane === 'draft' ? 'flex' : 'hidden',
+        ]"
         aria-label="角色档案"
       >
         <CharacterWorkspacePanel

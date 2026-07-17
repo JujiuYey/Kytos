@@ -77,6 +77,14 @@
 - 文本、按钮和工具栏必须在窄窗口下可换行或收缩，不允许互相遮挡。
 - 所有点击操作应支持键盘与清晰焦点状态；图片和纯图标按钮提供可访问名称。
 
+### 页面高度与滚动
+
+- `src/layout/index.vue` 中承载 `RouterView` 的容器已经固定为 `h-screen`。所有路由页面和页面级组件必须占满这块既定高度，根节点使用 `h-full`，不得再使用 `h-screen`、`min-h-screen` 或其他视口高度重新撑开页面。
+- 页面根容器默认使用 `min-h-0 overflow-hidden` 管理边界；参与纵向 flex/grid 布局且包含滚动区的中间容器也必须设置 `min-h-0`，防止内容把父级高度撑开并触发窗口级滚动。
+- 只允许页面内部的指定区域滚动，不允许 `body`、布局容器或整个路由页面产生滚动。
+- 所有业务滚动区域必须使用 `src/components/ui/scroll-area` 提供的 `ScrollArea`（需要横向滚动时组合 `ScrollBar`），不得直接使用 `overflow-auto`、`overflow-scroll`、`overflow-x-auto`、`overflow-y-auto` 等原生滚动 utility 实现。
+- 新增或修改页面时，发现已有业务区域使用原生滚动，应在本次改动范围内替换为 `ScrollArea`；底层 UI 原语为实现组件自身行为而使用的内部 overflow 不属于业务页面滚动区，不在业务代码中绕过或重写。
+
 ### 视觉核对
 
 - 禁止代码代理主动执行视觉核对，界面视觉验收由用户自行完成。
