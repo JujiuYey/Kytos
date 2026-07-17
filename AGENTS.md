@@ -18,6 +18,7 @@
 - `src/components/ai-elements/`：对话、消息、Prompt 输入、Reasoning、附件、图片、Artifact 等 AI 交互组件。
 
 实现界面前必须先搜索这两个目录。已有组件能够覆盖的能力，必须直接复用或组合，不得在业务页面中重新实现。
+同时这两个目录分别是shadcn和ai-elements的原文件，轻易不得修改。业务组件统一存放在`/src/components/sag`
 
 具体要求：
 

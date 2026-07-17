@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import {
   Dialog,
   DialogContent,
@@ -79,18 +80,10 @@ function handleCancel() {
         </DialogDescription>
       </DialogHeader>
       <DialogFooter class="gap-2">
-        <Button
-          variant="outline"
-          :disabled="loading"
-          @click="handleCancel"
-        >
+        <Button variant="outline" :disabled="loading" @click="handleCancel">
           {{ cancelText }}
         </Button>
-        <Button
-          variant="destructive"
-          :loading="loading"
-          @click="handleConfirm"
-        >
+        <Button variant="destructive" :disabled="loading" :loading="loading" @click="handleConfirm">
           {{ confirmText }}
         </Button>
       </DialogFooter>

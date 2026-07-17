@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopApi } from '../shared/desktop';
 
 const desktopApi: DesktopApi = {
+  deleteCharacterPortrait: request => ipcRenderer.invoke('character-portrait:delete', request),
   deleteCredential: service => ipcRenderer.invoke('credential:delete', service),
   generateCharacterPortrait: request => ipcRenderer.invoke('character-portrait:generate', request),
   getCharacterPortraitTask: taskId => ipcRenderer.invoke('character-portrait:get-task', taskId),

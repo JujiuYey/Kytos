@@ -6,6 +6,7 @@ import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import type {
   CharacterDraft,
   CharacterPortraitImage,
@@ -33,6 +34,12 @@ const isInitializing = ref(true);
 const isSubmitting = ref(false);
 const isPolling = ref(false);
 const selectingFileName = ref('');
+const deletingFileName = ref('');
+const deleteDialogOpen = ref(false);
+const deleteTarget = ref<{
+  image: CharacterPortraitImage;
+  record: CharacterPortraitRecord;
+} | null>(null);
 const mobilePane = ref<'settings' | 'gallery'>('settings');
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -192,7 +199,7 @@ function retryPolling() {
 }
 
 async function selectPortrait(record: CharacterPortraitRecord, image: CharacterPortraitImage) {
-  if (selectingFileName.value) {
+  if (selectingFileName.value || deletingFileName.value) {
     return;
   }
   selectingFileName.value = image.fileName;
@@ -207,6 +214,38 @@ async function selectPortrait(record: CharacterPortraitRecord, image: CharacterP
     toast.error(selectionError instanceof Error ? selectionError.message : String(selectionError));
   } finally {
     selectingFileName.value = '';
+  }
+}
+
+function requestDeletePortrait(record: CharacterPortraitRecord, image: CharacterPortraitImage) {
+  if (selectingFileName.value || deletingFileName.value) {
+    return;
+  }
+  deleteTarget.value = { image, record };
+  deleteDialogOpen.value = true;
+}
+
+async function deletePortrait() {
+  if (!deleteTarget.value || deletingFileName.value) {
+    return;
+  }
+
+  const { image, record } = deleteTarget.value;
+  deletingFileName.value = image.fileName;
+  try {
+    const workspace = await window.desktop.deleteCharacterPortrait({
+      fileName: image.fileName,
+      taskId: record.id,
+    });
+    records.value = workspace.records;
+    selectedImage.value = workspace.selectedImage;
+    deleteDialogOpen.value = false;
+    deleteTarget.value = null;
+    toast.success('定妆照已删除');
+  } catch (deletionError: unknown) {
+    toast.error(deletionError instanceof Error ? deletionError.message : String(deletionError));
+  } finally {
+    deletingFileName.value = '';
   }
 }
 
@@ -300,13 +339,24 @@ onBeforeUnmount(() => {
         :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
       >
         <PortraitGallery
+          :deleting-file-name="deletingFileName"
           :records="records"
           :selected-image="selectedImage"
           :selecting-file-name="selectingFileName"
           class="min-h-0 min-w-0 flex-1"
+          @delete="requestDeletePortrait"
           @select="selectPortrait"
         />
       </div>
     </div>
+
+    <SagConfirmDialog
+      v-model:open="deleteDialogOpen"
+      title="删除这张定妆照？"
+      description="图片将从作品工作区永久删除，此操作不可恢复。"
+      :confirm-text="deletingFileName ? '删除中' : '确定删除'"
+      :loading="Boolean(deletingFileName)"
+      @confirm="deletePortrait"
+    />
   </main>
 </template>

@@ -2,6 +2,7 @@ import type { CharacterWorkspaceState, SaveCharacterProfileRequest } from './cha
 import type {
   CharacterPortraitRecord,
   CharacterPortraitWorkspaceState,
+  DeleteCharacterPortraitRequest,
   GenerateCharacterPortraitRequest,
   SelectCharacterPortraitRequest,
 } from './character-portrait';
@@ -39,6 +40,9 @@ export interface SavedFileResult {
 }
 
 export interface DesktopApi {
+  deleteCharacterPortrait: (
+    request: DeleteCharacterPortraitRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
   deleteCredential: (service: CredentialService) => Promise<CredentialStatus>;
   generateCharacterPortrait: (
     request: GenerateCharacterPortraitRequest,

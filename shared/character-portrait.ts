@@ -48,3 +48,8 @@ export interface SelectCharacterPortraitRequest {
   fileName: string;
   taskId: string;
 }
+
+export interface DeleteCharacterPortraitRequest {
+  fileName: string;
+  taskId: string;
+}

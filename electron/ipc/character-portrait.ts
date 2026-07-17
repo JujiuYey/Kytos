@@ -1,9 +1,11 @@
 import { ipcMain } from 'electron';
 import type {
+  DeleteCharacterPortraitRequest,
   GenerateCharacterPortraitRequest,
   SelectCharacterPortraitRequest,
 } from '../../shared/character-portrait';
 import {
+  deleteCharacterPortrait,
   generateCharacterPortrait,
   getCharacterPortraitTask,
   getCharacterPortraitWorkspace,
@@ -12,6 +14,14 @@ import {
 import type { TrustedSenderGuard } from './trusted-sender';
 
 export function registerCharacterPortraitIpc(assertTrustedSender: TrustedSenderGuard): void {
+  ipcMain.handle(
+    'character-portrait:delete',
+    async (event, request: DeleteCharacterPortraitRequest) => {
+      assertTrustedSender(event);
+      return deleteCharacterPortrait(request);
+    },
+  );
+
   ipcMain.handle(
     'character-portrait:generate',
     async (event, request: GenerateCharacterPortraitRequest) => {

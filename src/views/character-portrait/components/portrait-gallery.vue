@@ -1,19 +1,13 @@
 <script setup lang="ts">
-import { Camera, Check, Clock3, ImageIcon } from 'lucide-vue-next';
+import { Camera, Check, Clock3, ImageIcon, Trash2 } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { ImageViewer } from '@/components/sag/image-viewer';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type {
   CharacterPortraitImage,
   CharacterPortraitRecord,
@@ -22,12 +16,14 @@ import type {
 } from '@/types';
 
 defineProps<{
+  deletingFileName: string;
   records: CharacterPortraitRecord[];
   selectedImage: CharacterPortraitSelection | null;
   selectingFileName: string;
 }>();
 
 const emit = defineEmits<{
+  (event: 'delete', record: CharacterPortraitRecord, image: CharacterPortraitImage): void;
   (event: 'select', record: CharacterPortraitRecord, image: CharacterPortraitImage): void;
 }>();
 
@@ -143,35 +139,27 @@ function formatDate(value: string): string {
               :key="image.fileName"
               class="overflow-hidden rounded-md border bg-background"
             >
-              <Dialog>
-                <DialogTrigger as-child>
-                  <Button
-                    variant="ghost"
-                    class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
-                    :aria-label="`查看第 ${imageIndex + 1} 张定妆照`"
-                  >
-                    <AiImage
-                      :alt="`${record.id} 的第 ${imageIndex + 1} 张定妆照`"
-                      :src="image.url"
-                      :class="[
-                        getAspectClass(record.size),
-                        'w-full rounded-none bg-muted/30 object-contain',
-                      ]"
-                    />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent class="max-h-[90vh] max-w-4xl overflow-hidden p-4 sm:max-w-4xl">
-                  <DialogHeader class="sr-only">
-                    <DialogTitle>定妆照预览</DialogTitle>
-                    <DialogDescription>查看生成的定妆照大图</DialogDescription>
-                  </DialogHeader>
+              <ImageViewer
+                :alt="`${record.id} 的第 ${imageIndex + 1} 张定妆照预览`"
+                :src="image.url"
+                title="定妆照预览"
+                description="查看生成的定妆照大图，可缩放和拖拽"
+              >
+                <Button
+                  variant="ghost"
+                  class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
+                  :aria-label="`查看第 ${imageIndex + 1} 张定妆照`"
+                >
                   <AiImage
-                    :alt="`${record.id} 的第 ${imageIndex + 1} 张定妆照预览`"
+                    :alt="`${record.id} 的第 ${imageIndex + 1} 张定妆照`"
                     :src="image.url"
-                    class="max-h-[calc(90vh-2rem)] w-full object-contain"
+                    :class="[
+                      getAspectClass(record.size),
+                      'w-full rounded-none bg-muted/30 object-contain',
+                    ]"
                   />
-                </DialogContent>
-              </Dialog>
+                </Button>
+              </ImageViewer>
 
               <figcaption
                 class="flex min-h-12 items-center justify-between gap-3 border-t px-3 py-2"
@@ -179,23 +167,42 @@ function formatDate(value: string): string {
                 <span class="truncate text-xs text-muted-foreground"
                   >候选 {{ imageIndex + 1 }}</span
                 >
-                <Badge
-                  v-if="isSelected(selectedImage, record, image)"
-                  variant="secondary"
-                  class="gap-1"
-                >
-                  <Check class="size-3" />
-                  已选定
-                </Badge>
-                <Button
-                  v-else
-                  size="sm"
-                  variant="outline"
-                  :disabled="selectingFileName === image.fileName"
-                  @click="emit('select', record, image)"
-                >
-                  {{ selectingFileName === image.fileName ? '保存中' : '设为定妆照' }}
-                </Button>
+                <div class="flex shrink-0 items-center gap-1.5">
+                  <Badge
+                    v-if="isSelected(selectedImage, record, image)"
+                    variant="secondary"
+                    class="gap-1"
+                  >
+                    <Check class="size-3" />
+                    已选定
+                  </Badge>
+                  <Button
+                    v-else
+                    size="sm"
+                    variant="outline"
+                    :disabled="selectingFileName === image.fileName || Boolean(deletingFileName)"
+                    @click="emit('select', record, image)"
+                  >
+                    {{ selectingFileName === image.fileName ? '保存中' : '设为定妆照' }}
+                  </Button>
+                  <TooltipProvider :delay-duration="300">
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          class="size-8 text-muted-foreground hover:text-destructive"
+                          :disabled="Boolean(deletingFileName) || Boolean(selectingFileName)"
+                          :aria-label="`删除第 ${imageIndex + 1} 张定妆照`"
+                          @click="emit('delete', record, image)"
+                        >
+                          <Trash2 class="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>删除定妆照</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </figcaption>
             </figure>
           </div>

@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   CharacterPortraitImage,
@@ -8,6 +8,7 @@ import type {
   CharacterPortraitSize,
   CharacterPortraitTaskStatus,
   CharacterPortraitWorkspaceState,
+  DeleteCharacterPortraitRequest,
   GenerateCharacterPortraitRequest,
   SelectCharacterPortraitRequest,
 } from '../../shared/character-portrait';
@@ -16,7 +17,7 @@ import {
   CHARACTER_PORTRAIT_SIZES,
 } from '../../shared/character-portrait';
 import { getCredentialValue } from './credentials';
-import { readJsonFile, writeJsonFile } from './json-store';
+import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 
 const API_BASE_URL = 'https://api.apimart.ai';
@@ -326,6 +327,60 @@ function replaceRecord(
 export async function getCharacterPortraitWorkspace(): Promise<CharacterPortraitWorkspaceState> {
   const store = await loadPortraitStore();
   return { records: store.records, selectedImage: store.selectedImage };
+}
+
+export async function deleteCharacterPortrait(
+  request: DeleteCharacterPortraitRequest,
+): Promise<CharacterPortraitWorkspaceState> {
+  if (
+    !request ||
+    typeof request !== 'object' ||
+    typeof request.taskId !== 'string' ||
+    !TASK_ID_PATTERN.test(request.taskId) ||
+    typeof request.fileName !== 'string' ||
+    path.basename(request.fileName) !== request.fileName
+  ) {
+    throw new Error('定妆照删除请求无效');
+  }
+
+  const store = await loadPortraitStore();
+  const record = store.records.find(item => item.id === request.taskId);
+  const image = record?.images.find(item => item.fileName === request.fileName);
+  if (!record || !image) {
+    throw new Error('未找到这张定妆照');
+  }
+
+  const remainingImages = record.images.filter(item => item.fileName !== request.fileName);
+  const nextStore: StoredPortraitWorkspace = {
+    ...store,
+    records: remainingImages.length
+      ? store.records.map(item =>
+          item.id === record.id
+            ? { ...item, images: remainingImages, updatedAt: new Date().toISOString() }
+            : item,
+        )
+      : store.records.filter(item => item.id !== record.id),
+    selectedImage:
+      store.selectedImage?.taskId === request.taskId &&
+      store.selectedImage.fileName === request.fileName
+        ? null
+        : store.selectedImage,
+  };
+
+  await savePortraitStore(nextStore);
+  try {
+    const workspacePath = await getWorkspaceDirectory();
+    await unlink(path.join(workspacePath, 'assets', PORTRAIT_ASSET_DIRECTORY, request.fileName));
+  } catch (error: unknown) {
+    if (!isNodeError(error) || error.code !== 'ENOENT') {
+      await savePortraitStore(store);
+      throw new Error(
+        error instanceof Error ? `定妆照文件删除失败：${error.message}` : '定妆照文件删除失败',
+      );
+    }
+  }
+
+  return { records: nextStore.records, selectedImage: nextStore.selectedImage };
 }
 
 export async function generateCharacterPortrait(
