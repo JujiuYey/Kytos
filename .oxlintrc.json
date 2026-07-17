@@ -1,0 +1,64 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "env": {
+    "browser": true,
+    "builtin": true,
+    "vue": true
+  },
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "promise", "node", "vue"],
+  "ignorePatterns": [
+    ".claude/**",
+    "dist/**",
+    "node_modules/**",
+    "out/**",
+    "public/**",
+    "src/types/auto-import*.d.ts"
+  ],
+  "rules": {
+    "no-console": "off",
+    "no-debugger": "error",
+    "typescript/no-explicit-any": "off",
+    "unicorn/no-useless-fallback-in-spread": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["src/**/*.{ts,tsx,vue}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["electron", "electron/*", "node:*"],
+                "message": "Renderer code must use the API exposed by electron/preload.ts."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["electron/**/*.ts"],
+      "env": {
+        "browser": false,
+        "node": true,
+        "vue": false
+      },
+      "globals": {
+        "MAIN_WINDOW_VITE_DEV_SERVER_URL": "readonly",
+        "MAIN_WINDOW_VITE_NAME": "readonly"
+      }
+    },
+    {
+      "files": ["*.config.ts", "*.config.mts", "forge.env.d.ts"],
+      "env": {
+        "browser": false,
+        "node": true,
+        "vue": false
+      }
+    }
+  ]
+}

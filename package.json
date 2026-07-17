@@ -11,8 +11,10 @@
     "package": "vue-tsc -b && electron-forge package",
     "make": "vue-tsc -b && electron-forge make",
     "preview": "vite preview",
-    "lint:eslint": "eslint \"src/**/*.{vue,ts,tsx}\" --fix --cache --cache-location node_modules/.cache/eslint/",
-    "lint:ui": "eslint \"src/components/ui/**/*.{vue,ts,tsx}\" \"src/components/ai-elements/**/*.{vue,ts,tsx}\" --fix --cache --cache-location node_modules/.cache/eslint/",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "format": "oxfmt .",
+    "typecheck": "vue-tsc -b",
     "lint:lint-staged": "lint-staged"
   },
   "dependencies": {
@@ -64,7 +66,6 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^4.16.2",
     "@electron-forge/cli": "7.11.2",
     "@electron-forge/maker-zip": "7.11.2",
     "@electron-forge/plugin-vite": "7.11.2",
@@ -72,19 +73,22 @@
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^24.0.8",
     "@vitejs/plugin-vue": "^6.0.0",
-    "@vue/eslint-config-typescript": "^14.6.0",
     "@vue/tsconfig": "^0.7.0",
     "electron": "43.1.1",
-    "eslint": "^9.30.1",
     "lint-staged": "^16.1.2",
+    "oxfmt": "0.59.0",
+    "oxlint": "1.74.0",
     "tailwindcss": "^4.1.11",
     "typescript": "~5.8.3",
     "vite": "^7.0.0",
-    "vite-plugin-checker": "^0.10.0",
     "vue-tsc": "^2.2.10"
   },
   "lint-staged": {
-    "*.{vue,js,ts,tsx}": "eslint --fix"
+    "*.{vue,js,mjs,cjs,ts,mts,cts,jsx,tsx}": [
+      "oxlint --fix --no-error-on-unmatched-pattern",
+      "oxfmt --no-error-on-unmatched-pattern"
+    ],
+    "*.{json,jsonc,css,scss,less,html,md,mdx,yaml,yml,toml}": "oxfmt --no-error-on-unmatched-pattern"
   },
   "packageManager": "pnpm@10.12.4+sha512.5ea8b0deed94ed68691c9bad4c955492705c5eeb8a87ef86bc62c74a26b037b08ff9570f108b2e4dbd1dd1a9186fea925e527f141c648e85af45631074680184"
 }

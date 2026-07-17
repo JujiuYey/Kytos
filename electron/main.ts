@@ -3,15 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import {
-  app,
-  BrowserWindow,
-  dialog,
-  ipcMain,
-  net,
-  protocol,
-  shell,
-} from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 import type { SaveFileRequest, SavedFileResult } from '../shared/desktop';
 
@@ -32,9 +24,11 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 function isTrustedSender(event: IpcMainInvokeEvent): boolean {
-  return mainWindow !== null
-    && event.sender === mainWindow.webContents
-    && event.senderFrame === mainWindow.webContents.mainFrame;
+  return (
+    mainWindow !== null &&
+    event.sender === mainWindow.webContents &&
+    event.senderFrame === mainWindow.webContents.mainFrame
+  );
 }
 
 function assertTrustedSender(event: IpcMainInvokeEvent): void {
@@ -45,9 +39,11 @@ function assertTrustedSender(event: IpcMainInvokeEvent): void {
 
 function createStoredFileName(originalName: string): string {
   const extension = path.extname(originalName);
-  const baseName = path.basename(originalName, extension)
-    .replace(/[^\p{L}\p{N}._-]+/gu, '-')
-    .replace(/^-+|-+$/g, '') || 'file';
+  const baseName =
+    path
+      .basename(originalName, extension)
+      .replace(/[^\p{L}\p{N}._-]+/gu, '-')
+      .replace(/^-+|-+$/g, '') || 'file';
 
   return `${baseName}-${randomUUID().slice(0, 8)}${extension}`;
 }
@@ -75,7 +71,7 @@ function registerIpcHandlers(): void {
       ? await dialog.showOpenDialog(owner, { properties: ['openDirectory', 'createDirectory'] })
       : await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
 
-    return result.canceled ? null : result.filePaths[0] ?? null;
+    return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 
   ipcMain.handle('file:save', async (event, request: SaveFileRequest): Promise<SavedFileResult> => {
@@ -98,10 +94,7 @@ function registerIpcHandlers(): void {
 }
 
 function registerAppProtocol(): void {
-  const rendererRoot = path.resolve(
-    __dirname,
-    `../renderer/${MAIN_WINDOW_VITE_NAME}`,
-  );
+  const rendererRoot = path.resolve(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`);
 
   protocol.handle(APP_SCHEME, request => {
     const url = new URL(request.url);
@@ -110,13 +103,17 @@ function registerAppProtocol(): void {
     }
 
     const decodedPath = decodeURIComponent(url.pathname);
-    const relativePath = decodedPath === '/' || path.extname(decodedPath) === ''
-      ? 'index.html'
-      : decodedPath.replace(/^\/+/, '');
+    const relativePath =
+      decodedPath === '/' || path.extname(decodedPath) === ''
+        ? 'index.html'
+        : decodedPath.replace(/^\/+/, '');
     const filePath = path.resolve(rendererRoot, relativePath);
     const rendererRootPrefix = `${rendererRoot}${path.sep}`;
 
-    if (filePath !== path.join(rendererRoot, 'index.html') && !filePath.startsWith(rendererRootPrefix)) {
+    if (
+      filePath !== path.join(rendererRoot, 'index.html') &&
+      !filePath.startsWith(rendererRootPrefix)
+    ) {
       return new Response('Not found', { status: 404 });
     }
 

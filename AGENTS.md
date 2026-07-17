@@ -2,7 +2,11 @@
 
 本文件约束所有在本仓库中工作的代码代理。开始修改前先阅读本文件；。
 
+## 安装规则
+任何安装依赖的行为都直接给用户安装命令，不要自己执行安装命令。
+
 ## SKILL使用规则
+
 使用任何CE:*的相关SKILL需要用户的同意，否则禁止主动使用.
 
 ## 组件使用规则
@@ -50,12 +54,11 @@
 - 类型和组件使用 PascalCase；函数、变量、props 和 emits 使用 camelCase；常量仅在真正不可变且跨函数共享时使用 UPPER_SNAKE_CASE。
 - 模板中的组件名使用 PascalCase，事件名和 HTML 属性使用 kebab-case。
 
-
 ## Vue 代码风格
 
 - 所有 Vue SFC 使用 `<script setup lang="ts">`。
 - SFC 默认顺序为 `<script setup>`、`<template>`、必要时 `<style scoped>`。
-- 遵循 `eslint.config.mjs`：2 空格缩进、单引号、分号、1TBS 大括号风格。
+- 遵循 `.oxfmtrc.json`：2 空格缩进、单引号、分号。
 - TypeScript 保持 `strict`。不要使用 `any` 逃避建模；优先用明确的 interface、type union 和类型收窄。
 - props 使用 `defineProps`，事件使用带类型的 `defineEmits`，并显式声明所有 emit。
 - 简单派生状态使用 `computed`，可变状态使用 `ref`；不要把可以计算出的值重复存进 store。
@@ -74,14 +77,16 @@
 - 所有点击操作应支持键盘与清晰焦点状态；图片和纯图标按钮提供可访问名称。
 
 ## 验证
+
 根据改动范围执行最小且充分的验证：
 
 ```bash
 # Vue / TypeScript 构建
 pnpm build
 
-# 只检查改动过的前端文件；不要为了一个局部改动 lint --fix 全仓库
-pnpm exec eslint <changed-files>
+# 只检查改动过的文件；不要为了一个局部改动格式化全仓库
+pnpm exec oxlint <changed-files>
+pnpm exec oxfmt --check <changed-files>
 ```
 
 交付前同时运行 `git diff --check`，并确认生成文件、缓存和无关格式化没有混入 diff。

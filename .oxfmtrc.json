@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "arrowParens": "avoid",
+  "printWidth": 100,
+  "semi": true,
+  "singleQuote": true,
+  "sortImports": false,
+  "sortPackageJson": false,
+  "sortTailwindcss": false,
+  "tabWidth": 2,
+  "trailingComma": "all",
+  "useTabs": false,
+  "ignorePatterns": [
+    ".claude/**",
+    "dist/**",
+    "node_modules/**",
+    "out/**",
+    "public/**",
+    "src/types/auto-import*.d.ts"
+  ]
+}
