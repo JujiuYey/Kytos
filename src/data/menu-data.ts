@@ -18,7 +18,7 @@ export const menuGroups: MenuGroup[] = [
     label: '角色形象',
     items: [
       {
-        title: '特征',
+        title: '创建角色',
         key: 'character',
         icon: User,
         path: '/character',

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
-import type { Context, ContextKind } from '@/types/writer';
+import type { ContextKind } from '@/types/writer';
+import { readContext, writeContext } from '@/lib/tauri/context';
 
 export const useContextStore = defineStore('context', () => {
   const ipPath = ref<string>('');
@@ -23,7 +23,7 @@ export const useContextStore = defineStore('context', () => {
     isLoading.value = true;
     lastError.value = '';
     try {
-      const ctx = await invoke<Context>('read_context', { root });
+      const ctx = await readContext(root);
       ip.value = ctx.ip;
       agents.value = ctx.agents;
       ipPath.value = ctx.ip_path;
@@ -44,7 +44,7 @@ export const useContextStore = defineStore('context', () => {
     isSaving.value = true;
     lastError.value = '';
     try {
-      await invoke('write_context', { root, kind, content });
+      await writeContext(root, kind, content);
       if (kind === 'ip') {
         ip.value = content;
       } else {

@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia';
 import { nanoid } from 'nanoid';
 import { ref } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { useContextStore } from '@/stores/context';
 import { useGachaStore } from '@/stores/gacha';
 import { useAppStore } from '@/stores/app';
+import { chatIp, summarizeIp } from '@/lib/tauri/generation';
+import { readContext } from '@/lib/tauri/context';
+import type { ChatDelta, ChatMessage as BackendChatMessage } from '@/types/chat';
 
 export type ChatRole = 'user' | 'assistant';
 
@@ -30,18 +32,6 @@ export interface SnapshotIp {
   content: string;
 }
 
-interface DeepSeekDeltaPayload {
-  content: string;
-  reasoning: string;
-  mode: string;
-  request_id: string;
-}
-
-interface ChatBackendMessage {
-  role: string;
-  content: string;
-}
-
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>([]);
   const phase = ref<ChatPhase>('idle');
@@ -55,7 +45,7 @@ export const useChatStore = defineStore('chat', () => {
     if (deltaUnlisten) {
       return;
     }
-    deltaUnlisten = await listen<DeepSeekDeltaPayload>('deepseek://delta', event => onDelta(event.payload));
+    deltaUnlisten = await listen<ChatDelta>('deepseek://delta', event => onDelta(event.payload));
   }
 
   async function enterChat(root: string) {
@@ -64,7 +54,7 @@ export const useChatStore = defineStore('chat', () => {
       return;
     }
     try {
-      const ctx = await invoke<{ ip: string }>('read_context', { root });
+      const ctx = await readContext(root);
       snapshotIp.value = { capturedAt: Date.now(), content: ctx.ip };
     } catch (e) {
       lastError.value = String(e);
@@ -95,16 +85,14 @@ export const useChatStore = defineStore('chat', () => {
     pendingRequestId.value = assistantId;
     lastError.value = '';
 
-    const history: ChatBackendMessage[] = [...messages.value.map(m => ({ role: m.role, content: m.content }))];
+    const history: BackendChatMessage[] = [...messages.value.map(m => ({ role: m.role, content: m.content }))];
 
     try {
-      await invoke<unknown>('chat_ip', {
-        req: {
-          root: gacha.projectRoot,
-          history,
-          model: app.settings.deepseekModel,
-          request_id: assistantId,
-        },
+      await chatIp({
+        root: gacha.projectRoot,
+        history,
+        model: app.settings.deepseekModel,
+        request_id: assistantId,
       });
     } catch (e) {
       lastError.value = String(e);
@@ -139,16 +127,14 @@ export const useChatStore = defineStore('chat', () => {
     pendingRequestId.value = summaryId;
     lastError.value = '';
 
-    const history: ChatBackendMessage[] = messages.value.map(m => ({ role: m.role, content: m.content }));
+    const history: BackendChatMessage[] = messages.value.map(m => ({ role: m.role, content: m.content }));
 
     try {
-      await invoke<unknown>('summarize_ip', {
-        req: {
-          root: gacha.projectRoot,
-          history,
-          model: app.settings.deepseekModel,
-          request_id: summaryId,
-        },
+      await summarizeIp({
+        root: gacha.projectRoot,
+        history,
+        model: app.settings.deepseekModel,
+        request_id: summaryId,
       });
       phase.value = 'preview';
     } catch (e) {
@@ -183,7 +169,7 @@ export const useChatStore = defineStore('chat', () => {
     pendingRequestId.value = '';
   }
 
-  function onDelta(delta: DeepSeekDeltaPayload) {
+  function onDelta(delta: ChatDelta) {
     if (delta.mode !== 'chat' && delta.mode !== 'summary') {
       return;
     }

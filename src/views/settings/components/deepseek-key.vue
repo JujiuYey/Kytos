@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
 import { toast } from 'vue-sonner';
 import { ExternalLink, Loader2, Save, Trash2 } from 'lucide-vue-next';
 import { useGachaStore } from '@/stores/gacha';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
+import { deleteEnvKey, readEnvKey, writeEnvKey } from '@/lib/tauri/project-keys';
 
 const store = useGachaStore();
 
@@ -22,10 +22,7 @@ async function refreshDeepseekStatus() {
     return;
   }
   try {
-    const key = await invoke<string | null>('read_env_key', {
-      root: store.projectRoot,
-      name: 'DEEPSEEK_API_KEY',
-    });
+    const key = await readEnvKey(store.projectRoot, 'DEEPSEEK_API_KEY');
     deepseekKeyStatus.value = key ? 'set' : 'unset';
     deepseekKeyMasked.value = key ? `sk-****${key.slice(-4)}` : '';
   } catch (err) {
@@ -41,11 +38,7 @@ async function saveDeepseekKey() {
   }
   isSavingDeepseek.value = true;
   try {
-    await invoke('write_env_key', {
-      root: store.projectRoot,
-      name: 'DEEPSEEK_API_KEY',
-      value: deepseekKeyInput.value.trim(),
-    });
+    await writeEnvKey(store.projectRoot, 'DEEPSEEK_API_KEY', deepseekKeyInput.value.trim());
     deepseekKeyInput.value = '';
     await refreshDeepseekStatus();
     await store.scanProject();
@@ -70,10 +63,7 @@ async function confirmClearDeepseek() {
   }
   isClearingDeepseek.value = true;
   try {
-    await invoke('delete_env_key', {
-      root: store.projectRoot,
-      name: 'DEEPSEEK_API_KEY',
-    });
+    await deleteEnvKey(store.projectRoot, 'DEEPSEEK_API_KEY');
     await refreshDeepseekStatus();
     await store.scanProject();
     toast.success('DeepSeek key 已清空');
@@ -115,7 +105,7 @@ watch(
     <template v-else>
       <div class="text-xs">
         <span class="text-muted-foreground">当前：</span>
-        <span v-if="deepseekKeyStatus === 'set'" class="font-mono">{{ deepseekKeyMasked }}</span>
+        <span v-if="deepseekKeyStatus === 'set'" class="font-mono text-green-500">{{ deepseekKeyMasked }}</span>
         <span v-else-if="deepseekKeyStatus === 'unset'" class="text-red-600">未配置</span>
         <span v-else class="text-muted-foreground">读取中…</span>
         <button

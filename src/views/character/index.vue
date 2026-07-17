@@ -1,45 +1,101 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useGachaStore } from '@/stores/gacha';
-import { useContextStore } from '@/stores/context';
-import ContextEditor from '@/components/context-editor.vue';
-import ChatTab from './components/chat-tab.vue';
+import { useChatStore } from '@/stores/chat';
+
+import CharacterChatHeader from './components/character-chat-header.vue';
+import CharacterChatInput from './components/character-chat-input.vue';
+import CharacterChatMessages from './components/character-chat-messages.vue';
+import ChatSummaryPreview from './components/chat-summary-preview.vue';
+
+const emit = defineEmits<{ (e: 'accepted'): void }>();
 
 const project = useGachaStore();
-const context = useContextStore();
+const chat = useChatStore();
 
-const activeTab = ref<'write' | 'chat'>('write');
+const noProject = computed(() => !project.projectRoot);
+const noKey = computed(() => !project.project?.has_deepseek_key);
+const assistantCount = computed(() => chat.messages.filter(m => m.role === 'assistant' && !m.failed).length);
+const busy = computed(() => chat.phase === 'streaming-chat' || chat.phase === 'summarizing');
+
+const canSummarize = computed(
+  () => chat.phase === 'idle' && assistantCount.value > 0 && !noProject.value && !noKey.value,
+);
 
 onMounted(async () => {
   if (project.projectRoot) {
-    await context.load(project.projectRoot);
+    await chat.enterChat(project.projectRoot);
   }
 });
 
-function onAccepted() {
-  activeTab.value = 'write';
+async function onSummarize() {
+  await chat.summarize();
+}
+
+function onNewSession() {
+  // eslint-disable-next-line no-alert
+  const ok = window.confirm('清空当前对话？这不能撤销。');
+  if (ok) {
+    chat.resetSession();
+    if (project.projectRoot) {
+      void chat.enterChat(project.projectRoot);
+    }
+  }
+}
+
+async function onSend(text: string) {
+  await chat.sendUserMessage(text);
+}
+
+function onAcceptPreview() {
+  chat.acceptSummary();
+  emit('accepted');
+}
+function onCancelPreview() {
+  chat.cancelPreview();
 }
 </script>
 
 <template>
-  <Tabs v-model:value="activeTab" class="h-full">
-    <TabsList class="m-2">
-      <TabsTrigger value="write">
-        手写
-      </TabsTrigger>
-      <TabsTrigger value="chat">
-        对话
-      </TabsTrigger>
-    </TabsList>
-    <TabsContent value="write" class="h-[calc(100%-3rem)] mt-0">
-      <ContextEditor
-        kind="ip"
-        label="特征"
-        helper-text="你的人物形象是谁、ta该演什么。写卡时作为 system prompt 发给 DeepSeek。"
+  <div class="h-full flex flex-col">
+    <div
+      v-if="noProject"
+      class="h-full flex items-center justify-center p-6 text-sm text-muted-foreground"
+    >
+      先去「设置」里选一个项目目录。
+    </div>
+
+    <template v-else>
+      <CharacterChatHeader
+        :can-summarize="canSummarize"
+        :busy="busy"
+        @summarize="onSummarize"
+        @new-session="onNewSession"
       />
-    </TabsContent>
-    <TabsContent value="chat" class="h-[calc(100%-3rem)] mt-0">
-      <ChatTab @accepted="onAccepted" />
-    </TabsContent>
-  </Tabs>
+
+      <div
+        v-if="noKey"
+        class="px-6 py-2 border-b bg-destructive/10 text-destructive text-sm"
+      >
+        还没配 DeepSeek key，去「设置」里加
+      </div>
+
+      <CharacterChatMessages :messages="chat.messages" :phase="chat.phase" />
+
+      <ChatSummaryPreview
+        v-if="chat.phase === 'preview'"
+        @accept="onAcceptPreview"
+        @cancel="onCancelPreview"
+      />
+
+      <CharacterChatInput :busy="busy" :no-key="noKey" @send="onSend" />
+
+      <div
+        v-if="chat.lastError"
+        class="px-6 py-2 border-t bg-destructive/10 text-destructive text-sm"
+      >
+        {{ chat.lastError }}
+      </div>
+    </template>
+  </div>
 </template>

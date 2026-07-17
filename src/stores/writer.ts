@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import type { DeepSeekDelta, GenerateRequest, GenerateResult } from '@/types/writer';
+import { createPrompt } from '@/lib/tauri/project';
+import { generatePrompt } from '@/lib/tauri/generation';
 import { useGachaStore } from '@/stores/gacha';
 import { useContextStore } from '@/stores/context';
 import { useAppStore } from '@/stores/app';
@@ -92,7 +93,7 @@ export const useWriterStore = defineStore('writer', () => {
         intent: intent.value,
         model: app.settings.deepseekModel,
       };
-      const result = await invoke<GenerateResult>('generate_prompt', { req });
+      const result = await generatePrompt(req);
       // Even though we streamed into draft, prefer the canonical server-returned
       // text in case the stream missed something (reconnect etc).
       if (result.md && result.md.length >= draft.value.length) {
@@ -129,12 +130,7 @@ export const useWriterStore = defineStore('writer', () => {
     const raw = `${sizeLine}\n${resolutionLine}\n\n${draft.value.trim()}`;
 
     try {
-      await invoke<string>('create_prompt', {
-        root: gacha.projectRoot,
-        category: category.value,
-        name: name.value.trim(),
-        raw,
-      });
+      await createPrompt(gacha.projectRoot, category.value, name.value.trim(), raw);
       await gacha.scanProject();
       const cat = gacha.project?.categories.find(c => c.name === category.value);
       const prompt = cat?.prompts.find(p => p.name === name.value.trim());

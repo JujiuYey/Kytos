@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import type {
@@ -12,6 +11,13 @@ import type {
   PromptDetail,
   PromptSummary,
 } from '@/types/gacha';
+import {
+  readPrompt as readPromptCommand,
+  scanProject as scanProjectCommand,
+  setBaseline as setBaselineCommand,
+  writePrompt as writePromptCommand,
+} from '@/lib/tauri/project';
+import { draw as drawCommand, fetchTask as fetchTaskCommand } from '@/lib/tauri/generation';
 
 interface SelectedPrompt {
   categoryName: string;
@@ -45,7 +51,7 @@ export const useGachaStore = defineStore('gacha', () => {
     isLoading.value = true;
     pushLog('info', `扫描 ${projectRoot.value}`);
     try {
-      project.value = await invoke<Project>('scan_project', { root: projectRoot.value });
+      project.value = await scanProjectCommand(projectRoot.value);
       pushLog('info', `扫到 ${project.value.categories.length} 个类目`);
       // If the previously selected prompt is gone, clear it.
       if (selectedPrompt.value) {
@@ -68,7 +74,7 @@ export const useGachaStore = defineStore('gacha', () => {
     selectedPrompt.value = { categoryName, prompt };
     isLoading.value = true;
     try {
-      promptDetail.value = await invoke<PromptDetail>('read_prompt', { mdPath: prompt.md_path });
+      promptDetail.value = await readPromptCommand(prompt.md_path);
     } catch (e) {
       pushLog('error', String(e));
       promptDetail.value = null;
@@ -83,7 +89,7 @@ export const useGachaStore = defineStore('gacha', () => {
     }
     isSaving.value = true;
     try {
-      await invoke('write_prompt', { mdPath: selectedPrompt.value.prompt.md_path, raw });
+      await writePromptCommand(selectedPrompt.value.prompt.md_path, raw);
       pushLog('info', `已保存 ${selectedPrompt.value.prompt.name}`);
       return true;
     } catch (e) {
@@ -99,7 +105,7 @@ export const useGachaStore = defineStore('gacha', () => {
       return;
     }
     try {
-      await invoke('set_baseline', { root: projectRoot.value, imagePath, target });
+      await setBaselineCommand(projectRoot.value, imagePath, target);
       pushLog('info', `已把 ${imagePath} 设为 ${target}`);
       await scanProject();
     } catch (e) {
@@ -117,7 +123,7 @@ export const useGachaStore = defineStore('gacha', () => {
       });
     }
     try {
-      const result = await invoke<DrawResult>('draw', { req });
+      const result = await drawCommand(req);
       lastDrawResult.value = result;
       lastTaskId.value = result.task_id;
       pushLog('info', `抽卡完成: task=${result.task_id}, saved=${result.saved.length}/${result.urls.length}`);
@@ -138,11 +144,7 @@ export const useGachaStore = defineStore('gacha', () => {
     }
     isDrawing.value = true;
     try {
-      const result = await invoke<DrawResult>('fetch_task', {
-        root: projectRoot.value,
-        mdPath: selectedPrompt.value.prompt.md_path,
-        taskId,
-      });
+      const result = await fetchTaskCommand(projectRoot.value, selectedPrompt.value.prompt.md_path, taskId);
       lastDrawResult.value = result;
       pushLog('info', `取回完成: task=${result.task_id}, saved=${result.saved.length}/${result.urls.length}`);
       return result;

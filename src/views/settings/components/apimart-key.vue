@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
 import { ExternalLink, Loader2, Save, Trash2 } from 'lucide-vue-next';
 import { useGachaStore } from '@/stores/gacha';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
+import { deleteApiKey, readApiKey, writeApiKey } from '@/lib/tauri/project-keys';
 
 const store = useGachaStore();
 
@@ -20,7 +20,7 @@ async function refreshApimartStatus() {
     apiKeyStatus.value = 'unknown';
     return;
   }
-  const key = await invoke<string | null>('read_api_key', { root: store.projectRoot });
+  const key = await readApiKey(store.projectRoot);
   apiKeyStatus.value = key ? 'set' : 'unset';
   apiKeyMasked.value = key ? `sk-****${key.slice(-4)}` : '';
 }
@@ -31,7 +31,7 @@ async function saveApimartKey() {
   }
   isSavingApimart.value = true;
   try {
-    await invoke('write_api_key', { root: store.projectRoot, key: apiKeyInput.value.trim() });
+    await writeApiKey(store.projectRoot, apiKeyInput.value.trim());
     apiKeyInput.value = '';
     await refreshApimartStatus();
   } finally {
@@ -52,7 +52,7 @@ async function confirmClearApimart() {
   }
   isClearingApimart.value = true;
   try {
-    await invoke('delete_api_key', { root: store.projectRoot });
+    await deleteApiKey(store.projectRoot);
     await refreshApimartStatus();
   } finally {
     isClearingApimart.value = false;
@@ -87,10 +87,11 @@ watch(
     <p v-if="!store.projectRoot" class="text-xs text-muted-foreground">
       先设置项目目录。
     </p>
+
     <template v-else>
       <div class="text-xs">
         <span class="text-muted-foreground">当前：</span>
-        <span v-if="apiKeyStatus === 'set'" class="font-mono">{{ apiKeyMasked }}</span>
+        <span v-if="apiKeyStatus === 'set'" class="font-mono text-green-600">{{ apiKeyMasked }}</span>
         <span v-else-if="apiKeyStatus === 'unset'" class="text-red-600">未配置</span>
         <span v-else class="text-muted-foreground">读取中…</span>
         <button
@@ -102,6 +103,7 @@ watch(
           <ExternalLink class="size-3" />
         </button>
       </div>
+
       <div class="flex gap-2">
         <Input
           v-model="apiKeyInput"
@@ -126,6 +128,7 @@ watch(
         </Button>
       </div>
     </template>
+
     <SagConfirmDialog
       v-model:open="isConfirmOpen"
       title="清空 APIMart key？"
