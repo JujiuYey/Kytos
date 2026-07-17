@@ -86,6 +86,11 @@ const routes: RouteRecordRaw[] = [
         path: '',
         redirect: '/gacha',
       },
+      {
+        path: '/settings',
+        name: 'settings',
+        component: () => import('@/views/settings/index.vue'),
+      },
       ...generateRoutes(allMenus),
     ],
   },

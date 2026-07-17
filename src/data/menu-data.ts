@@ -1,5 +1,5 @@
 import type { Component } from 'vue';
-import { Sparkles, PenLine, User, BookText, Settings, Wand2 } from 'lucide-vue-next';
+import { Sparkles, PenLine, User, BookText, Wand2 } from 'lucide-vue-next';
 
 export interface MenuItem {
   title: string;
@@ -52,20 +52,11 @@ export const menus: MenuItem[] = [
     path: '/strategy',
     component: 'strategy/index',
   },
-  {
-    title: '设置',
-    key: 'settings',
-    group: '系统',
-    icon: Settings,
-    path: '/settings',
-    component: 'settings/index',
-  },
 ];
 
 /** Legacy exports — kept so existing imports keep working during the migration. */
 export const gachaMenus = menus.filter(m => m.group === '创作');
 export const writerMenus = menus.filter(m => m.group === 'ip形象');
-export const systemMenus = menus.filter(m => m.group === '系统');
 
 export interface MenuGroup {
   label: string;
@@ -74,7 +65,7 @@ export interface MenuGroup {
 
 /** Sidebar order: 创作 → ip形象 → 系统. */
 export const menuGroups: MenuGroup[] = (() => {
-  const order = ['创作', 'ip形象', '系统'];
+  const order = ['创作', 'ip形象'];
   return order.map(label => ({
     label,
     items: menus.filter(m => m.group === label),
