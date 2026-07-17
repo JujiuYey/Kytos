@@ -1,80 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import type { RouteRecordRaw, RouteComponent } from 'vue-router';
-import type { Component } from 'vue';
+import type { RouteRecordRaw } from 'vue-router';
 import Layout from '@/layout/index.vue';
-import { menus } from '@/data/menu-data';
-import type { MenuItem } from '@/data/menu-data';
-
-type LazyComponent = () => Promise<RouteComponent>;
-
-function dynamicImport(componentPath: string): LazyComponent {
-  const normalizedPath = componentPath.replace(/\\/g, '/');
-  const pathWithExtension = normalizedPath.endsWith('.vue')
-    ? normalizedPath
-    : `${normalizedPath}.vue`;
-
-  const modules = import.meta.glob('@/views/**/*.vue');
-
-  const moduleKey = Object.keys(modules).find(key => {
-    const normalizedKey = key.replace(/\\/g, '/');
-    return normalizedKey.endsWith(pathWithExtension);
-  });
-
-  if (!moduleKey) {
-    console.error(`Component not found: ${pathWithExtension}`);
-    return () => Promise.reject(new Error(`Component ${pathWithExtension} not found`));
-  }
-
-  return modules[moduleKey] as LazyComponent;
-}
-
-function generateRoutes(items: MenuItem[], parentPath = ''): RouteRecordRaw[] {
-  return items.flatMap(menu => {
-    const normalizedParentPath = parentPath.endsWith('/')
-      ? parentPath.slice(0, -1)
-      : parentPath;
-
-    const routePath = menu.path.startsWith('/')
-      ? menu.path
-      : `${normalizedParentPath}/${menu.path}`;
-
-    const route: RouteRecordRaw = {
-      path: routePath,
-      name: menu.key,
-      meta: {
-        title: menu.title,
-        icon: menu.icon,
-        hiddenInMenu: menu.hiddenInMenu,
-      },
-      component: undefined as unknown as Component,
-    };
-
-    if (menu.component) {
-      try {
-        const component = dynamicImport(menu.component);
-        if (component) {
-          route.component = component;
-        } else {
-          console.error(`Component not found: ${menu.component}`);
-          route.component = () => Promise.reject(new Error(`Component ${menu.component} not found`));
-        }
-      } catch (error) {
-        console.error(`Failed to load component: ${menu.component}`, error);
-        route.component = () => Promise.reject(error);
-      }
-    }
-
-    const childRoutes: RouteRecordRaw[] = [];
-
-    if (!route.component && childRoutes.length > 0) {
-      return childRoutes;
-    }
-
-    return [route, ...childRoutes];
-  });
-}
-
-const allMenus = menus;
 
 const routes: RouteRecordRaw[] = [
   {
@@ -91,7 +17,36 @@ const routes: RouteRecordRaw[] = [
         name: 'settings',
         component: () => import('@/views/settings/index.vue'),
       },
-      ...generateRoutes(allMenus),
+      {
+        path: '/writer',
+        name: 'writer',
+        component: () => import('@/views/writer/index.vue'),
+        meta: { title: 'ip形象' },
+      },
+      {
+        path: '/gacha',
+        name: 'gacha',
+        component: () => import('@/views/gacha/index.vue'),
+        meta: { title: '抽卡' },
+      },
+      {
+        path: '/initial',
+        name: 'initial',
+        component: () => import('@/views/initial/index.vue'),
+        meta: { title: '初始' },
+      },
+      {
+        path: '/character',
+        name: 'character',
+        component: () => import('@/views/character/index.vue'),
+        meta: { title: '特征' },
+      },
+      {
+        path: '/strategy',
+        name: 'strategy',
+        component: () => import('@/views/strategy/index.vue'),
+        meta: { title: '策略' },
+      },
     ],
   },
   {
