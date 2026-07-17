@@ -2,6 +2,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { net, protocol } from 'electron';
 import { handleCharacterAgentRequest } from './character-agent/route';
+import { getWorkspaceDirectory } from './services/workspace';
 
 const APP_SCHEME = 'app';
 const APP_HOST = 'bundle';
@@ -36,6 +37,19 @@ export function registerAppProtocol(): void {
 
     if (url.pathname === '/api/character-agent') {
       return handleCharacterAgentRequest(request);
+    }
+
+    if (url.pathname.startsWith('/workspace-assets/character-portraits/')) {
+      const workspacePath = await getWorkspaceDirectory();
+      const assetsRoot = path.resolve(workspacePath, 'assets', 'character-portraits');
+      const relativePath = decodeURIComponent(
+        url.pathname.slice('/workspace-assets/character-portraits/'.length),
+      );
+      const filePath = path.resolve(assetsRoot, relativePath);
+      if (!relativePath || !filePath.startsWith(`${assetsRoot}${path.sep}`)) {
+        return new Response('Not found', { status: 404 });
+      }
+      return net.fetch(pathToFileURL(filePath).toString());
     }
 
     if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {

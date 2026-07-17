@@ -43,7 +43,7 @@ export async function getCredentialValue(service: CredentialService): Promise<st
   const secrets = await loadStoredSecrets();
   const encryptedValue = secrets.credentials[service];
   if (!encryptedValue) {
-    throw new Error('尚未配置 DeepSeek API Key');
+    throw new Error(`尚未配置 ${service === 'apimart' ? 'APIMart' : 'DeepSeek'} API Key`);
   }
   if (!(await safeStorage.isAsyncEncryptionAvailable())) {
     throw new Error('系统安全存储不可用，无法读取 API Key');

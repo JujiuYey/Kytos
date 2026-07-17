@@ -17,6 +17,17 @@ export type {
   CharacterWorkspaceState,
   SaveCharacterProfileRequest,
 } from '../../shared/character';
+export type {
+  CharacterPortraitImage,
+  CharacterPortraitRecord,
+  CharacterPortraitResolution,
+  CharacterPortraitSelection,
+  CharacterPortraitSize,
+  CharacterPortraitTaskStatus,
+  CharacterPortraitWorkspaceState,
+  GenerateCharacterPortraitRequest,
+  SelectCharacterPortraitRequest,
+} from '../../shared/character-portrait';
 export {
   CHARACTER_AGENT_ENDPOINT,
   CHARACTER_DRAFT_FIELDS,
@@ -24,4 +35,8 @@ export {
   createEmptyCharacterDraft,
   getCharacterDraftProgress,
 } from '../../shared/character';
+export {
+  CHARACTER_PORTRAIT_RESOLUTIONS,
+  CHARACTER_PORTRAIT_SIZES,
+} from '../../shared/character-portrait';
 export * from './setting';

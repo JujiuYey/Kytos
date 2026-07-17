@@ -1,6 +1,6 @@
 import type { Component } from 'vue';
 // import { BookText, PenLine, Sparkles, User, Wand2 } from 'lucide-vue-next';
-import { User } from 'lucide-vue-next';
+import { Camera, User } from 'lucide-vue-next';
 
 export interface MenuItem {
   title: string;
@@ -23,6 +23,12 @@ export const menuGroups: MenuGroup[] = [
         key: 'character',
         icon: User,
         path: '/character',
+      },
+      {
+        title: '定妆照',
+        key: 'character-portrait',
+        icon: Camera,
+        path: '/character-portrait',
       },
     ],
   },
