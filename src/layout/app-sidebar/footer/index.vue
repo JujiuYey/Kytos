@@ -1,7 +1,14 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { ArrowLeftToLine, ArrowRightToLine, Settings } from 'lucide-vue-next';
-import { useSidebar } from '@/components/ui/sidebar';
 import { useRoute, useRouter } from 'vue-router';
+import {
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from '@/components/ui/sidebar';
 
 const { state, toggleSidebar } = useSidebar();
 const router = useRouter();
@@ -13,7 +20,8 @@ const currentKey = computed(() => {
 });
 
 const getMenuButtonClass = computed(() => ({
-  'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground': currentKey.value === 'settings',
+  'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground':
+    currentKey.value === 'settings',
   'hover:bg-gray-200 dark:hover:bg-gray-700': currentKey.value !== 'settings',
 }));
 

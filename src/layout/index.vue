@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import SidebarProvider from '@/components/ui/sidebar/SidebarProvider.vue';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import AppSidebar from './app-sidebar/index.vue';
 </script>
 

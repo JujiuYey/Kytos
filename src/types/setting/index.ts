@@ -2,6 +2,5 @@
 export interface AppSettings {
   autoSave: boolean;
   theme: 'light' | 'dark' | 'system';
-  storagePath: string;
   deepseekModel: string;
 }

@@ -3,16 +3,19 @@ import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import App from './App.vue';
 import router from './router';
+import { useAppStore } from '@/stores/app';
 import './index.css';
 
-// 创建Vue应用
-const app = createApp(App);
-const pinia = createPinia();
+async function bootstrap() {
+  const app = createApp(App);
+  const pinia = createPinia();
 
-// 注册持久化插件
-pinia.use(piniaPluginPersistedstate);
+  pinia.use(piniaPluginPersistedstate);
+  app.use(pinia);
 
-app
-  .use(pinia)
-  .use(router)
-  .mount('#app');
+  await useAppStore(pinia).initializeDesktop();
+
+  app.use(router).mount('#app');
+}
+
+void bootstrap();

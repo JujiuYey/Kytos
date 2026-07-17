@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Sidebar } from '@/components/ui/sidebar';
 import AppSidebarHeader from './header/index.vue';
 import AppSidebarFooter from './footer/index.vue';
 import AppSidebarMenu from './menu/index.vue';

@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { UploadIcon, XIcon, FileIcon, ImageIcon, FileTextIcon, FileVideoIcon, FileAudioIcon, FileArchiveIcon } from 'lucide-vue-next';
+import {
+  UploadIcon,
+  XIcon,
+  FileIcon,
+  ImageIcon,
+  FileTextIcon,
+  FileVideoIcon,
+  FileAudioIcon,
+  FileArchiveIcon,
+} from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -129,7 +138,10 @@ async function handleFiles(files: File[]) {
     });
   });
 
-  emit('fileChange', fileList.value.map(item => item.file));
+  emit(
+    'fileChange',
+    fileList.value.map(item => item.file),
+  );
 
   if (props.autoUpload) {
     await startUpload();
@@ -182,9 +194,7 @@ function getErrorMessage(error: unknown): string {
 
 // 开始上传
 async function startUpload() {
-  // 检查存储路径配置
-  const storagePath = appStore.settings.storagePath;
-  if (!storagePath) {
+  if (!appStore.workspacePath) {
     errorMessage.value = '存储路径未设置，请先在设置中配置存储路径';
     return;
   }
@@ -210,7 +220,6 @@ async function startUpload() {
       const result = await window.desktop.saveFile({
         fileName: fileItem.file.name,
         fileData,
-        storagePath,
         mimeType: fileItem.file.type,
       });
 
@@ -267,8 +276,14 @@ function getFileIcon(file: File) {
   if (type.includes('pdf') || name.endsWith('.pdf')) {
     return FileTextIcon;
   }
-  if (type.includes('zip') || type.includes('rar') || type.includes('tar')
-    || name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.tar')) {
+  if (
+    type.includes('zip') ||
+    type.includes('rar') ||
+    type.includes('tar') ||
+    name.endsWith('.zip') ||
+    name.endsWith('.rar') ||
+    name.endsWith('.tar')
+  ) {
     return FileArchiveIcon;
   }
   return FileIcon;
@@ -306,7 +321,11 @@ defineExpose({
     <div
       v-if="showDropZone"
       class="border-2 rounded-lg p-8 text-center transition-all"
-      :class="[isDragging ? 'border-primary bg-primary/5' : 'border-input bg-background/50 hover:bg-background/80']"
+      :class="[
+        isDragging
+          ? 'border-primary bg-primary/5'
+          : 'border-input bg-background/50 hover:bg-background/80',
+      ]"
       @dragover.prevent
       @dragenter.prevent="isDragging = true"
       @dragleave.prevent="isDragging = false"
@@ -315,9 +334,7 @@ defineExpose({
       <div v-if="!uploading" class="space-y-2">
         <UploadIcon class="mx-auto h-12 w-12 text-muted-foreground" />
         <div class="space-y-1">
-          <p class="text-sm font-medium">
-            拖放文件到此处，或
-          </p>
+          <p class="text-sm font-medium">拖放文件到此处，或</p>
           <label
             for="base-file-upload"
             class="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 text-sm cursor-pointer"
@@ -338,18 +355,14 @@ defineExpose({
           <template v-if="maxFileSize">
             ，最大文件大小: {{ formatFileSize(maxFileSize) }}
           </template>
-          <template v-if="maxFiles">
-            ，最多 {{ maxFiles }} 个文件
-          </template>
+          <template v-if="maxFiles"> ，最多 {{ maxFiles }} 个文件 </template>
         </p>
       </div>
 
       <!-- 上传进度 -->
       <div v-if="uploading && showProgress" class="space-y-2">
         <Progress :value="totalProgressPercent" class="h-2" />
-        <p class="text-sm text-muted-foreground">
-          正在上传... ({{ totalProgressPercent }}%)
-        </p>
+        <p class="text-sm text-muted-foreground">正在上传... ({{ totalProgressPercent }}%)</p>
         <div class="flex justify-center space-x-2 text-xs text-muted-foreground">
           <span>上传中: {{ fileList.filter(item => item.status === 1).length }}</span>
           <span>成功: {{ successCount }}</span>
@@ -361,9 +374,7 @@ defineExpose({
     <!-- 文件列表 -->
     <div v-if="fileList.length && showFileList" class="space-y-3">
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-medium">
-          文件列表 ({{ fileList.length }}/{{ maxFiles }})
-        </h3>
+        <h3 class="text-sm font-medium">文件列表 ({{ fileList.length }}/{{ maxFiles }})</h3>
         <div class="flex space-x-2">
           <Button
             v-if="!autoUpload && fileList.filter(item => item.status === 0).length > 0"
@@ -372,9 +383,7 @@ defineExpose({
           >
             开始上传
           </Button>
-          <Button variant="outline" size="sm" @click="clearFiles">
-            清空
-          </Button>
+          <Button variant="outline" size="sm" @click="clearFiles"> 清空 </Button>
         </div>
       </div>
 
@@ -385,20 +394,45 @@ defineExpose({
           class="flex items-center justify-between rounded-md border p-3"
         >
           <div class="flex items-center space-x-3 flex-1 min-w-0">
-            <component :is="getFileIcon(fileItem.file)" class="h-8 w-8 text-muted-foreground flex-shrink-0" />
+            <component
+              :is="getFileIcon(fileItem.file)"
+              class="h-8 w-8 text-muted-foreground flex-shrink-0"
+            />
             <div class="flex-1 min-w-0">
               <div class="flex items-center space-x-2">
                 <p class="text-sm font-medium truncate">
                   {{ fileItem.file.name }}
                 </p>
-                <Badge :variant="fileItem.status === 2 ? 'default' : fileItem.status === 3 ? 'destructive' : 'secondary'">
-                  {{ fileItem.status === 0 ? '等待中' : fileItem.status === 1 ? '上传中' : fileItem.status === 2 ? '成功' : '失败' }}
+                <Badge
+                  :variant="
+                    fileItem.status === 2
+                      ? 'default'
+                      : fileItem.status === 3
+                        ? 'destructive'
+                        : 'secondary'
+                  "
+                >
+                  {{
+                    fileItem.status === 0
+                      ? '等待中'
+                      : fileItem.status === 1
+                        ? '上传中'
+                        : fileItem.status === 2
+                          ? '成功'
+                          : '失败'
+                  }}
                 </Badge>
               </div>
               <p class="text-xs text-muted-foreground">
                 {{ formatFileSize(fileItem.file.size) }}
                 <template v-if="fileItem.status === 2 && fileItem.result">
-                  • <a :href="fileItem.result.url" target="_blank" class="text-primary hover:underline">查看文件</a>
+                  •
+                  <a
+                    :href="fileItem.result.url"
+                    target="_blank"
+                    class="text-primary hover:underline"
+                    >查看文件</a
+                  >
                 </template>
                 <template v-if="fileItem.status === 3 && fileItem.error">
                   • {{ fileItem.error }}
@@ -409,10 +443,7 @@ defineExpose({
 
           <div class="flex items-center space-x-2 flex-shrink-0">
             <div v-if="fileItem.status === 1 && showProgress" class="w-20">
-              <Progress
-                :value="fileItem.progress"
-                class="h-1"
-              />
+              <Progress :value="fileItem.progress" class="h-1" />
             </div>
             <Button
               v-if="fileItem.status === 3"
@@ -422,12 +453,7 @@ defineExpose({
             >
               重试
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              class="h-7 w-7 p-0"
-              @click="removeFile(index)"
-            >
+            <Button variant="ghost" size="sm" class="h-7 w-7 p-0" @click="removeFile(index)">
               <XIcon class="h-4 w-4" />
             </Button>
           </div>

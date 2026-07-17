@@ -1,6 +1,15 @@
 <script lang="ts" setup>
 import { useRoute, useRouter } from 'vue-router';
 import { computed } from 'vue';
+import {
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '@/components/ui/sidebar';
 import { menuGroups } from '@/data/menu-data';
 import type { MenuItem } from '@/data/menu-data';
 
@@ -17,7 +26,8 @@ const currentKey = computed(() => {
 });
 
 const getMenuButtonClass = computed(() => (key: string) => ({
-  'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground': key === currentKey.value,
+  'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground':
+    key === currentKey.value,
   'hover:bg-gray-200 dark:hover:bg-gray-700': key !== currentKey.value,
 }));
 </script>
@@ -28,11 +38,7 @@ const getMenuButtonClass = computed(() => (key: string) => ({
       <SidebarGroupLabel>{{ group.label }}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          <SidebarMenuItem
-            v-for="item of group.items"
-            :key="item.key"
-            @click="handleClick(item)"
-          >
+          <SidebarMenuItem v-for="item of group.items" :key="item.key" @click="handleClick(item)">
             <SidebarMenuButton as-child :class="getMenuButtonClass(item.key)">
               <span>
                 <component :is="item.icon" />
