@@ -19,9 +19,13 @@ export async function readJsonFile(filePath: string): Promise<unknown | null> {
 }
 
 export async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
+  await writeTextFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+export async function writeTextFile(filePath: string, content: string): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
-  await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, {
+  await writeFile(temporaryPath, content, {
     encoding: 'utf8',
     mode: 0o600,
   });

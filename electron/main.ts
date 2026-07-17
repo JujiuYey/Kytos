@@ -16,9 +16,7 @@ function openMainWindow(): void {
 }
 
 app.whenReady().then(() => {
-  if (!MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    registerAppProtocol();
-  }
+  registerAppProtocol();
   registerIpcHandlers(() => mainWindow);
   openMainWindow();
 

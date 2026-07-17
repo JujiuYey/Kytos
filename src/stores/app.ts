@@ -1,12 +1,21 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import type { AppSettings, DesktopSettings } from '@/types';
+import { DEFAULT_DEEPSEEK_MODEL } from '@/types';
 
 const defaultSettings: AppSettings = {
   autoSave: true,
   theme: 'system',
   deepseekModel: '',
 };
+
+function migrateDeepSeekModel(model: string | undefined): string {
+  const normalizedModel = model?.trim() ?? '';
+  if (normalizedModel === 'deepseek-chat' || normalizedModel === 'deepseek-reasoner') {
+    return DEFAULT_DEEPSEEK_MODEL;
+  }
+  return normalizedModel;
+}
 
 function getLegacyWorkspacePath(): string | null {
   try {
@@ -72,7 +81,7 @@ export const useAppStore = defineStore(
 
         settings.value = {
           autoSave: settings.value.autoSave ?? defaultSettings.autoSave,
-          deepseekModel: settings.value.deepseekModel ?? defaultSettings.deepseekModel,
+          deepseekModel: migrateDeepSeekModel(settings.value.deepseekModel),
           theme: settings.value.theme ?? defaultSettings.theme,
         };
       } catch (error: unknown) {

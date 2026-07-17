@@ -1,40 +1,67 @@
 <script setup lang="ts">
-import { RefreshCw, Sparkles } from 'lucide-vue-next';
+import { Bot, FileText, MessageSquare, RotateCcw } from 'lucide-vue-next';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const props = defineProps<{
-  canSummarize: boolean;
+defineProps<{
   busy: boolean;
+  keyConfigured: boolean;
+  mobilePane: 'chat' | 'draft';
+  model: string;
 }>();
 
 const emit = defineEmits<{
-  (e: 'summarize'): void;
-  (e: 'newSession'): void;
+  (event: 'newSession'): void;
+  (event: 'update:mobilePane', value: 'chat' | 'draft'): void;
 }>();
 </script>
 
 <template>
-  <header class="flex items-center gap-3 px-6 py-3 border-b">
-    <div class="flex items-center gap-2 flex-1 min-w-0">
-      <div class="size-8 rounded-full bg-primary/15 flex items-center justify-center text-primary font-medium">
-        AI
+  <header class="flex min-h-14 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-5">
+    <div class="flex min-w-0 flex-1 items-center gap-3">
+      <div
+        class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
+      >
+        <Bot class="size-4" />
       </div>
-      <span class="font-medium truncate">创建角色 助手</span>
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="truncate text-sm font-medium">角色共创 Agent</h1>
+          <Badge :variant="keyConfigured ? 'secondary' : 'outline'">
+            {{ keyConfigured ? 'DeepSeek 已连接' : '等待 API Key' }}
+          </Badge>
+        </div>
+        <p class="truncate text-xs text-muted-foreground">{{ model }}</p>
+      </div>
     </div>
-    <Button
-      variant="outline"
-      size="sm"
-      :disabled="!props.canSummarize"
-      @click="emit('summarize')"
+
+    <Tabs
+      :model-value="mobilePane"
+      class="lg:hidden"
+      @update:model-value="value => emit('update:mobilePane', value as 'chat' | 'draft')"
     >
-      <Sparkles class="size-4" /> 让 DeepSeek 总结
-    </Button>
+      <TabsList>
+        <TabsTrigger value="chat">
+          <MessageSquare class="size-3.5" />
+          对话
+        </TabsTrigger>
+        <TabsTrigger value="draft">
+          <FileText class="size-3.5" />
+          角色档案
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
+
     <Button
-      variant="outline"
-      size="sm"
-      :disabled="props.busy"
+      variant="ghost"
+      size="icon"
+      :disabled="busy"
+      aria-label="开始新对话"
+      title="开始新对话"
       @click="emit('newSession')"
     >
-      <RefreshCw class="size-4" /> 新会话
+      <RotateCcw class="size-4" />
     </Button>
   </header>
 </template>

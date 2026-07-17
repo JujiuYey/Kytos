@@ -18,6 +18,8 @@
     "lint:lint-staged": "lint-staged"
   },
   "dependencies": {
+    "@ai-sdk/deepseek": "^3.0.12",
+    "@ai-sdk/vue": "^4.0.31",
     "@internationalized/date": "^3.9.0",
     "@lucide/vue": "^1.24.0",
     "@rive-app/webgl2": "^2.38.5",
@@ -32,7 +34,7 @@
     "@vue-flow/core": "^1.48.2",
     "@vue-flow/node-toolbar": "^1.1.1",
     "@vueuse/core": "^13.5.0",
-    "ai": "^7.0.22",
+    "ai": "^7.0.31",
     "ansi-to-vue3": "^0.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ChatStatus } from 'ai';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import {
   PromptInput,
@@ -10,37 +11,49 @@ import {
 } from '@/components/ai-elements/prompt-input';
 
 const props = defineProps<{
-  busy: boolean;
-  noKey: boolean;
+  disabled: boolean;
+  status: ChatStatus;
 }>();
 
 const emit = defineEmits<{
-  (e: 'send', text: string): void;
+  (event: 'send', text: string): void;
+  (event: 'stop'): void;
 }>();
 
 function handleSubmit(message: PromptInputMessage) {
   const text = message.text.trim();
-  if (!text || props.busy || props.noKey) {
+  if (!text || props.disabled || props.status !== 'ready') {
     return;
   }
   emit('send', text);
 }
+
+function handleSubmitClick(event: MouseEvent) {
+  if (props.status === 'submitted' || props.status === 'streaming') {
+    event.preventDefault();
+    emit('stop');
+  }
+}
 </script>
 
 <template>
-  <div class="w-full shrink-0 bg-background px-4 py-3 sm:px-6">
+  <div class="shrink-0 border-t bg-background px-4 py-3 sm:px-5">
     <PromptInputProvider @submit="handleSubmit">
-      <PromptInput class="w-full">
+      <PromptInput class="mx-auto w-full max-w-3xl">
         <PromptInputBody>
           <PromptInputTextarea
-            placeholder="聊聊这位角色…"
-            :disabled="props.busy || props.noKey"
+            placeholder="描述角色，或者回答 Agent 的问题…"
+            :disabled="props.disabled"
           />
         </PromptInputBody>
-        <PromptInputFooter class="flex justify-end">
+        <PromptInputFooter class="flex items-center justify-between gap-3">
+          <span class="min-w-0 truncate text-xs text-muted-foreground">
+            {{ props.disabled ? '请先在设置中配置 DeepSeek API Key' : 'Agent 会同步更新右侧草稿' }}
+          </span>
           <PromptInputSubmit
-            :status="props.busy ? 'submitted' : 'ready'"
-            :disabled="props.busy || props.noKey"
+            :status="props.status"
+            :disabled="props.disabled"
+            @click="handleSubmitClick"
           />
         </PromptInputFooter>
       </PromptInput>

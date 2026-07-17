@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { net, protocol } from 'electron';
+import { handleCharacterAgentRequest } from './character-agent/route';
 
 const APP_SCHEME = 'app';
 const APP_HOST = 'bundle';
@@ -13,6 +14,8 @@ export function registerAppScheme(): void {
         standard: true,
         secure: true,
         supportFetchAPI: true,
+        corsEnabled: true,
+        stream: true,
       },
     },
   ]);
@@ -25,9 +28,17 @@ export function getMainWindowUrl(): string {
 export function registerAppProtocol(): void {
   const rendererRoot = path.resolve(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`);
 
-  protocol.handle(APP_SCHEME, request => {
+  protocol.handle(APP_SCHEME, async request => {
     const url = new URL(request.url);
     if (url.host !== APP_HOST) {
+      return new Response('Not found', { status: 404 });
+    }
+
+    if (url.pathname === '/api/character-agent') {
+      return handleCharacterAgentRequest(request);
+    }
+
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
       return new Response('Not found', { status: 404 });
     }
 

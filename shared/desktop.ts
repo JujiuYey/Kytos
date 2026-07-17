@@ -1,3 +1,5 @@
+import type { CharacterWorkspaceState, SaveCharacterProfileRequest } from './character';
+
 export type CredentialService = 'apimart' | 'deepseek';
 
 export interface DesktopSettings {
@@ -32,11 +34,13 @@ export interface SavedFileResult {
 
 export interface DesktopApi {
   deleteCredential: (service: CredentialService) => Promise<CredentialStatus>;
+  getCharacterWorkspace: () => Promise<CharacterWorkspaceState>;
   getCredentialStatus: (service: CredentialService) => Promise<CredentialStatus>;
   getSettings: () => Promise<DesktopSettings>;
   openWorkspaceDirectory: () => Promise<void>;
   selectDirectory: () => Promise<string | null>;
   saveFile: (request: SaveFileRequest) => Promise<SavedFileResult>;
+  saveCharacterProfile: (request: SaveCharacterProfileRequest) => Promise<void>;
   setCredential: (request: SetCredentialRequest) => Promise<CredentialStatus>;
   setWorkspaceDirectory: (workspacePath: string) => Promise<DesktopSettings>;
   useSuggestedWorkspace: () => Promise<DesktopSettings>;

@@ -39,6 +39,14 @@ async function loadStoredSettings(): Promise<StoredSettings> {
   return storedSettingsCache;
 }
 
+export async function getWorkspaceDirectory(): Promise<string> {
+  const settings = await loadStoredSettings();
+  if (!settings.workspacePath) {
+    throw new Error('尚未设置工作区目录');
+  }
+  return settings.workspacePath;
+}
+
 async function saveStoredSettings(settings: StoredSettings): Promise<void> {
   await writeJsonFile(getSettingsFilePath(), settings);
   storedSettingsCache = settings;
@@ -84,11 +92,8 @@ export async function getDesktopSettings(): Promise<DesktopSettings> {
 }
 
 export async function openWorkspaceDirectory(): Promise<void> {
-  const settings = await loadStoredSettings();
-  if (!settings.workspacePath) {
-    throw new Error('尚未设置工作区目录');
-  }
-  const errorMessage = await shell.openPath(settings.workspacePath);
+  const workspacePath = await getWorkspaceDirectory();
+  const errorMessage = await shell.openPath(workspacePath);
   if (errorMessage) {
     throw new Error(errorMessage);
   }
@@ -120,12 +125,8 @@ function validateSaveFileRequest(request: SaveFileRequest): void {
 export async function saveWorkspaceFile(request: SaveFileRequest): Promise<SavedFileResult> {
   validateSaveFileRequest(request);
 
-  const settings = await loadStoredSettings();
-  if (!settings.workspacePath) {
-    throw new Error('尚未设置工作区目录');
-  }
-
-  const storagePath = path.join(settings.workspacePath, 'assets');
+  const workspacePath = await getWorkspaceDirectory();
+  const storagePath = path.join(workspacePath, 'assets');
   const storedFileName = createStoredFileName(request.fileName);
   const destination = path.join(storagePath, storedFileName);
   await mkdir(storagePath, { recursive: true });

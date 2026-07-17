@@ -39,6 +39,25 @@ async function loadStoredSecrets(): Promise<StoredSecrets> {
   return { credentials, version: 1 };
 }
 
+export async function getCredentialValue(service: CredentialService): Promise<string> {
+  const secrets = await loadStoredSecrets();
+  const encryptedValue = secrets.credentials[service];
+  if (!encryptedValue) {
+    throw new Error('尚未配置 DeepSeek API Key');
+  }
+  if (!(await safeStorage.isAsyncEncryptionAvailable())) {
+    throw new Error('系统安全存储不可用，无法读取 API Key');
+  }
+
+  const decrypted = await safeStorage.decryptStringAsync(Buffer.from(encryptedValue, 'base64'));
+  if (decrypted.shouldReEncrypt) {
+    const refreshedValue = await safeStorage.encryptStringAsync(decrypted.result);
+    secrets.credentials[service] = refreshedValue.toString('base64');
+    await writeJsonFile(getSecretsFilePath(), secrets);
+  }
+  return decrypted.result;
+}
+
 export function isCredentialService(value: unknown): value is CredentialService {
   return credentialServices.includes(value as CredentialService);
 }
