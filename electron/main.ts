@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import {
   app,
@@ -10,8 +11,8 @@ import {
   net,
   protocol,
   shell,
-} from 'electron/main';
-import type { IpcMainInvokeEvent } from 'electron/main';
+} from 'electron';
+import type { IpcMainInvokeEvent } from 'electron';
 import type { SaveFileRequest, SavedFileResult } from '../src/types/desktop';
 
 const APP_SCHEME = 'app';
