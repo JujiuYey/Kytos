@@ -21,6 +21,8 @@ pub fn run() {
       gacha::delete_env_key,
       gacha::draw,
       gacha::fetch_task,
+      gacha::chat_ip,
+      gacha::summarize_ip,
       gacha::read_context,
       gacha::write_context,
       gacha::generate_prompt,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import MarkdownRenderer from '@/components/markdown-renderer.vue';
+import { MessageResponse } from '@/components/ai-elements/message';
 import { useChatStore } from '@/stores/chat';
 
 const emit = defineEmits<{
@@ -31,7 +31,7 @@ const draft = computed(() => {
       </div>
     </header>
     <div class="rounded border bg-background p-4 max-h-[40vh] overflow-auto">
-      <MarkdownRenderer :content="draft" :is-streaming="false" />
+      <MessageResponse :content="draft" />
     </div>
   </div>
 </template>

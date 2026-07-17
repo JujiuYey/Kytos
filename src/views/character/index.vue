@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useGachaStore } from '@/stores/gacha';
 import { useChatStore } from '@/stores/chat';
 
@@ -14,7 +14,8 @@ const project = useGachaStore();
 const chat = useChatStore();
 
 const noProject = computed(() => !project.projectRoot);
-const noKey = computed(() => !project.project?.has_deepseek_key);
+const noKey = computed(() => project.project !== null && !project.project.has_deepseek_key);
+const projectLoaded = ref(false);
 const assistantCount = computed(() => chat.messages.filter(m => m.role === 'assistant' && !m.failed).length);
 const busy = computed(() => chat.phase === 'streaming-chat' || chat.phase === 'summarizing');
 
@@ -23,7 +24,12 @@ const canSummarize = computed(
 );
 
 onMounted(async () => {
-  if (project.projectRoot) {
+  if (!project.projectRoot) {
+    return;
+  }
+  await project.scanProject();
+  projectLoaded.value = true;
+  if (project.project) {
     await chat.enterChat(project.projectRoot);
   }
 });
@@ -65,6 +71,20 @@ function onCancelPreview() {
       先去「设置」里选一个项目目录。
     </div>
 
+    <div
+      v-else-if="!projectLoaded || project.isLoading"
+      class="h-full flex items-center justify-center p-6 text-sm text-muted-foreground"
+    >
+      正在读取项目配置…
+    </div>
+
+    <div
+      v-else-if="!project.project"
+      class="h-full flex items-center justify-center p-6 text-sm text-destructive"
+    >
+      项目配置读取失败，请重新选择项目目录。
+    </div>
+
     <template v-else>
       <CharacterChatHeader
         :can-summarize="canSummarize"
@@ -80,7 +100,11 @@ function onCancelPreview() {
         还没配 DeepSeek key，去「设置」里加
       </div>
 
-      <CharacterChatMessages :messages="chat.messages" :phase="chat.phase" />
+      <CharacterChatMessages
+        class="min-h-0 flex-1"
+        :messages="chat.messages"
+        :phase="chat.phase"
+      />
 
       <ChatSummaryPreview
         v-if="chat.phase === 'preview'"

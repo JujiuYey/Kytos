@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ai-elements/conversation';
-import { Message, MessageContent } from '@/components/ai-elements/message';
+import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning';
-import MarkdownRenderer from '@/components/markdown-renderer.vue';
 import type { ChatMessage, ChatPhase } from '@/stores/chat';
 
 const props = defineProps<{
@@ -36,10 +35,9 @@ const lastMessage = computed(() => props.messages[props.messages.length - 1]);
             <ReasoningTrigger />
             <ReasoningContent :content="message.reasoning" />
           </Reasoning>
-          <MarkdownRenderer
+          <MessageResponse
             v-if="message.role === 'assistant'"
             :content="message.content"
-            :is-streaming="props.phase !== 'idle' && message === lastMessage && !message.failed"
           />
           <div
             v-else

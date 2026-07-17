@@ -28,7 +28,7 @@ function handleSubmit(message: PromptInputMessage) {
 </script>
 
 <template>
-  <div class="size-full bg-background px-4 py-3 sm:px-6">
+  <div class="w-full shrink-0 bg-background px-4 py-3 sm:px-6">
     <PromptInputProvider @submit="handleSubmit">
       <PromptInput class="w-full">
         <PromptInputBody>
