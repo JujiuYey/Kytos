@@ -10,7 +10,7 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        redirect: '/gacha',
+        redirect: '/settings',
       },
       {
         path: '/settings',
