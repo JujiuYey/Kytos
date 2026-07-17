@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import { open } from '@tauri-apps/plugin-dialog';
 import { FolderOpen } from 'lucide-vue-next';
 
 async function chooseProjectDir() {
-  const selected = await open({ directory: true, multiple: false });
-  if (typeof selected === 'string') {
-    // await store.scanProject();
-  }
+
 }
 </script>
 
