@@ -1,18 +1,8 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { useGachaStore } from '@/stores/gacha';
 import ProjectDir from './components/project-dir.vue';
 import ApimartKey from './components/apimart-key.vue';
 import DeepseekKey from './components/deepseek-key.vue';
 import DeepseekModel from './components/deepseek-model.vue';
-
-const store = useGachaStore();
-
-onMounted(() => {
-  if (store.projectRoot) {
-    store.scanProject();
-  }
-});
 </script>
 
 <template>
