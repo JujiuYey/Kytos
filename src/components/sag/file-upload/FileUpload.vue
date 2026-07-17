@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { UploadIcon, XIcon, FileIcon, ImageIcon, FileTextIcon, FileVideoIcon, FileAudioIcon, FileArchiveIcon } from 'lucide-vue-next';
-import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -173,17 +172,12 @@ function isFileAccepted(file: File, accept: string): boolean {
 }
 
 // 读取文件为 ArrayBuffer
-async function readFileAsArrayBuffer(file: File): Promise<number[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const arrayBuffer = reader.result as ArrayBuffer;
-      const uint8Array = new Uint8Array(arrayBuffer);
-      resolve(Array.from(uint8Array));
-    };
-    reader.onerror = reject;
-    reader.readAsArrayBuffer(file);
-  });
+async function readFileData(file: File): Promise<Uint8Array> {
+  return new Uint8Array(await file.arrayBuffer());
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 // 开始上传
@@ -207,17 +201,17 @@ async function startUpload() {
 
     try {
       // 读取文件内容
-      const fileData = await readFileAsArrayBuffer(fileItem.file);
+      const fileData = await readFileData(fileItem.file);
 
       // 模拟进度更新
       fileItem.progress = 50;
       emit('uploadProgress', 50, fileItem.file);
 
-      // 调用 Tauri 命令保存文件
-      const result = await invoke<UploadResult>('save_file_to_storage', {
+      const result = await window.desktop.saveFile({
         fileName: fileItem.file.name,
         fileData,
         storagePath,
+        mimeType: fileItem.file.type,
       });
 
       // 更新进度和状态
@@ -227,10 +221,10 @@ async function startUpload() {
 
       emit('uploadProgress', 100, fileItem.file);
       emit('uploadSuccess', result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       fileItem.status = 3;
-      fileItem.error = error?.toString() || '上传失败';
-      // emit('uploadError', fileItem.error, fileItem.file);
+      fileItem.error = getErrorMessage(error) || '上传失败';
+      emit('uploadError', fileItem.error, fileItem.file);
     }
   }
 

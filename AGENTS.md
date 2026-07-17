@@ -2,6 +2,8 @@
 
 本文件约束所有在本仓库中工作的代码代理。开始修改前先阅读本文件；。
 
+## SKILL使用规则
+使用任何CE:*的相关SKILL需要用户的同意，否则禁止主动使用.
 
 ## 组件使用规则
 
@@ -24,7 +26,7 @@
 
 ### 组件导入
 
-- `src/components/ui/` 已在 `vite.config.ts` 中配置自动注册；模板中按现有代码直接使用 PascalCase 组件即可。
+- `src/components/ui/` 已在 `vite.config.mts` 中配置自动注册；模板中按现有代码直接使用 PascalCase 组件即可。
 - `src/components/ai-elements/` 从具体目录的 barrel 文件显式导入，例如：
 
   ```ts
