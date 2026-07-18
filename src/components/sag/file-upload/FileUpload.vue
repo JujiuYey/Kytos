@@ -15,6 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import type { UploadResult } from './types';
 import { useAppStore } from '@/stores/app';
+import type { SaveFileRequest } from '@/types';
 
 // 文件项状态
 interface FileItem {
@@ -36,6 +37,7 @@ interface BaseProps {
   showFileList?: boolean;
   showProgress?: boolean;
   showDropZone?: boolean;
+  uploadHandler?: (request: SaveFileRequest) => Promise<UploadResult>;
 }
 
 const props = withDefaults(defineProps<BaseProps>(), {
@@ -217,11 +219,14 @@ async function startUpload() {
       fileItem.progress = 50;
       emit('uploadProgress', 50, fileItem.file);
 
-      const result = await window.desktop.saveFile({
+      const saveRequest: SaveFileRequest = {
         fileName: fileItem.file.name,
         fileData,
         mimeType: fileItem.file.type,
-      });
+      };
+      const result = props.uploadHandler
+        ? await props.uploadHandler(saveRequest)
+        : await window.desktop.saveFile(saveRequest);
 
       // 更新进度和状态
       fileItem.progress = 100;

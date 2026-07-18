@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Camera, Check, Clock3, ImageIcon, Trash2 } from 'lucide-vue-next';
+import { Camera, Check, Clock3, Images, Trash2 } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { Badge } from '@/components/ui/badge';
@@ -9,39 +9,43 @@ import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type {
+  CharacterImageRecord,
   CharacterPortraitImage,
-  CharacterPortraitRecord,
   CharacterPortraitSelection,
   CharacterPortraitTaskStatus,
 } from '@/types';
 
 defineProps<{
+  assetKind: 'portrait' | 'sheet';
   deletingFileName: string;
-  records: CharacterPortraitRecord[];
+  records: CharacterImageRecord[];
   selectedImage: CharacterPortraitSelection | null;
   selectingFileName: string;
 }>();
 
 const emit = defineEmits<{
-  (event: 'delete', record: CharacterPortraitRecord, image: CharacterPortraitImage): void;
-  (event: 'select', record: CharacterPortraitRecord, image: CharacterPortraitImage): void;
+  (event: 'delete', record: CharacterImageRecord, image: CharacterPortraitImage): void;
+  (event: 'select', record: CharacterImageRecord, image: CharacterPortraitImage): void;
 }>();
 
 const activeStatuses: CharacterPortraitTaskStatus[] = ['submitted', 'pending', 'processing'];
 
-function isActive(record: CharacterPortraitRecord): boolean {
+function isActive(record: CharacterImageRecord): boolean {
   return activeStatuses.includes(record.status);
 }
 
 function isSelected(
   selection: CharacterPortraitSelection | null,
-  record: CharacterPortraitRecord,
+  record: CharacterImageRecord,
   image: CharacterPortraitImage,
 ): boolean {
   return selection?.taskId === record.id && selection.fileName === image.fileName;
 }
 
-function getStatusLabel(status: CharacterPortraitTaskStatus): string {
+function getStatusLabel(record: CharacterImageRecord): string {
+  if (record.source === 'uploaded') {
+    return '已上传';
+  }
   const labels: Record<CharacterPortraitTaskStatus, string> = {
     cancelled: '已取消',
     completed: '已完成',
@@ -50,12 +54,13 @@ function getStatusLabel(status: CharacterPortraitTaskStatus): string {
     processing: '生成中',
     submitted: '已提交',
   };
-  return labels[status];
+  return labels[record.status];
 }
 
-function getAspectClass(size: CharacterPortraitRecord['size']): string {
+function getAspectClass(size: CharacterImageRecord['size']): string {
   return {
     '1:1': 'aspect-square',
+    '16:9': 'aspect-video',
     '2:3': 'aspect-[2/3]',
     '3:4': 'aspect-[3/4]',
     '4:5': 'aspect-[4/5]',
@@ -77,13 +82,18 @@ function formatDate(value: string): string {
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-col bg-muted/15" aria-label="定妆照候选">
+  <section
+    class="flex min-h-0 flex-col bg-muted/15"
+    :aria-label="assetKind === 'portrait' ? '定妆照候选' : '角色表候选'"
+  >
     <div class="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-5">
       <div class="min-w-0">
-        <h2 class="truncate text-sm font-medium">候选定妆照</h2>
-        <p class="mt-0.5 text-xs text-muted-foreground">生成结果会自动保存到作品工作区</p>
+        <h2 class="truncate text-sm font-medium">
+          {{ assetKind === 'portrait' ? '定妆照资产' : '多角度角色表' }}
+        </h2>
+        <p class="mt-0.5 text-xs text-muted-foreground">生成和上传的图片都会保存到作品工作区</p>
       </div>
-      <Badge variant="outline">{{ records.length }} 次生成</Badge>
+      <Badge variant="outline">{{ records.length }} 项记录</Badge>
     </div>
 
     <ScrollArea class="min-h-0 flex-1">
@@ -100,10 +110,13 @@ function formatDate(value: string): string {
               >
                 <Loader v-if="isActive(record)" class="size-3" />
                 <Check v-else-if="record.status === 'completed'" class="size-3" />
-                {{ getStatusLabel(record.status) }}
+                {{ getStatusLabel(record) }}
               </Badge>
-              <span class="text-xs text-muted-foreground">
+              <span v-if="record.source === 'generated'" class="text-xs text-muted-foreground">
                 {{ record.size }} · {{ record.resolution.toUpperCase() }} · {{ record.count }} 张
+              </span>
+              <span v-else class="max-w-64 truncate text-xs text-muted-foreground">
+                {{ record.originalName || '本地上传图片' }}
               </span>
             </div>
             <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -114,7 +127,9 @@ function formatDate(value: string): string {
 
           <div v-if="isActive(record)" class="rounded-md border bg-background p-5">
             <div class="flex items-center justify-between gap-4 text-sm">
-              <span>GPT-Image-2 正在绘制定妆照</span>
+              <span>
+                GPT-Image-2 正在绘制{{ assetKind === 'portrait' ? '定妆照' : '角色表' }}
+              </span>
               <span class="tabular-nums text-muted-foreground">{{ record.progress }}%</span>
             </div>
             <Progress :model-value="record.progress" class="mt-3" />
@@ -127,7 +142,10 @@ function formatDate(value: string): string {
             v-else-if="record.status === 'failed' || record.status === 'cancelled'"
             class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
           >
-            {{ record.errorMessage || '图片生成任务未完成' }}
+            {{
+              record.errorMessage ||
+              `${assetKind === 'portrait' ? '定妆照' : '角色表'}生成任务未完成`
+            }}
           </div>
 
           <div
@@ -140,18 +158,18 @@ function formatDate(value: string): string {
               class="overflow-hidden rounded-md border bg-background"
             >
               <ImageViewer
-                :alt="`${record.id} 的第 ${imageIndex + 1} 张定妆照预览`"
+                :alt="`${record.id} 的第 ${imageIndex + 1} 张${assetKind === 'portrait' ? '定妆照' : '角色表'}预览`"
                 :src="image.url"
-                title="定妆照预览"
-                description="查看生成的定妆照大图，可缩放和拖拽"
+                :title="assetKind === 'portrait' ? '定妆照预览' : '角色表预览'"
+                :description="`查看${assetKind === 'portrait' ? '定妆照' : '角色表'}大图，可缩放和拖拽`"
               >
                 <Button
                   variant="ghost"
                   class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
-                  :aria-label="`查看第 ${imageIndex + 1} 张定妆照`"
+                  :aria-label="`查看第 ${imageIndex + 1} 张${assetKind === 'portrait' ? '定妆照' : '角色表'}`"
                 >
                   <AiImage
-                    :alt="`${record.id} 的第 ${imageIndex + 1} 张定妆照`"
+                    :alt="`${record.id} 的第 ${imageIndex + 1} 张${assetKind === 'portrait' ? '定妆照' : '角色表'}`"
                     :src="image.url"
                     :class="[
                       getAspectClass(record.size),
@@ -164,9 +182,9 @@ function formatDate(value: string): string {
               <figcaption
                 class="flex min-h-12 items-center justify-between gap-3 border-t px-3 py-2"
               >
-                <span class="truncate text-xs text-muted-foreground"
-                  >候选 {{ imageIndex + 1 }}</span
-                >
+                <span class="truncate text-xs text-muted-foreground">
+                  {{ record.source === 'uploaded' ? '上传图片' : `候选 ${imageIndex + 1}` }}
+                </span>
                 <div class="flex shrink-0 items-center gap-1.5">
                   <Badge
                     v-if="isSelected(selectedImage, record, image)"
@@ -183,7 +201,13 @@ function formatDate(value: string): string {
                     :disabled="selectingFileName === image.fileName || Boolean(deletingFileName)"
                     @click="emit('select', record, image)"
                   >
-                    {{ selectingFileName === image.fileName ? '保存中' : '设为定妆照' }}
+                    {{
+                      selectingFileName === image.fileName
+                        ? '保存中'
+                        : assetKind === 'portrait'
+                          ? '设为定妆照'
+                          : '设为角色表'
+                    }}
                   </Button>
                   <TooltipProvider :delay-duration="300">
                     <Tooltip>
@@ -193,13 +217,15 @@ function formatDate(value: string): string {
                           variant="ghost"
                           class="size-8 text-muted-foreground hover:text-destructive"
                           :disabled="Boolean(deletingFileName) || Boolean(selectingFileName)"
-                          :aria-label="`删除第 ${imageIndex + 1} 张定妆照`"
+                          :aria-label="`删除第 ${imageIndex + 1} 张${assetKind === 'portrait' ? '定妆照' : '角色表'}`"
                           @click="emit('delete', record, image)"
                         >
                           <Trash2 class="size-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>删除定妆照</TooltipContent>
+                      <TooltipContent>
+                        删除{{ assetKind === 'portrait' ? '定妆照' : '角色表' }}
+                      </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </div>
@@ -214,16 +240,15 @@ function formatDate(value: string): string {
           <div
             class="mx-auto flex size-12 items-center justify-center rounded-md border bg-background"
           >
-            <Camera class="size-5 text-muted-foreground" />
+            <Camera v-if="assetKind === 'portrait'" class="size-5 text-muted-foreground" />
+            <Images v-else class="size-5 text-muted-foreground" />
           </div>
-          <h2 class="mt-4 text-sm font-medium">还没有定妆照</h2>
+          <h2 class="mt-4 text-sm font-medium">
+            还没有{{ assetKind === 'portrait' ? '定妆照' : '角色表' }}
+          </h2>
           <p class="mt-1.5 text-sm leading-6 text-muted-foreground">
-            确认左侧提示词和输出规格后，发起第一次生成。
+            可以从左侧上传已有图片，或确认设置后发起生成。
           </p>
-          <div class="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <ImageIcon class="size-3.5" />
-            图片完成后会显示在这里
-          </div>
         </div>
       </div>
     </ScrollArea>

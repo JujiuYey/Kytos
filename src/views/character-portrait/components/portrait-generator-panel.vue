@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { WandSparkles } from 'lucide-vue-next';
+import { Upload, WandSparkles } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -25,6 +25,7 @@ defineProps<{
 
 const emit = defineEmits<{
   (event: 'generate'): void;
+  (event: 'upload'): void;
   (event: 'update:count', value: number): void;
   (event: 'update:modelValue', value: string): void;
   (event: 'update:resolution', value: CharacterPortraitResolution): void;
@@ -143,10 +144,16 @@ const emit = defineEmits<{
     </ScrollArea>
 
     <footer class="shrink-0 border-t bg-background px-5 py-4">
-      <Button class="w-full" :disabled="disabled" @click="emit('generate')">
-        <WandSparkles class="size-4" />
-        {{ busy ? '正在生成定妆照' : `生成 ${count} 张定妆照` }}
-      </Button>
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+        <Button variant="outline" @click="emit('upload')">
+          <Upload class="size-4" />
+          上传已有定妆照
+        </Button>
+        <Button :disabled="disabled" @click="emit('generate')">
+          <WandSparkles class="size-4" />
+          {{ busy ? '正在生成定妆照' : `生成 ${count} 张定妆照` }}
+        </Button>
+      </div>
       <p class="mt-2 text-center text-xs text-muted-foreground">
         使用 GPT-Image-2，点击后将产生实际费用
       </p>

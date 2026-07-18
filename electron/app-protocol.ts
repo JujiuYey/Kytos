@@ -6,6 +6,11 @@ import { getWorkspaceDirectory } from './services/workspace';
 
 const APP_SCHEME = 'app';
 const APP_HOST = 'bundle';
+const WORKSPACE_IMAGE_DIRECTORIES = [
+  'character-expressions',
+  'character-portraits',
+  'character-sheets',
+] as const;
 
 export function registerAppScheme(): void {
   protocol.registerSchemesAsPrivileged([
@@ -39,11 +44,14 @@ export function registerAppProtocol(): void {
       return handleCharacterAgentRequest(request);
     }
 
-    if (url.pathname.startsWith('/workspace-assets/character-portraits/')) {
+    const imageDirectory = WORKSPACE_IMAGE_DIRECTORIES.find(directory =>
+      url.pathname.startsWith(`/workspace-assets/${directory}/`),
+    );
+    if (imageDirectory) {
       const workspacePath = await getWorkspaceDirectory();
-      const assetsRoot = path.resolve(workspacePath, 'assets', 'character-portraits');
+      const assetsRoot = path.resolve(workspacePath, 'assets', imageDirectory);
       const relativePath = decodeURIComponent(
-        url.pathname.slice('/workspace-assets/character-portraits/'.length),
+        url.pathname.slice(`/workspace-assets/${imageDirectory}/`.length),
       );
       const filePath = path.resolve(assetsRoot, relativePath);
       if (!relativePath || !filePath.startsWith(`${assetsRoot}${path.sep}`)) {

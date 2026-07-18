@@ -18,6 +18,18 @@ export type {
   SaveCharacterProfileRequest,
 } from '../../shared/character';
 export type {
+  CharacterExpressionRecord,
+  CharacterExpressionSize,
+  CharacterExpressionWorkspaceState,
+  DeleteCharacterExpressionRequest,
+  GenerateCharacterExpressionRequest,
+  RenameCharacterExpressionRequest,
+  UploadCharacterExpressionRequest,
+} from '../../shared/character-expression';
+export { CHARACTER_EXPRESSION_SIZES } from '../../shared/character-expression';
+export type {
+  CharacterImageRecord,
+  CharacterImageSource,
   CharacterPortraitImage,
   CharacterPortraitRecord,
   CharacterPortraitResolution,
@@ -25,8 +37,13 @@ export type {
   CharacterPortraitSize,
   CharacterPortraitTaskStatus,
   CharacterPortraitWorkspaceState,
+  CharacterSheetRecord,
+  DeleteCharacterPortraitRequest,
+  DeleteCharacterSheetRequest,
   GenerateCharacterPortraitRequest,
+  GenerateCharacterSheetRequest,
   SelectCharacterPortraitRequest,
+  SelectCharacterSheetRequest,
 } from '../../shared/character-portrait';
 export {
   CHARACTER_AGENT_ENDPOINT,
@@ -38,5 +55,6 @@ export {
 export {
   CHARACTER_PORTRAIT_RESOLUTIONS,
   CHARACTER_PORTRAIT_SIZES,
+  CHARACTER_SHEET_SIZE,
 } from '../../shared/character-portrait';
 export * from './setting';

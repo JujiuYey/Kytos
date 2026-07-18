@@ -1,55 +1,83 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { AlertCircle, Camera, SlidersHorizontal } from 'lucide-vue-next';
+import { AlertCircle, Camera, Check, Images, SlidersHorizontal } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upload-dialog';
+import { CharacterSheetGeneratorPanel } from '@/components/sag/character-sheet-generator-panel';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import type {
   CharacterDraft,
+  CharacterImageRecord,
   CharacterPortraitImage,
   CharacterPortraitRecord,
   CharacterPortraitResolution,
   CharacterPortraitSelection,
   CharacterPortraitSize,
+  CharacterPortraitWorkspaceState,
+  CharacterSheetRecord,
   CredentialStatus,
+  SaveFileRequest,
+  SavedFileResult,
 } from '@/types';
 import { createEmptyCharacterDraft } from '@/types';
 import PortraitGallery from './components/portrait-gallery.vue';
 import PortraitGeneratorPanel from './components/portrait-generator-panel.vue';
 
+type AssetKind = 'portrait' | 'sheet';
+type WorkspaceStage = 'portrait' | 'sheet';
+
 const router = useRouter();
 const draft = ref<CharacterDraft>(createEmptyCharacterDraft());
 const credentialStatus = ref<CredentialStatus | null>(null);
 const records = ref<CharacterPortraitRecord[]>([]);
+const sheetRecords = ref<CharacterSheetRecord[]>([]);
 const selectedImage = ref<CharacterPortraitSelection | null>(null);
+const selectedSheet = ref<CharacterPortraitSelection | null>(null);
 const prompt = ref('');
+const sheetPrompt = ref('');
 const size = ref<CharacterPortraitSize>('2:3');
 const resolution = ref<CharacterPortraitResolution>('2k');
+const sheetResolution = ref<CharacterPortraitResolution>('2k');
 const count = ref(2);
 const errorMessage = ref('');
 const isInitializing = ref(true);
 const isSubmitting = ref(false);
+const isSubmittingSheet = ref(false);
 const isPolling = ref(false);
+const isPollingSheet = ref(false);
 const selectingFileName = ref('');
 const deletingFileName = ref('');
 const deleteDialogOpen = ref(false);
 const deleteTarget = ref<{
   image: CharacterPortraitImage;
-  record: CharacterPortraitRecord;
+  kind: AssetKind;
+  record: CharacterImageRecord;
 } | null>(null);
+const uploadDialogOpen = ref(false);
+const uploadKind = ref<AssetKind>('portrait');
+const activeStage = ref<WorkspaceStage>('portrait');
 const mobilePane = ref<'settings' | 'gallery'>('settings');
 
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let portraitPollTimer: ReturnType<typeof setTimeout> | null = null;
+let sheetPollTimer: ReturnType<typeof setTimeout> | null = null;
 let isDisposed = false;
 
+const activeStatuses = ['submitted', 'pending', 'processing'];
 const activeRecord = computed(() =>
-  records.value.find(record => ['submitted', 'pending', 'processing'].includes(record.status)),
+  records.value.find(record => activeStatuses.includes(record.status)),
+);
+const activeSheetRecord = computed(() =>
+  sheetRecords.value.find(record => activeStatuses.includes(record.status)),
 );
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
 const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
+const isSheetBusy = computed(() => isSubmittingSheet.value || Boolean(activeSheetRecord.value));
+const selectedPortraitImage = computed(() => findSelectedImage(records.value, selectedImage.value));
 const isGenerateDisabled = computed(
   () =>
     isInitializing.value ||
@@ -57,6 +85,32 @@ const isGenerateDisabled = computed(
     !keyConfigured.value ||
     !prompt.value.trim() ||
     prompt.value.length > 20_000,
+);
+const isSheetGenerateDisabled = computed(
+  () =>
+    isInitializing.value ||
+    isSheetBusy.value ||
+    !keyConfigured.value ||
+    !selectedPortraitImage.value ||
+    !sheetPrompt.value.trim() ||
+    sheetPrompt.value.length > 20_000,
+);
+const currentPollingRecord = computed(() =>
+  activeStage.value === 'portrait' ? activeRecord.value : activeSheetRecord.value,
+);
+const currentIsPolling = computed(() =>
+  activeStage.value === 'portrait' ? isPolling.value : isPollingSheet.value,
+);
+const uploadTitle = computed(() =>
+  uploadKind.value === 'portrait' ? '上传已有定妆照' : '上传已有角色表',
+);
+const uploadDescription = computed(() =>
+  uploadKind.value === 'portrait'
+    ? '上传后将直接设为正式定妆照，并可继续生成多角度角色表。'
+    : '上传后将直接设为正式角色表，不再调用图片生成服务。',
+);
+const uploadHandler = computed(() =>
+  uploadKind.value === 'portrait' ? uploadPortrait : uploadSheet,
 );
 
 function buildPortraitPrompt(character: CharacterDraft): string {
@@ -77,51 +131,122 @@ function buildPortraitPrompt(character: CharacterDraft): string {
   ].join('\n');
 }
 
-function replaceRecord(updatedRecord: CharacterPortraitRecord) {
-  records.value = [
-    updatedRecord,
-    ...records.value.filter(record => record.id !== updatedRecord.id),
-  ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+function buildSheetPrompt(): string {
+  return [
+    '参考图中的角色就是唯一要画的人，必须保持同一个角色，不要重新设计或美化。',
+    '严格保持参考图中的脸、五官、神态、发型、身材比例、服装、鞋履、配饰、颜色和绘画风格一致。',
+    '生成一张 16:9 横版多角度角色设定表，人物之间留出清晰间距并对齐。',
+    '从左到右依次展示：正面全身、完全侧面全身、背面全身、放大的四分之三侧面头肩像。',
+    '全身视图保持相同身高和自然中性站姿，完整展示头部到鞋底；头像清楚展示五官、表情、发型与标志性配饰。',
+    '背景干净统一，不要地面线、阴影、边框、文字、标注、色卡、额外人物或额外物品。',
+  ].join('\n');
 }
 
-function clearPollTimer() {
-  if (pollTimer) {
-    clearTimeout(pollTimer);
-    pollTimer = null;
+function findSelectedImage<TRecord extends CharacterImageRecord>(
+  recordList: TRecord[],
+  selection: CharacterPortraitSelection | null,
+): CharacterPortraitImage | null {
+  if (!selection) {
+    return null;
+  }
+  return (
+    recordList
+      .find(record => record.id === selection.taskId)
+      ?.images.find(image => image.fileName === selection.fileName) ?? null
+  );
+}
+
+function replaceRecord<TRecord extends CharacterImageRecord>(
+  recordList: TRecord[],
+  updatedRecord: TRecord,
+): TRecord[] {
+  return [updatedRecord, ...recordList.filter(record => record.id !== updatedRecord.id)].sort(
+    (left, right) => right.createdAt.localeCompare(left.createdAt),
+  );
+}
+
+function applyWorkspace(workspace: CharacterPortraitWorkspaceState) {
+  records.value = workspace.records;
+  sheetRecords.value = workspace.sheetRecords;
+  selectedImage.value = workspace.selectedImage;
+  selectedSheet.value = workspace.selectedSheet;
+}
+
+function clearPollTimer(kind: AssetKind) {
+  if (kind === 'portrait' && portraitPollTimer) {
+    clearTimeout(portraitPollTimer);
+    portraitPollTimer = null;
+  }
+  if (kind === 'sheet' && sheetPollTimer) {
+    clearTimeout(sheetPollTimer);
+    sheetPollTimer = null;
   }
 }
 
-function schedulePoll(taskId: string) {
-  clearPollTimer();
-  pollTimer = setTimeout(() => {
-    void pollTask(taskId);
+function schedulePoll(kind: AssetKind, taskId: string) {
+  clearPollTimer(kind);
+  const timer = setTimeout(() => {
+    if (kind === 'portrait') {
+      void pollPortraitTask(taskId);
+    } else {
+      void pollSheetTask(taskId);
+    }
   }, 2500);
+  if (kind === 'portrait') {
+    portraitPollTimer = timer;
+  } else {
+    sheetPollTimer = timer;
+  }
 }
 
-async function pollTask(taskId: string) {
+async function pollPortraitTask(taskId: string) {
   if (isDisposed) {
     return;
   }
   isPolling.value = true;
   try {
     const record = await window.desktop.getCharacterPortraitTask(taskId);
-    replaceRecord(record);
+    records.value = replaceRecord(records.value, record);
     errorMessage.value = '';
-
-    if (['submitted', 'pending', 'processing'].includes(record.status)) {
-      schedulePoll(taskId);
+    if (activeStatuses.includes(record.status)) {
+      schedulePoll('portrait', taskId);
       return;
     }
-
     isPolling.value = false;
     if (record.status === 'completed') {
       toast.success('定妆照已生成并保存到工作区');
       mobilePane.value = 'gallery';
     } else {
-      errorMessage.value = record.errorMessage || '图片生成任务未完成';
+      errorMessage.value = record.errorMessage || '定妆照生成任务未完成';
     }
   } catch (pollError: unknown) {
     isPolling.value = false;
+    errorMessage.value = pollError instanceof Error ? pollError.message : String(pollError);
+  }
+}
+
+async function pollSheetTask(taskId: string) {
+  if (isDisposed) {
+    return;
+  }
+  isPollingSheet.value = true;
+  try {
+    const record = await window.desktop.getCharacterSheetTask(taskId);
+    sheetRecords.value = replaceRecord(sheetRecords.value, record);
+    errorMessage.value = '';
+    if (activeStatuses.includes(record.status)) {
+      schedulePoll('sheet', taskId);
+      return;
+    }
+    isPollingSheet.value = false;
+    if (record.status === 'completed') {
+      toast.success('多角度角色表已生成并保存到工作区');
+      mobilePane.value = 'gallery';
+    } else {
+      errorMessage.value = record.errorMessage || '角色表生成任务未完成';
+    }
+  } catch (pollError: unknown) {
+    isPollingSheet.value = false;
     errorMessage.value = pollError instanceof Error ? pollError.message : String(pollError);
   }
 }
@@ -136,24 +261,40 @@ async function initialize() {
       window.desktop.getCredentialStatus('apimart'),
     ]);
     draft.value = characterWorkspace.draft;
-    records.value = portraitWorkspace.records;
-    selectedImage.value = portraitWorkspace.selectedImage;
+    applyWorkspace(portraitWorkspace);
     credentialStatus.value = status;
 
-    const latestRecord = portraitWorkspace.records[0];
-    prompt.value = latestRecord?.prompt || buildPortraitPrompt(characterWorkspace.draft);
-    if (latestRecord) {
-      size.value = latestRecord.size;
-      resolution.value = latestRecord.resolution;
-      count.value = latestRecord.count;
+    const latestGeneratedRecord = portraitWorkspace.records.find(
+      record => record.source === 'generated',
+    );
+    prompt.value = latestGeneratedRecord?.prompt || buildPortraitPrompt(characterWorkspace.draft);
+    if (latestGeneratedRecord) {
+      size.value = latestGeneratedRecord.size;
+      resolution.value = latestGeneratedRecord.resolution;
+      count.value = latestGeneratedRecord.count;
     }
 
+    const latestGeneratedSheet = portraitWorkspace.sheetRecords.find(
+      record => record.source === 'generated',
+    );
+    sheetPrompt.value = latestGeneratedSheet?.prompt || buildSheetPrompt();
+    sheetResolution.value = latestGeneratedSheet?.resolution || '2k';
+
     const unfinishedRecord = portraitWorkspace.records.find(record =>
-      ['submitted', 'pending', 'processing'].includes(record.status),
+      activeStatuses.includes(record.status),
+    );
+    const unfinishedSheet = portraitWorkspace.sheetRecords.find(record =>
+      activeStatuses.includes(record.status),
     );
     if (unfinishedRecord) {
+      schedulePoll('portrait', unfinishedRecord.id);
+    }
+    if (unfinishedSheet) {
+      activeStage.value = 'sheet';
+      schedulePoll('sheet', unfinishedSheet.id);
+    }
+    if (unfinishedRecord || unfinishedSheet) {
       mobilePane.value = 'gallery';
-      schedulePoll(unfinishedRecord.id);
     }
   } catch (initializationError: unknown) {
     errorMessage.value =
@@ -169,7 +310,6 @@ async function generatePortraits() {
   if (isGenerateDisabled.value) {
     return;
   }
-
   isSubmitting.value = true;
   errorMessage.value = '';
   try {
@@ -179,9 +319,9 @@ async function generatePortraits() {
       resolution: resolution.value,
       size: size.value,
     });
-    replaceRecord(record);
+    records.value = replaceRecord(records.value, record);
     mobilePane.value = 'gallery';
-    await pollTask(record.id);
+    await pollPortraitTask(record.id);
   } catch (generationError: unknown) {
     errorMessage.value =
       generationError instanceof Error ? generationError.message : String(generationError);
@@ -190,15 +330,41 @@ async function generatePortraits() {
   }
 }
 
+async function generateSheet() {
+  if (isSheetGenerateDisabled.value) {
+    return;
+  }
+  isSubmittingSheet.value = true;
+  errorMessage.value = '';
+  try {
+    const record = await window.desktop.generateCharacterSheet({
+      prompt: sheetPrompt.value.trim(),
+      resolution: sheetResolution.value,
+    });
+    sheetRecords.value = replaceRecord(sheetRecords.value, record);
+    mobilePane.value = 'gallery';
+    await pollSheetTask(record.id);
+  } catch (generationError: unknown) {
+    errorMessage.value =
+      generationError instanceof Error ? generationError.message : String(generationError);
+  } finally {
+    isSubmittingSheet.value = false;
+  }
+}
+
 function retryPolling() {
-  if (!activeRecord.value || isPolling.value) {
+  if (!currentPollingRecord.value || currentIsPolling.value) {
     return;
   }
   errorMessage.value = '';
-  void pollTask(activeRecord.value.id);
+  if (activeStage.value === 'portrait') {
+    void pollPortraitTask(currentPollingRecord.value.id);
+  } else {
+    void pollSheetTask(currentPollingRecord.value.id);
+  }
 }
 
-async function selectPortrait(record: CharacterPortraitRecord, image: CharacterPortraitImage) {
+async function selectPortrait(record: CharacterImageRecord, image: CharacterPortraitImage) {
   if (selectingFileName.value || deletingFileName.value) {
     return;
   }
@@ -208,8 +374,10 @@ async function selectPortrait(record: CharacterPortraitRecord, image: CharacterP
       fileName: image.fileName,
       taskId: record.id,
     });
-    selectedImage.value = workspace.selectedImage;
-    toast.success('已设为角色定妆照');
+    applyWorkspace(workspace);
+    activeStage.value = 'sheet';
+    mobilePane.value = 'settings';
+    toast.success('已设为正式定妆照');
   } catch (selectionError: unknown) {
     toast.error(selectionError instanceof Error ? selectionError.message : String(selectionError));
   } finally {
@@ -217,35 +385,87 @@ async function selectPortrait(record: CharacterPortraitRecord, image: CharacterP
   }
 }
 
-function requestDeletePortrait(record: CharacterPortraitRecord, image: CharacterPortraitImage) {
+async function selectSheet(record: CharacterImageRecord, image: CharacterPortraitImage) {
   if (selectingFileName.value || deletingFileName.value) {
     return;
   }
-  deleteTarget.value = { image, record };
-  deleteDialogOpen.value = true;
-}
-
-async function deletePortrait() {
-  if (!deleteTarget.value || deletingFileName.value) {
-    return;
-  }
-
-  const { image, record } = deleteTarget.value;
-  deletingFileName.value = image.fileName;
+  selectingFileName.value = image.fileName;
   try {
-    const workspace = await window.desktop.deleteCharacterPortrait({
+    const workspace = await window.desktop.selectCharacterSheet({
       fileName: image.fileName,
       taskId: record.id,
     });
-    records.value = workspace.records;
-    selectedImage.value = workspace.selectedImage;
+    applyWorkspace(workspace);
+    toast.success('已设为正式角色表');
+  } catch (selectionError: unknown) {
+    toast.error(selectionError instanceof Error ? selectionError.message : String(selectionError));
+  } finally {
+    selectingFileName.value = '';
+  }
+}
+
+function requestDelete(
+  kind: AssetKind,
+  record: CharacterImageRecord,
+  image: CharacterPortraitImage,
+) {
+  if (selectingFileName.value || deletingFileName.value) {
+    return;
+  }
+  deleteTarget.value = { image, kind, record };
+  deleteDialogOpen.value = true;
+}
+
+async function deleteAsset() {
+  if (!deleteTarget.value || deletingFileName.value) {
+    return;
+  }
+  const { image, kind, record } = deleteTarget.value;
+  deletingFileName.value = image.fileName;
+  try {
+    const request = { fileName: image.fileName, taskId: record.id };
+    const workspace =
+      kind === 'portrait'
+        ? await window.desktop.deleteCharacterPortrait(request)
+        : await window.desktop.deleteCharacterSheet(request);
+    applyWorkspace(workspace);
     deleteDialogOpen.value = false;
     deleteTarget.value = null;
-    toast.success('定妆照已删除');
+    toast.success(kind === 'portrait' ? '定妆照已删除' : '角色表已删除');
   } catch (deletionError: unknown) {
     toast.error(deletionError instanceof Error ? deletionError.message : String(deletionError));
   } finally {
     deletingFileName.value = '';
+  }
+}
+
+function openUpload(kind: AssetKind) {
+  uploadKind.value = kind;
+  uploadDialogOpen.value = true;
+}
+
+function uploadPortrait(request: SaveFileRequest): Promise<SavedFileResult> {
+  return window.desktop.uploadCharacterPortrait(request);
+}
+
+function uploadSheet(request: SaveFileRequest): Promise<SavedFileResult> {
+  return window.desktop.uploadCharacterSheet(request);
+}
+
+async function handleUploaded() {
+  try {
+    applyWorkspace(await window.desktop.getCharacterPortraitWorkspace());
+    if (uploadKind.value === 'portrait') {
+      activeStage.value = 'sheet';
+      mobilePane.value = 'settings';
+      toast.success('定妆照已上传并设为正式定妆照');
+    } else {
+      activeStage.value = 'sheet';
+      mobilePane.value = 'gallery';
+      toast.success('角色表已上传并设为正式角色表');
+    }
+  } catch (uploadError: unknown) {
+    toast.error(uploadError instanceof Error ? uploadError.message : String(uploadError));
   }
 }
 
@@ -255,14 +475,15 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   isDisposed = true;
-  clearPollTimer();
+  clearPollTimer('portrait');
+  clearPollTimer('sheet');
 });
 </script>
 
 <template>
   <main class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-    <header class="flex h-14 shrink-0 items-center justify-between gap-4 border-b px-4 sm:px-5">
-      <div class="flex min-w-0 items-center gap-3">
+    <header class="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-5">
+      <div class="flex min-w-0 flex-1 items-center gap-3">
         <div
           class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
         >
@@ -270,54 +491,75 @@ onBeforeUnmount(() => {
         </div>
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <h1 class="truncate text-sm font-semibold">角色定妆照</h1>
+            <h1 class="truncate text-sm font-semibold">角色视觉资产</h1>
             <Badge variant="outline" class="hidden sm:inline-flex">GPT-Image-2</Badge>
           </div>
-          <p class="truncate text-xs text-muted-foreground">根据角色档案生成并选定标准视觉形象</p>
+          <p class="truncate text-xs text-muted-foreground">定妆照与多角度角色表</p>
         </div>
       </div>
 
-      <div class="flex items-center gap-2 lg:hidden">
+      <Tabs v-model="activeStage" class="order-3 w-full gap-0 sm:order-none sm:w-auto">
+        <TabsList class="grid h-9 w-full grid-cols-2 sm:w-72">
+          <TabsTrigger value="portrait" class="gap-1.5">
+            <Camera class="size-3.5" />
+            1. 定妆照
+            <Check v-if="selectedImage" class="size-3.5 text-primary" />
+          </TabsTrigger>
+          <TabsTrigger value="sheet" class="gap-1.5">
+            <Images class="size-3.5" />
+            2. 角色表
+            <Check v-if="selectedSheet" class="size-3.5 text-primary" />
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div class="flex items-center gap-1 lg:hidden">
         <Button
-          size="sm"
+          size="icon"
           :variant="mobilePane === 'settings' ? 'secondary' : 'ghost'"
+          aria-label="显示设置"
           @click="mobilePane = 'settings'"
         >
           <SlidersHorizontal class="size-4" />
-          设置
         </Button>
         <Button
-          size="sm"
+          size="icon"
           :variant="mobilePane === 'gallery' ? 'secondary' : 'ghost'"
+          aria-label="显示图片"
           @click="mobilePane = 'gallery'"
         >
-          <Camera class="size-4" />
-          候选
+          <Images class="size-4" />
         </Button>
       </div>
     </header>
 
     <Alert v-if="!isInitializing && !keyConfigured" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
-      <AlertTitle>需要 APIMart API Key</AlertTitle>
+      <AlertTitle>生成图片需要 APIMart API Key</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>配置完成后才能调用 GPT-Image-2 生成定妆照。</span>
+        <span>上传已有定妆照或角色表不受影响。</span>
         <Button size="sm" variant="outline" @click="router.push('/settings')">前往设置</Button>
       </AlertDescription>
     </Alert>
 
     <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
-      <AlertTitle>定妆照流程暂时中断</AlertTitle>
+      <AlertTitle>角色图片流程暂时中断</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
         <span>{{ errorMessage }}</span>
-        <Button v-if="activeRecord && !isPolling" size="sm" variant="outline" @click="retryPolling">
+        <Button
+          v-if="currentPollingRecord && !currentIsPolling"
+          size="sm"
+          variant="outline"
+          @click="retryPolling"
+        >
           继续查询
         </Button>
       </AlertDescription>
     </Alert>
 
     <div
+      v-if="activeStage === 'portrait'"
       class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(340px,2fr)_minmax(0,5fr)]"
     >
       <div
@@ -333,30 +575,74 @@ onBeforeUnmount(() => {
           :draft="draft"
           class="min-h-0 min-w-0 flex-1"
           @generate="generatePortraits"
+          @upload="openUpload('portrait')"
         />
       </div>
       <div
         :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
       >
         <PortraitGallery
+          asset-kind="portrait"
           :deleting-file-name="deletingFileName"
           :records="records"
           :selected-image="selectedImage"
           :selecting-file-name="selectingFileName"
           class="min-h-0 min-w-0 flex-1"
-          @delete="requestDeletePortrait"
+          @delete="(record, image) => requestDelete('portrait', record, image)"
           @select="selectPortrait"
         />
       </div>
     </div>
 
+    <div
+      v-else
+      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(340px,2fr)_minmax(0,5fr)]"
+    >
+      <div
+        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'settings' ? 'flex' : 'hidden lg:flex']"
+      >
+        <CharacterSheetGeneratorPanel
+          v-model="sheetPrompt"
+          v-model:resolution="sheetResolution"
+          :busy="isSheetBusy"
+          :disabled="isSheetGenerateDisabled"
+          :reference-image="selectedPortraitImage"
+          class="min-h-0 min-w-0 flex-1"
+          @generate="generateSheet"
+          @upload="openUpload('sheet')"
+        />
+      </div>
+      <div
+        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
+      >
+        <PortraitGallery
+          asset-kind="sheet"
+          :deleting-file-name="deletingFileName"
+          :records="sheetRecords"
+          :selected-image="selectedSheet"
+          :selecting-file-name="selectingFileName"
+          class="min-h-0 min-w-0 flex-1"
+          @delete="(record, image) => requestDelete('sheet', record, image)"
+          @select="selectSheet"
+        />
+      </div>
+    </div>
+
+    <CharacterAssetUploadDialog
+      v-model:open="uploadDialogOpen"
+      :description="uploadDescription"
+      :title="uploadTitle"
+      :upload-handler="uploadHandler"
+      @uploaded="handleUploaded"
+    />
+
     <SagConfirmDialog
       v-model:open="deleteDialogOpen"
-      title="删除这张定妆照？"
+      :title="deleteTarget?.kind === 'sheet' ? '删除这张角色表？' : '删除这张定妆照？'"
       description="图片将从作品工作区永久删除，此操作不可恢复。"
       :confirm-text="deletingFileName ? '删除中' : '确定删除'"
       :loading="Boolean(deletingFileName)"
-      @confirm="deletePortrait"
+      @confirm="deleteAsset"
     />
   </main>
 </template>
