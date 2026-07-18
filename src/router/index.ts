@@ -49,6 +49,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/illustration-library/index.vue'),
         meta: { title: '插画管理' },
       },
+      {
+        path: '/story',
+        name: 'story',
+        component: () => import('@/views/story/index.vue'),
+        meta: { title: '故事创作' },
+      },
     ],
   },
   {

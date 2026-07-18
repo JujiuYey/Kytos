@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { net, protocol } from 'electron';
 import { handleCharacterAgentRequest } from './character-agent/route';
 import { handleIllustrationAgentRequest } from './illustration-agent/route';
+import { handleStoryAgentRequest } from './story-agent/route';
 import { getWorkspaceDirectory } from './services/workspace';
 
 const APP_SCHEME = 'app';
@@ -12,6 +13,7 @@ const WORKSPACE_IMAGE_DIRECTORIES = [
   'character-portraits',
   'character-sheets',
   'illustrations',
+  'story-frames',
 ] as const;
 
 export function registerAppScheme(): void {
@@ -48,6 +50,10 @@ export function registerAppProtocol(): void {
 
     if (url.pathname === '/api/illustration-agent') {
       return handleIllustrationAgentRequest(request);
+    }
+
+    if (url.pathname === '/api/story-agent') {
+      return handleStoryAgentRequest(request);
     }
 
     const imageDirectory = WORKSPACE_IMAGE_DIRECTORIES.find(directory =>

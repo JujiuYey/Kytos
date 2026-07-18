@@ -33,6 +33,23 @@ import type {
   UploadedIllustration,
   UploadIllustrationRequest,
 } from './illustration';
+import type {
+  CreateStoryRequest,
+  CreateStoryShotRequest,
+  DeleteStoryRequest,
+  DeleteStoryShotRequest,
+  DeleteStoryShotVersionRequest,
+  GenerateStoryShotRequest,
+  MoveStoryShotRequest,
+  SaveStoryConversationRequest,
+  SelectStoryShotVersionRequest,
+  StoryProject,
+  StoryShotUpdateResult,
+  StoryShotVersion,
+  StoryWorkspaceState,
+  UpdateStoryRequest,
+  UpdateStoryShotRequest,
+} from './story';
 
 export type CredentialService = 'apimart' | 'deepseek';
 
@@ -67,6 +84,8 @@ export interface SavedFileResult {
 }
 
 export interface DesktopApi {
+  createStory: (request: CreateStoryRequest) => Promise<StoryProject>;
+  createStoryShot: (request: CreateStoryShotRequest) => Promise<StoryProject>;
   createIllustrationTopic: (request: CreateIllustrationTopicRequest) => Promise<IllustrationTopic>;
   deleteIllustrationTopic: (
     request: DeleteIllustrationTopicRequest,
@@ -87,6 +106,9 @@ export interface DesktopApi {
     request: DeleteCharacterSheetRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
   deleteCredential: (service: CredentialService) => Promise<CredentialStatus>;
+  deleteStory: (request: DeleteStoryRequest) => Promise<StoryWorkspaceState>;
+  deleteStoryShot: (request: DeleteStoryShotRequest) => Promise<StoryProject>;
+  deleteStoryShotVersion: (request: DeleteStoryShotVersionRequest) => Promise<StoryProject>;
   generateCharacterExpression: (
     request: GenerateCharacterExpressionRequest,
   ) => Promise<CharacterExpressionRecord>;
@@ -95,6 +117,7 @@ export interface DesktopApi {
   ) => Promise<CharacterPortraitRecord>;
   generateCharacterSheet: (request: GenerateCharacterSheetRequest) => Promise<CharacterSheetRecord>;
   generateIllustration: (request: GenerateIllustrationRequest) => Promise<IllustrationVersion>;
+  generateStoryShot: (request: GenerateStoryShotRequest) => Promise<StoryShotVersion>;
   getCharacterExpressionTask: (taskId: string) => Promise<CharacterExpressionRecord>;
   getCharacterExpressionWorkspace: () => Promise<CharacterExpressionWorkspaceState>;
   getCharacterPortraitTask: (taskId: string) => Promise<CharacterPortraitRecord>;
@@ -103,9 +126,12 @@ export interface DesktopApi {
   getCharacterWorkspace: () => Promise<CharacterWorkspaceState>;
   getIllustrationTask: (taskId: string) => Promise<IllustrationVersion>;
   getIllustrationWorkspace: () => Promise<IllustrationWorkspaceState>;
+  getStoryShotTask: (taskId: string) => Promise<StoryShotVersion>;
+  getStoryWorkspace: () => Promise<StoryWorkspaceState>;
   getCredentialStatus: (service: CredentialService) => Promise<CredentialStatus>;
   getSettings: () => Promise<DesktopSettings>;
   openWorkspaceDirectory: () => Promise<void>;
+  moveStoryShot: (request: MoveStoryShotRequest) => Promise<StoryProject>;
   renameCharacterExpression: (
     request: RenameCharacterExpressionRequest,
   ) => Promise<CharacterExpressionWorkspaceState>;
@@ -115,6 +141,7 @@ export interface DesktopApi {
   saveIllustrationConversation: (
     request: SaveIllustrationConversationRequest,
   ) => Promise<IllustrationTopic>;
+  saveStoryConversation: (request: SaveStoryConversationRequest) => Promise<StoryProject>;
   selectCharacterPortrait: (
     request: SelectCharacterPortraitRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
@@ -124,6 +151,7 @@ export interface DesktopApi {
   selectIllustrationStyleReference: (
     request: SelectIllustrationStyleReferenceRequest,
   ) => Promise<IllustrationWorkspaceState>;
+  selectStoryShotVersion: (request: SelectStoryShotVersionRequest) => Promise<StoryProject>;
   setCredential: (request: SetCredentialRequest) => Promise<CredentialStatus>;
   setWorkspaceDirectory: (workspacePath: string) => Promise<DesktopSettings>;
   useSuggestedWorkspace: () => Promise<DesktopSettings>;
@@ -134,4 +162,6 @@ export interface DesktopApi {
   uploadCharacterSheet: (request: SaveFileRequest) => Promise<SavedFileResult>;
   uploadIllustration: (request: UploadIllustrationRequest) => Promise<UploadedIllustration>;
   updateIllustrationTopic: (request: UpdateIllustrationTopicRequest) => Promise<IllustrationTopic>;
+  updateStory: (request: UpdateStoryRequest) => Promise<StoryProject>;
+  updateStoryShot: (request: UpdateStoryShotRequest) => Promise<StoryShotUpdateResult>;
 }

@@ -1,5 +1,5 @@
 import type { Component } from 'vue';
-import { Camera, ImagePlus, Images, Laugh, User } from 'lucide-vue-next';
+import { BookOpen, Camera, ImagePlus, Images, Laugh, User } from 'lucide-vue-next';
 
 export interface MenuItem {
   title: string;
@@ -51,6 +51,12 @@ export const menuGroups: MenuGroup[] = [
         key: 'illustration',
         icon: ImagePlus,
         path: '/illustration',
+      },
+      {
+        title: '故事创作',
+        key: 'story',
+        icon: BookOpen,
+        path: '/story',
       },
     ],
   },

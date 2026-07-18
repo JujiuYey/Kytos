@@ -84,4 +84,34 @@ export {
   ILLUSTRATION_STYLE_GUIDANCE,
   createEmptyIllustrationBrief,
 } from '../../shared/illustration';
+export type {
+  CreateStoryRequest,
+  CreateStoryShotRequest,
+  DeleteStoryRequest,
+  DeleteStoryShotRequest,
+  DeleteStoryShotVersionRequest,
+  GenerateStoryShotRequest,
+  MoveStoryShotRequest,
+  SaveStoryConversationRequest,
+  SelectStoryShotVersionRequest,
+  StoryAgentMessage,
+  StoryDraft,
+  StoryDraftUpdateResult,
+  StoryProject,
+  StoryShot,
+  StoryShotContent,
+  StoryShotUpdateResult,
+  StoryShotVersion,
+  StoryVersionReference,
+  StoryboardUpdateResult,
+  StoryWorkspaceState,
+  UpdateStoryRequest,
+  UpdateStoryShotRequest,
+} from '../../shared/story';
+export {
+  STORY_AGENT_ENDPOINT,
+  STORY_SHOT_LIMITS,
+  createEmptyStoryDraft,
+  createEmptyStoryShotContent,
+} from '../../shared/story';
 export * from './setting';
