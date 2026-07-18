@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
+import { SagPage } from '@/components/sag/sag-page';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionSize,
@@ -323,8 +324,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-    <header class="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-5">
+  <SagPage>
+    <template #header>
       <div class="flex min-w-0 flex-1 items-center gap-3">
         <div
           class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
@@ -358,7 +359,7 @@ onBeforeUnmount(() => {
           <Images class="size-4" />
         </Button>
       </div>
-    </header>
+    </template>
 
     <Alert v-if="!isInitializing && !hasReferences" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
@@ -448,5 +449,5 @@ onBeforeUnmount(() => {
       :loading="Boolean(deletingFileName)"
       @confirm="deleteExpression"
     />
-  </main>
+  </SagPage>
 </template>

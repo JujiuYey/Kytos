@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/app';
+import { SagPage } from '@/components/sag/sag-page';
 import type {
   CharacterAgentMessage,
   CharacterDraft,
@@ -185,14 +186,16 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-    <CharacterChatHeader
-      v-model:mobile-pane="mobilePane"
-      :busy="isBusy"
-      :key-configured="keyConfigured"
-      :model="model"
-      @new-session="isResetDialogOpen = true"
-    />
+  <SagPage>
+    <template #header>
+      <CharacterChatHeader
+        v-model:mobile-pane="mobilePane"
+        :busy="isBusy"
+        :key-configured="keyConfigured"
+        :model="model"
+        @new-session="isResetDialogOpen = true"
+      />
+    </template>
 
     <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
@@ -256,5 +259,5 @@ onMounted(() => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </main>
+  </SagPage>
 </template>
