@@ -18,6 +18,20 @@ import type {
   SelectCharacterPortraitRequest,
   SelectCharacterSheetRequest,
 } from './character-portrait';
+import type {
+  CreateIllustrationTopicRequest,
+  DeleteIllustrationUploadRequest,
+  DeleteIllustrationTopicRequest,
+  DeleteIllustrationVersionRequest,
+  GenerateIllustrationRequest,
+  IllustrationTopic,
+  IllustrationVersion,
+  IllustrationWorkspaceState,
+  SaveIllustrationConversationRequest,
+  UpdateIllustrationTopicRequest,
+  UploadedIllustration,
+  UploadIllustrationRequest,
+} from './illustration';
 
 export type CredentialService = 'apimart' | 'deepseek';
 
@@ -52,6 +66,16 @@ export interface SavedFileResult {
 }
 
 export interface DesktopApi {
+  createIllustrationTopic: (request: CreateIllustrationTopicRequest) => Promise<IllustrationTopic>;
+  deleteIllustrationTopic: (
+    request: DeleteIllustrationTopicRequest,
+  ) => Promise<IllustrationWorkspaceState>;
+  deleteIllustrationVersion: (
+    request: DeleteIllustrationVersionRequest,
+  ) => Promise<IllustrationTopic>;
+  deleteIllustrationUpload: (
+    request: DeleteIllustrationUploadRequest,
+  ) => Promise<IllustrationWorkspaceState>;
   deleteCharacterExpression: (
     request: DeleteCharacterExpressionRequest,
   ) => Promise<CharacterExpressionWorkspaceState>;
@@ -69,12 +93,15 @@ export interface DesktopApi {
     request: GenerateCharacterPortraitRequest,
   ) => Promise<CharacterPortraitRecord>;
   generateCharacterSheet: (request: GenerateCharacterSheetRequest) => Promise<CharacterSheetRecord>;
+  generateIllustration: (request: GenerateIllustrationRequest) => Promise<IllustrationVersion>;
   getCharacterExpressionTask: (taskId: string) => Promise<CharacterExpressionRecord>;
   getCharacterExpressionWorkspace: () => Promise<CharacterExpressionWorkspaceState>;
   getCharacterPortraitTask: (taskId: string) => Promise<CharacterPortraitRecord>;
   getCharacterPortraitWorkspace: () => Promise<CharacterPortraitWorkspaceState>;
   getCharacterSheetTask: (taskId: string) => Promise<CharacterSheetRecord>;
   getCharacterWorkspace: () => Promise<CharacterWorkspaceState>;
+  getIllustrationTask: (taskId: string) => Promise<IllustrationVersion>;
+  getIllustrationWorkspace: () => Promise<IllustrationWorkspaceState>;
   getCredentialStatus: (service: CredentialService) => Promise<CredentialStatus>;
   getSettings: () => Promise<DesktopSettings>;
   openWorkspaceDirectory: () => Promise<void>;
@@ -84,6 +111,9 @@ export interface DesktopApi {
   selectDirectory: () => Promise<string | null>;
   saveFile: (request: SaveFileRequest) => Promise<SavedFileResult>;
   saveCharacterProfile: (request: SaveCharacterProfileRequest) => Promise<void>;
+  saveIllustrationConversation: (
+    request: SaveIllustrationConversationRequest,
+  ) => Promise<IllustrationTopic>;
   selectCharacterPortrait: (
     request: SelectCharacterPortraitRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
@@ -98,4 +128,6 @@ export interface DesktopApi {
     request: UploadCharacterExpressionRequest,
   ) => Promise<SavedFileResult>;
   uploadCharacterSheet: (request: SaveFileRequest) => Promise<SavedFileResult>;
+  uploadIllustration: (request: UploadIllustrationRequest) => Promise<UploadedIllustration>;
+  updateIllustrationTopic: (request: UpdateIllustrationTopicRequest) => Promise<IllustrationTopic>;
 }

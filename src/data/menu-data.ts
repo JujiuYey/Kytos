@@ -1,6 +1,5 @@
 import type { Component } from 'vue';
-// import { BookText, PenLine, Sparkles, User, Wand2 } from 'lucide-vue-next';
-import { Camera, Laugh, User } from 'lucide-vue-next';
+import { Camera, ImagePlus, Images, Laugh, User } from 'lucide-vue-next';
 
 export interface MenuItem {
   title: string;
@@ -38,21 +37,21 @@ export const menuGroups: MenuGroup[] = [
       },
     ],
   },
-  // {
-  //   label: '创作',
-  //   items: [
-  //     {
-  //       title: 'ip形象',
-  //       key: 'writer',
-  //       icon: PenLine,
-  //       path: '/writer',
-  //     },
-  //     {
-  //       title: '抽卡',
-  //       key: 'gacha',
-  //       icon: Sparkles,
-  //       path: '/gacha',
-  //     },
-  //   ],
-  // },
+  {
+    label: '创作',
+    items: [
+      {
+        title: '插画创作',
+        key: 'illustration',
+        icon: ImagePlus,
+        path: '/illustration',
+      },
+      {
+        title: '插画管理',
+        key: 'illustration-library',
+        icon: Images,
+        path: '/illustration-library',
+      },
+    ],
+  },
 ];

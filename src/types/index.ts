@@ -57,4 +57,28 @@ export {
   CHARACTER_PORTRAIT_SIZES,
   CHARACTER_SHEET_SIZE,
 } from '../../shared/character-portrait';
+export type {
+  CreateIllustrationTopicRequest,
+  DeleteIllustrationUploadRequest,
+  DeleteIllustrationTopicRequest,
+  DeleteIllustrationVersionRequest,
+  GenerateIllustrationRequest,
+  IllustrationAgentMessage,
+  IllustrationBrief,
+  IllustrationBriefUpdateResult,
+  IllustrationSize,
+  IllustrationTopic,
+  IllustrationVersion,
+  IllustrationVersionReference,
+  IllustrationWorkspaceState,
+  SaveIllustrationConversationRequest,
+  UpdateIllustrationTopicRequest,
+  UploadedIllustration,
+  UploadIllustrationRequest,
+} from '../../shared/illustration';
+export {
+  ILLUSTRATION_AGENT_ENDPOINT,
+  ILLUSTRATION_SIZES,
+  createEmptyIllustrationBrief,
+} from '../../shared/illustration';
 export * from './setting';

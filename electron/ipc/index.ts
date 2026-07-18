@@ -4,6 +4,7 @@ import { registerCharacterIpc } from './character';
 import { registerCharacterPortraitIpc } from './character-portrait';
 import { registerCredentialsIpc } from './credentials';
 import { registerFilesIpc } from './files';
+import { registerIllustrationIpc } from './illustration';
 import { registerSettingsIpc } from './settings';
 import { createTrustedSenderGuard } from './trusted-sender';
 
@@ -15,4 +16,5 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): 
   registerSettingsIpc(assertTrustedSender);
   registerCredentialsIpc(assertTrustedSender);
   registerFilesIpc(assertTrustedSender);
+  registerIllustrationIpc(assertTrustedSender);
 }

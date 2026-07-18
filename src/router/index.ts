@@ -37,6 +37,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/character-expression/index.vue'),
         meta: { title: '表情管理' },
       },
+      {
+        path: '/illustration',
+        name: 'illustration',
+        component: () => import('@/views/illustration/index.vue'),
+        meta: { title: '插画创作' },
+      },
+      {
+        path: '/illustration-library',
+        name: 'illustration-library',
+        component: () => import('@/views/illustration-library/index.vue'),
+        meta: { title: '插画管理' },
+      },
     ],
   },
   {
