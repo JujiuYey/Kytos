@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Upload, WandSparkles, X } from 'lucide-vue-next';
+import { WandSparkles, X } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -26,7 +26,6 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'close'): void;
   (event: 'generate'): void;
-  (event: 'upload'): void;
   (event: 'update:modelValue', value: string): void;
   (event: 'update:resolution', value: CharacterPortraitResolution): void;
 }>();
@@ -127,16 +126,10 @@ const emit = defineEmits<{
     </ScrollArea>
 
     <footer class="shrink-0 border-t bg-background px-5 py-4">
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
-        <Button variant="outline" @click="emit('upload')">
-          <Upload class="size-4" />
-          上传已有角色表
-        </Button>
-        <Button :disabled="disabled" @click="emit('generate')">
-          <WandSparkles class="size-4" />
-          {{ busy ? '正在生成角色表' : '生成多角度角色表' }}
-        </Button>
-      </div>
+      <Button class="w-full" :disabled="disabled" @click="emit('generate')">
+        <WandSparkles class="size-4" />
+        {{ busy ? '正在生成角色表' : '生成多角度角色表' }}
+      </Button>
       <p class="mt-2 text-center text-xs text-muted-foreground">
         使用正式定妆照进行 GPT-Image-2 图生图，点击后将产生实际费用
       </p>

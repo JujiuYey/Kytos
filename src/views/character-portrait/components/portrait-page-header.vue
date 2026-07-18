@@ -1,23 +1,34 @@
 <script setup lang="ts">
-import { Camera, Check, Images, SlidersHorizontal, WandSparkles } from 'lucide-vue-next';
+import {
+  Camera,
+  Check,
+  ChevronDown,
+  Images,
+  SlidersHorizontal,
+  Upload,
+  WandSparkles,
+} from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { CharacterPortraitSelection } from '@/types';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 type WorkspaceStage = 'portrait' | 'sheet';
 
 defineProps<{
   activeStage: WorkspaceStage;
+  assetCount: number;
   generatorOpen: boolean;
   mobilePane: 'settings' | 'gallery';
-  selectedImage: CharacterPortraitSelection | null;
-  selectedSheet: CharacterPortraitSelection | null;
 }>();
 
 const emit = defineEmits<{
-  (event: 'ai-create'): void;
-  (event: 'update:activeStage', value: WorkspaceStage): void;
+  (event: 'ai-create', value: WorkspaceStage): void;
+  (event: 'upload', value: WorkspaceStage): void;
   (event: 'update:mobilePane', value: 'settings' | 'gallery'): void;
 }>();
 </script>
@@ -32,38 +43,57 @@ const emit = defineEmits<{
     <div class="min-w-0">
       <div class="flex items-center gap-2">
         <h1 class="truncate text-sm font-semibold">角色视觉资产</h1>
-        <Badge variant="outline" class="hidden sm:inline-flex">GPT-Image-2</Badge>
+        <Badge variant="secondary" class="shrink-0 tabular-nums">{{ assetCount }}</Badge>
       </div>
-      <p class="truncate text-xs text-muted-foreground">定妆照与多角度角色表</p>
+      <p class="truncate text-xs text-muted-foreground">统一查看和管理角色图片</p>
     </div>
   </div>
 
-  <Tabs
-    :model-value="activeStage"
-    class="order-3 w-full gap-0 sm:order-none sm:w-auto"
-    @update:model-value="value => emit('update:activeStage', value as WorkspaceStage)"
-  >
-    <TabsList class="grid h-9 w-full grid-cols-2 sm:w-72">
-      <TabsTrigger value="portrait" class="gap-1.5">
-        <Camera class="size-3.5" />
-        1. 定妆照
-        <Check v-if="selectedImage" class="size-3.5 text-primary" />
-      </TabsTrigger>
-      <TabsTrigger value="sheet" class="gap-1.5">
-        <Images class="size-3.5" />
-        2. 角色表
-        <Check v-if="selectedSheet" class="size-3.5 text-primary" />
-      </TabsTrigger>
-    </TabsList>
-  </Tabs>
+  <DropdownMenu>
+    <DropdownMenuTrigger as-child>
+      <Button size="sm" variant="outline">
+        <Upload class="size-4" />
+        上传
+        <ChevronDown class="size-3.5" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" class="w-48">
+      <DropdownMenuItem @select="emit('upload', 'portrait')">
+        <Camera class="size-4" />
+        上传定妆照
+      </DropdownMenuItem>
+      <DropdownMenuItem @select="emit('upload', 'sheet')">
+        <Images class="size-4" />
+        上传角色表
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
 
-  <Button size="sm" :variant="generatorOpen ? 'secondary' : 'default'" @click="emit('ai-create')">
-    <WandSparkles class="size-4" />
-    AI 创建
-  </Button>
+  <DropdownMenu>
+    <DropdownMenuTrigger as-child>
+      <Button size="sm" :variant="generatorOpen ? 'secondary' : 'default'">
+        <WandSparkles class="size-4" />
+        AI 创建
+        <ChevronDown class="size-3.5" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" class="w-48">
+      <DropdownMenuItem @select="emit('ai-create', 'portrait')">
+        <Camera class="size-4" />
+        创建定妆照
+        <Check v-if="activeStage === 'portrait' && generatorOpen" class="ml-auto size-4" />
+      </DropdownMenuItem>
+      <DropdownMenuItem @select="emit('ai-create', 'sheet')">
+        <Images class="size-4" />
+        创建角色表
+        <Check v-if="activeStage === 'sheet' && generatorOpen" class="ml-auto size-4" />
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
 
   <div class="flex items-center gap-1 lg:hidden">
     <Button
+      v-if="generatorOpen"
       size="icon"
       :variant="mobilePane === 'settings' ? 'secondary' : 'ghost'"
       aria-label="显示设置"

@@ -42,7 +42,7 @@ const startingSuggestions = [
 </script>
 
 <template>
-  <Conversation class="min-h-0 flex-1">
+  <Conversation class="scrollbar-subtle min-h-0 flex-1">
     <ConversationContent class="mx-auto w-full max-w-3xl gap-6 px-4 py-6 sm:px-6">
       <ConversationEmptyState
         v-if="messages.length === 0"

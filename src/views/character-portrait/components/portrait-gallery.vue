@@ -1,45 +1,103 @@
 <script setup lang="ts">
-import { Camera, Check, Clock3, Images, Trash2 } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { Check, Clock3, Image as ImageIcon, Trash2 } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ImageViewer } from '@/components/sag/image-viewer';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ImageViewer } from '@/components/sag/image-viewer';
 import type {
   CharacterImageRecord,
   CharacterPortraitImage,
+  CharacterPortraitRecord,
   CharacterPortraitSelection,
   CharacterPortraitTaskStatus,
+  CharacterSheetRecord,
 } from '@/types';
 
-defineProps<{
-  assetKind: 'portrait' | 'sheet';
+type AssetKind = 'portrait' | 'sheet';
+
+interface GalleryEntry {
+  image: CharacterPortraitImage | null;
+  imageIndex: number;
+  key: string;
+  kind: AssetKind;
+  record: CharacterImageRecord;
+  type: 'image' | 'task';
+}
+
+const props = defineProps<{
   deletingFileName: string;
-  records: CharacterImageRecord[];
+  portraitRecords: CharacterPortraitRecord[];
   selectedImage: CharacterPortraitSelection | null;
+  selectedSheet: CharacterPortraitSelection | null;
   selectingFileName: string;
+  sheetRecords: CharacterSheetRecord[];
 }>();
 
 const emit = defineEmits<{
-  (event: 'delete', record: CharacterImageRecord, image: CharacterPortraitImage): void;
-  (event: 'select', record: CharacterImageRecord, image: CharacterPortraitImage): void;
+  (
+    event: 'delete',
+    kind: AssetKind,
+    record: CharacterImageRecord,
+    image: CharacterPortraitImage,
+  ): void;
+  (
+    event: 'select',
+    kind: AssetKind,
+    record: CharacterImageRecord,
+    image: CharacterPortraitImage,
+  ): void;
 }>();
 
 const activeStatuses: CharacterPortraitTaskStatus[] = ['submitted', 'pending', 'processing'];
+
+const galleryEntries = computed<GalleryEntry[]>(() =>
+  [
+    ...createEntries('portrait', props.portraitRecords),
+    ...createEntries('sheet', props.sheetRecords),
+  ].sort((left, right) => right.record.createdAt.localeCompare(left.record.createdAt)),
+);
+
+function createEntries(kind: AssetKind, records: CharacterImageRecord[]): GalleryEntry[] {
+  return records.flatMap((record): GalleryEntry[] => {
+    if (isActive(record) || record.status === 'failed' || record.status === 'cancelled') {
+      return [
+        {
+          image: null,
+          imageIndex: -1,
+          key: `${kind}:${record.id}:task`,
+          kind,
+          record,
+          type: 'task' as const,
+        },
+      ];
+    }
+
+    return record.images.map((image, imageIndex) => ({
+      image,
+      imageIndex,
+      key: `${kind}:${record.id}:${image.fileName}`,
+      kind,
+      record,
+      type: 'image' as const,
+    }));
+  });
+}
 
 function isActive(record: CharacterImageRecord): boolean {
   return activeStatuses.includes(record.status);
 }
 
-function isSelected(
-  selection: CharacterPortraitSelection | null,
-  record: CharacterImageRecord,
-  image: CharacterPortraitImage,
-): boolean {
-  return selection?.taskId === record.id && selection.fileName === image.fileName;
+function isSelected(entry: GalleryEntry): boolean {
+  if (!entry.image) {
+    return false;
+  }
+  const selection = entry.kind === 'portrait' ? props.selectedImage : props.selectedSheet;
+  return selection?.taskId === entry.record.id && selection.fileName === entry.image.fileName;
 }
 
 function getStatusLabel(record: CharacterImageRecord): string {
@@ -57,14 +115,19 @@ function getStatusLabel(record: CharacterImageRecord): string {
   return labels[record.status];
 }
 
+function getAssetLabel(kind: AssetKind): string {
+  return kind === 'portrait' ? '定妆照' : '角色表';
+}
+
 function getAspectClass(size: CharacterImageRecord['size']): string {
-  return {
+  const aspectClasses: Record<CharacterImageRecord['size'], string> = {
     '1:1': 'aspect-square',
     '16:9': 'aspect-video',
     '2:3': 'aspect-[2/3]',
     '3:4': 'aspect-[3/4]',
     '4:5': 'aspect-[4/5]',
-  }[size];
+  };
+  return aspectClasses[size];
 }
 
 function formatDate(value: string): string {
@@ -82,122 +145,116 @@ function formatDate(value: string): string {
 </script>
 
 <template>
-  <section
-    class="flex min-h-0 flex-col bg-muted/15"
-    :aria-label="assetKind === 'portrait' ? '定妆照候选' : '角色表候选'"
-  >
+  <section class="flex min-h-0 flex-col bg-muted/15" aria-label="角色图片资产库">
     <ScrollArea class="min-h-0 flex-1">
-      <div v-if="records.length" class="mx-auto w-full max-w-5xl space-y-8 px-5 py-6 lg:px-8">
-        <article v-for="record in records" :key="record.id">
-          <header class="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div class="flex min-w-0 flex-wrap items-center gap-2">
-              <Badge
-                :variant="
-                  record.status === 'failed' || record.status === 'cancelled'
-                    ? 'destructive'
-                    : 'secondary'
-                "
-              >
-                <Loader v-if="isActive(record)" class="size-3" />
-                <Check v-else-if="record.status === 'completed'" class="size-3" />
-                {{ getStatusLabel(record) }}
-              </Badge>
-              <span v-if="record.source === 'generated'" class="text-xs text-muted-foreground">
-                {{ record.size }} · {{ record.resolution.toUpperCase() }} · {{ record.count }} 张
-              </span>
-              <span v-else class="max-w-64 truncate text-xs text-muted-foreground">
-                {{ record.originalName || '本地上传图片' }}
-              </span>
-            </div>
-            <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock3 class="size-3.5" />
-              {{ formatDate(record.createdAt) }}
-            </span>
-          </header>
-
-          <div v-if="isActive(record)" class="rounded-md border bg-background p-5">
-            <div class="flex items-center justify-between gap-4 text-sm">
-              <span>
-                GPT-Image-2 正在绘制{{ assetKind === 'portrait' ? '定妆照' : '角色表' }}
-              </span>
-              <span class="tabular-nums text-muted-foreground">{{ record.progress }}%</span>
-            </div>
-            <Progress :model-value="record.progress" class="mt-3" />
-            <p class="mt-3 text-xs text-muted-foreground">
-              可以离开此页面，下次进入时会继续查询任务。
-            </p>
-          </div>
-
-          <div
-            v-else-if="record.status === 'failed' || record.status === 'cancelled'"
-            class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-          >
-            {{
-              record.errorMessage ||
-              `${assetKind === 'portrait' ? '定妆照' : '角色表'}生成任务未完成`
-            }}
-          </div>
-
-          <div
-            v-else-if="record.images.length"
-            class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
-          >
-            <figure
-              v-for="(image, imageIndex) in record.images"
-              :key="image.fileName"
-              class="overflow-hidden rounded-md border bg-background"
-            >
-              <ImageViewer
-                :alt="`${record.id} 的第 ${imageIndex + 1} 张${assetKind === 'portrait' ? '定妆照' : '角色表'}预览`"
-                :src="image.url"
-                :title="assetKind === 'portrait' ? '定妆照预览' : '角色表预览'"
-                :description="`查看${assetKind === 'portrait' ? '定妆照' : '角色表'}大图，可缩放和拖拽`"
-              >
-                <Button
-                  variant="ghost"
-                  class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
-                  :aria-label="`查看第 ${imageIndex + 1} 张${assetKind === 'portrait' ? '定妆照' : '角色表'}`"
+      <div
+        v-if="galleryEntries.length"
+        class="mx-auto w-full max-w-7xl columns-1 gap-5 px-4 py-5 sm:columns-2 sm:px-5 xl:columns-3 2xl:columns-4"
+      >
+        <article
+          v-for="entry in galleryEntries"
+          :key="entry.key"
+          :class="[
+            'mb-5 inline-block w-full break-inside-avoid overflow-hidden rounded-md border bg-background align-top',
+            isSelected(entry) && 'border-primary/40 ring-1 ring-primary/10',
+          ]"
+        >
+          <template v-if="entry.type === 'task'">
+            <div class="p-4">
+              <div class="flex min-w-0 items-center justify-between gap-3">
+                <h2 class="truncate text-sm font-medium">
+                  {{ getAssetLabel(entry.kind) }}生成任务
+                </h2>
+                <Badge
+                  :variant="
+                    entry.record.status === 'failed' || entry.record.status === 'cancelled'
+                      ? 'destructive'
+                      : 'secondary'
+                  "
+                  class="shrink-0"
                 >
-                  <AiImage
-                    :alt="`${record.id} 的第 ${imageIndex + 1} 张${assetKind === 'portrait' ? '定妆照' : '角色表'}`"
-                    :src="image.url"
-                    :class="[
-                      getAspectClass(record.size),
-                      'w-full rounded-none bg-muted/30 object-contain',
-                    ]"
-                  />
-                </Button>
-              </ImageViewer>
+                  <Loader v-if="isActive(entry.record)" class="size-3" />
+                  {{ getStatusLabel(entry.record) }}
+                </Badge>
+              </div>
 
-              <figcaption
-                class="flex min-h-12 items-center justify-between gap-3 border-t px-3 py-2"
+              <template v-if="isActive(entry.record)">
+                <p class="mt-4 text-sm">GPT-Image-2 正在绘制{{ getAssetLabel(entry.kind) }}</p>
+                <div
+                  class="mt-3 flex items-center justify-between gap-4 text-xs text-muted-foreground"
+                >
+                  <span>可以离开此页面，下次进入时会继续查询任务。</span>
+                  <span class="shrink-0 tabular-nums">{{ entry.record.progress }}%</span>
+                </div>
+                <Progress :model-value="entry.record.progress" class="mt-2" />
+              </template>
+
+              <p v-else class="mt-4 text-sm text-destructive">
+                {{ entry.record.errorMessage || `${getAssetLabel(entry.kind)}生成任务未完成` }}
+              </p>
+            </div>
+          </template>
+
+          <template v-else-if="entry.image">
+            <ImageViewer
+              :alt="`${getAssetLabel(entry.kind)}候选 ${entry.imageIndex + 1} 预览`"
+              :src="entry.image.url"
+              :title="`${getAssetLabel(entry.kind)}预览`"
+              :description="`查看${getAssetLabel(entry.kind)}大图，可缩放和拖拽`"
+            >
+              <Button
+                variant="ghost"
+                class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
+                :aria-label="`查看${getAssetLabel(entry.kind)}候选 ${entry.imageIndex + 1}`"
               >
-                <span class="truncate text-xs text-muted-foreground">
-                  {{ record.source === 'uploaded' ? '上传图片' : `候选 ${imageIndex + 1}` }}
+                <AiImage
+                  :alt="`${getAssetLabel(entry.kind)}候选 ${entry.imageIndex + 1}`"
+                  :src="entry.image.url"
+                  :class="[
+                    getAspectClass(entry.record.size),
+                    'w-full rounded-none bg-muted/30 object-contain transition-opacity hover:opacity-95',
+                  ]"
+                />
+              </Button>
+            </ImageViewer>
+
+            <div class="space-y-3 border-t px-3 py-3">
+              <div class="flex min-w-0 items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <h2 class="truncate text-sm font-medium">{{ getAssetLabel(entry.kind) }}</h2>
+                  <p class="mt-1 truncate text-xs text-muted-foreground">
+                    {{
+                      entry.record.source === 'uploaded'
+                        ? entry.record.originalName || '上传图片'
+                        : `候选 ${entry.imageIndex + 1} · ${entry.record.size} · ${entry.record.resolution.toUpperCase()}`
+                    }}
+                  </p>
+                </div>
+                <Badge v-if="isSelected(entry)" variant="secondary" class="shrink-0 gap-1">
+                  <Check class="size-3" />
+                  正式资产
+                </Badge>
+                <Badge v-else variant="outline" class="shrink-0">
+                  {{ entry.record.source === 'uploaded' ? '上传' : '生成' }}
+                </Badge>
+              </div>
+
+              <div class="flex min-w-0 items-center justify-between gap-3">
+                <span class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                  <Clock3 class="size-3.5 shrink-0" />
+                  <span class="truncate">{{ formatDate(entry.record.createdAt) }}</span>
                 </span>
                 <div class="flex shrink-0 items-center gap-1.5">
-                  <Badge
-                    v-if="isSelected(selectedImage, record, image)"
-                    variant="secondary"
-                    class="gap-1"
-                  >
-                    <Check class="size-3" />
-                    已选定
-                  </Badge>
                   <Button
-                    v-else
+                    v-if="!isSelected(entry)"
                     size="sm"
                     variant="outline"
-                    :disabled="selectingFileName === image.fileName || Boolean(deletingFileName)"
-                    @click="emit('select', record, image)"
+                    :disabled="
+                      selectingFileName === entry.image.fileName || Boolean(deletingFileName)
+                    "
+                    @click="emit('select', entry.kind, entry.record, entry.image)"
                   >
-                    {{
-                      selectingFileName === image.fileName
-                        ? '保存中'
-                        : assetKind === 'portrait'
-                          ? '设为定妆照'
-                          : '设为角色表'
-                    }}
+                    {{ selectingFileName === entry.image.fileName ? '保存中' : '设为正式资产' }}
                   </Button>
                   <TooltipProvider :delay-duration="300">
                     <Tooltip>
@@ -207,21 +264,19 @@ function formatDate(value: string): string {
                           variant="ghost"
                           class="size-8 text-muted-foreground hover:text-destructive"
                           :disabled="Boolean(deletingFileName) || Boolean(selectingFileName)"
-                          :aria-label="`删除第 ${imageIndex + 1} 张${assetKind === 'portrait' ? '定妆照' : '角色表'}`"
-                          @click="emit('delete', record, image)"
+                          :aria-label="`删除这张${getAssetLabel(entry.kind)}`"
+                          @click="emit('delete', entry.kind, entry.record, entry.image)"
                         >
                           <Trash2 class="size-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>
-                        删除{{ assetKind === 'portrait' ? '定妆照' : '角色表' }}
-                      </TooltipContent>
+                      <TooltipContent>删除{{ getAssetLabel(entry.kind) }}</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-              </figcaption>
-            </figure>
-          </div>
+              </div>
+            </div>
+          </template>
         </article>
       </div>
 
@@ -230,14 +285,11 @@ function formatDate(value: string): string {
           <div
             class="mx-auto flex size-12 items-center justify-center rounded-md border bg-background"
           >
-            <Camera v-if="assetKind === 'portrait'" class="size-5 text-muted-foreground" />
-            <Images v-else class="size-5 text-muted-foreground" />
+            <ImageIcon class="size-5 text-muted-foreground" />
           </div>
-          <h2 class="mt-4 text-sm font-medium">
-            还没有{{ assetKind === 'portrait' ? '定妆照' : '角色表' }}
-          </h2>
+          <h2 class="mt-4 text-sm font-medium">还没有角色图片</h2>
           <p class="mt-1.5 text-sm leading-6 text-muted-foreground">
-            可以从左侧上传已有图片，或确认设置后发起生成。
+            可以通过 AI 创建或上传已有图片，建立角色的视觉资产。
           </p>
         </div>
       </div>

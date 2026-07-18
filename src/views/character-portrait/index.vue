@@ -79,6 +79,11 @@ const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured)
 const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
 const isSheetBusy = computed(() => isSubmittingSheet.value || Boolean(activeSheetRecord.value));
 const selectedPortraitImage = computed(() => findSelectedImage(records.value, selectedImage.value));
+const assetCount = computed(
+  () =>
+    records.value.reduce((total, record) => total + record.images.length, 0) +
+    sheetRecords.value.reduce((total, record) => total + record.images.length, 0),
+);
 const isGenerateDisabled = computed(
   () =>
     isInitializing.value ||
@@ -370,9 +375,22 @@ function closeGenerator(): void {
   mobilePane.value = 'gallery';
 }
 
-function openGenerator(): void {
+function openGenerator(stage: WorkspaceStage): void {
+  activeStage.value = stage;
   generatorOpen.value = true;
   mobilePane.value = 'settings';
+}
+
+async function selectAsset(
+  kind: AssetKind,
+  record: CharacterImageRecord,
+  image: CharacterPortraitImage,
+) {
+  if (kind === 'portrait') {
+    await selectPortrait(record, image);
+  } else {
+    await selectSheet(record, image);
+  }
 }
 
 async function selectPortrait(record: CharacterImageRecord, image: CharacterPortraitImage) {
@@ -495,12 +513,12 @@ onBeforeUnmount(() => {
   <SagPage>
     <template #header>
       <PortraitPageHeader
-        v-model:active-stage="activeStage"
         v-model:mobile-pane="mobilePane"
+        :active-stage="activeStage"
+        :asset-count="assetCount"
         :generator-open="generatorOpen"
-        :selected-image="selectedImage"
-        :selected-sheet="selectedSheet"
         @ai-create="openGenerator"
+        @upload="openUpload"
       />
     </template>
 
@@ -530,7 +548,6 @@ onBeforeUnmount(() => {
     </Alert>
 
     <div
-      v-if="activeStage === 'portrait'"
       :class="[
         'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
         generatorOpen && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
@@ -543,14 +560,15 @@ onBeforeUnmount(() => {
         ]"
       >
         <PortraitGallery
-          asset-kind="portrait"
           :deleting-file-name="deletingFileName"
-          :records="records"
+          :portrait-records="records"
           :selected-image="selectedImage"
+          :selected-sheet="selectedSheet"
           :selecting-file-name="selectingFileName"
+          :sheet-records="sheetRecords"
           class="min-h-0 min-w-0 flex-1"
-          @delete="(record, image) => requestDelete('portrait', record, image)"
-          @select="selectPortrait"
+          @delete="requestDelete"
+          @select="selectAsset"
         />
       </div>
       <div
@@ -561,6 +579,7 @@ onBeforeUnmount(() => {
         ]"
       >
         <PortraitGeneratorPanel
+          v-if="activeStage === 'portrait'"
           v-model="prompt"
           v-model:count="count"
           v-model:resolution="resolution"
@@ -571,43 +590,9 @@ onBeforeUnmount(() => {
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeGenerator"
           @generate="generatePortraits"
-          @upload="openUpload('portrait')"
         />
-      </div>
-    </div>
-
-    <div
-      v-else
-      :class="[
-        'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
-        generatorOpen && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
-      ]"
-    >
-      <div
-        :class="[
-          'min-h-0 min-w-0 lg:flex',
-          !generatorOpen || mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex',
-        ]"
-      >
-        <PortraitGallery
-          asset-kind="sheet"
-          :deleting-file-name="deletingFileName"
-          :records="sheetRecords"
-          :selected-image="selectedSheet"
-          :selecting-file-name="selectingFileName"
-          class="min-h-0 min-w-0 flex-1"
-          @delete="(record, image) => requestDelete('sheet', record, image)"
-          @select="selectSheet"
-        />
-      </div>
-      <div
-        v-if="generatorOpen"
-        :class="[
-          'min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5',
-          mobilePane === 'settings' ? 'flex' : 'hidden lg:flex',
-        ]"
-      >
         <CharacterSheetGeneratorPanel
+          v-else
           v-model="sheetPrompt"
           v-model:resolution="sheetResolution"
           :busy="isSheetBusy"
@@ -616,7 +601,6 @@ onBeforeUnmount(() => {
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeGenerator"
           @generate="generateSheet"
-          @upload="openUpload('sheet')"
         />
       </div>
     </div>

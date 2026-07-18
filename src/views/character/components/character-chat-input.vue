@@ -42,6 +42,7 @@ function handleSubmitClick(event: MouseEvent) {
       <PromptInput class="mx-auto w-full max-w-3xl">
         <PromptInputBody>
           <PromptInputTextarea
+            class="scrollbar-subtle"
             placeholder="描述角色，或者回答 Agent 的问题…"
             :disabled="props.disabled"
           />
