@@ -48,7 +48,8 @@ const deleteTarget = ref<{
 const renameDialogOpen = ref(false);
 const renameTarget = ref<CharacterExpressionRecord | null>(null);
 const uploadDialogOpen = ref(false);
-const mobilePane = ref<'settings' | 'gallery'>('settings');
+const generatorOpen = ref(false);
+const mobilePane = ref<'settings' | 'gallery'>('gallery');
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let isDisposed = false;
@@ -189,6 +190,7 @@ async function initialize(): Promise<void> {
       activeStatuses.includes(record.status),
     );
     if (unfinishedRecord) {
+      generatorOpen.value = true;
       mobilePane.value = 'gallery';
       schedulePoll(unfinishedRecord.id);
     }
@@ -233,6 +235,11 @@ function retryPolling(): void {
   }
   errorMessage.value = '';
   void pollExpressionTask(activeRecord.value.id);
+}
+
+function closeGenerator(): void {
+  generatorOpen.value = false;
+  mobilePane.value = 'gallery';
 }
 
 function uploadExpression(
@@ -326,7 +333,19 @@ onBeforeUnmount(() => {
 <template>
   <SagPage>
     <template #header>
-      <ExpressionPageHeader v-model:mobile-pane="mobilePane" />
+      <ExpressionPageHeader
+        v-model:mobile-pane="mobilePane"
+        :generator-open="generatorOpen"
+        @ai-create="
+          generatorOpen = true;
+          mobilePane = 'settings';
+        "
+        @upload="
+          uploadDialogOpen = true;
+          generatorOpen = false;
+          mobilePane = 'gallery';
+        "
+      />
     </template>
 
     <Alert v-if="!isInitializing && !hasReferences" class="mx-4 mt-3 shrink-0 sm:mx-5">
@@ -361,10 +380,16 @@ onBeforeUnmount(() => {
     </Alert>
 
     <div
-      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]"
+      :class="[
+        'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
+        generatorOpen && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
+      ]"
     >
       <div
-        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
+        :class="[
+          'min-h-0 min-w-0 lg:flex',
+          !generatorOpen || mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex',
+        ]"
       >
         <ExpressionGallery
           :deleting-file-name="deletingFileName"
@@ -377,7 +402,11 @@ onBeforeUnmount(() => {
       </div>
 
       <div
-        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'settings' ? 'flex' : 'hidden lg:flex']"
+        v-if="generatorOpen"
+        :class="[
+          'min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5',
+          mobilePane === 'settings' ? 'flex' : 'hidden lg:flex',
+        ]"
       >
         <ExpressionGeneratorPanel
           v-model:count="count"
@@ -389,9 +418,9 @@ onBeforeUnmount(() => {
           :disabled="isGenerateDisabled"
           :reference-portrait="selectedPortraitImage"
           :reference-sheet="selectedSheetImage"
-          class="min-h-0 min-w-0 flex-1"
+          class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
+          @close="closeGenerator"
           @generate="generateExpression"
-          @upload="uploadDialogOpen = true"
         />
       </div>
     </div>

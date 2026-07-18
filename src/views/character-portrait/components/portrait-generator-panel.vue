@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Upload, WandSparkles } from 'lucide-vue-next';
+import { Upload, WandSparkles, X } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -24,6 +24,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
+  (event: 'close'): void;
   (event: 'generate'): void;
   (event: 'upload'): void;
   (event: 'update:count', value: number): void;
@@ -34,7 +35,14 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-col border-r" aria-label="定妆照生成设置">
+  <section class="flex min-h-0 flex-col" aria-label="定妆照生成设置">
+    <div class="flex h-12 shrink-0 items-center justify-between border-b px-4">
+      <h2 class="text-sm font-medium">AI 创建定妆照</h2>
+      <Button variant="ghost" size="icon" aria-label="关闭 AI 创建面板" @click="emit('close')">
+        <X class="size-4" />
+      </Button>
+    </div>
+
     <ScrollArea class="min-h-0 flex-1">
       <div class="space-y-7 px-5 py-5">
         <section aria-labelledby="portrait-source-heading">

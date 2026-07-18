@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Camera, Check, Images, SlidersHorizontal } from 'lucide-vue-next';
+import { Camera, Check, Images, SlidersHorizontal, WandSparkles } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,12 +9,14 @@ type WorkspaceStage = 'portrait' | 'sheet';
 
 defineProps<{
   activeStage: WorkspaceStage;
+  generatorOpen: boolean;
   mobilePane: 'settings' | 'gallery';
   selectedImage: CharacterPortraitSelection | null;
   selectedSheet: CharacterPortraitSelection | null;
 }>();
 
 const emit = defineEmits<{
+  (event: 'ai-create'): void;
   (event: 'update:activeStage', value: WorkspaceStage): void;
   (event: 'update:mobilePane', value: 'settings' | 'gallery'): void;
 }>();
@@ -54,6 +56,11 @@ const emit = defineEmits<{
       </TabsTrigger>
     </TabsList>
   </Tabs>
+
+  <Button size="sm" :variant="generatorOpen ? 'secondary' : 'default'" @click="emit('ai-create')">
+    <WandSparkles class="size-4" />
+    AI 创建
+  </Button>
 
   <div class="flex items-center gap-1 lg:hidden">
     <Button

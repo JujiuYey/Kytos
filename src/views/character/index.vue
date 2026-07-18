@@ -44,6 +44,7 @@ const isInitializing = ref(true);
 const isResetDialogOpen = ref(false);
 const isSaving = ref(false);
 const isProfileSaved = ref(false);
+const workspaceOpen = ref(true);
 const mobilePane = ref<'chat' | 'draft'>('chat');
 
 const model = computed(() => appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL);
@@ -179,6 +180,16 @@ function resetConversation() {
   mobilePane.value = 'chat';
 }
 
+function closeWorkspace(): void {
+  workspaceOpen.value = false;
+  mobilePane.value = 'chat';
+}
+
+function openWorkspace(): void {
+  workspaceOpen.value = true;
+  mobilePane.value = 'draft';
+}
+
 watch(messages, messageList => applyToolOutputs(messageList));
 onMounted(() => {
   void initialize();
@@ -193,6 +204,8 @@ onMounted(() => {
         :busy="isBusy"
         :key-configured="keyConfigured"
         :model="model"
+        :workspace-open="workspaceOpen"
+        @open-workspace="openWorkspace"
         @new-session="isResetDialogOpen = true"
       />
     </template>
@@ -209,12 +222,15 @@ onMounted(() => {
     </Alert>
 
     <div
-      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]"
+      :class="[
+        'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
+        workspaceOpen && 'lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]',
+      ]"
     >
       <section
         :class="[
           'min-h-0 min-w-0 flex-col overflow-hidden lg:flex',
-          mobilePane === 'chat' ? 'flex' : 'hidden',
+          !workspaceOpen || mobilePane === 'chat' ? 'flex' : 'hidden',
         ]"
         aria-label="角色共创对话"
       >
@@ -228,8 +244,9 @@ onMounted(() => {
       </section>
 
       <aside
+        v-if="workspaceOpen"
         :class="[
-          'min-h-0 min-w-0 flex-col overflow-hidden border-l lg:flex',
+          'min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5',
           mobilePane === 'draft' ? 'flex' : 'hidden',
         ]"
         aria-label="角色档案"
@@ -240,6 +257,8 @@ onMounted(() => {
           :is-saving="isSaving"
           :profile-markdown="profileMarkdown"
           :saved="isProfileSaved"
+          class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
+          @close="closeWorkspace"
           @save="saveProfile"
         />
       </aside>

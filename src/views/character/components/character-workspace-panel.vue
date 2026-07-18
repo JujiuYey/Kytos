@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { watch, ref } from 'vue';
-import { FileText, ListTree } from 'lucide-vue-next';
+import { FileText, ListTree, X } from 'lucide-vue-next';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import type { CharacterDraft } from '@/types';
 import CharacterDraftPanel from './character-draft-panel.vue';
 import ChatSummaryPreview from './chat-summary-preview.vue';
@@ -15,6 +16,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  (event: 'close'): void;
   (event: 'save'): void;
 }>();
 
@@ -31,8 +33,8 @@ watch(
 </script>
 
 <template>
-  <Tabs v-model="activeTab" class="h-full min-h-0 gap-0 bg-muted/20">
-    <div class="flex h-12 shrink-0 items-center border-b px-4">
+  <Tabs v-model="activeTab" class="h-full min-h-0 gap-0">
+    <div class="flex h-12 shrink-0 items-center justify-between gap-3 border-b px-4">
       <TabsList class="h-8">
         <TabsTrigger value="draft">
           <ListTree class="size-3.5" />
@@ -43,6 +45,9 @@ watch(
           完成稿
         </TabsTrigger>
       </TabsList>
+      <Button variant="ghost" size="icon" aria-label="关闭角色档案面板" @click="emit('close')">
+        <X class="size-4" />
+      </Button>
     </div>
 
     <TabsContent value="draft" class="min-h-0 data-[state=inactive]:hidden">

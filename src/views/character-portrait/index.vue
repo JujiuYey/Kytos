@@ -61,6 +61,7 @@ const deleteTarget = ref<{
 const uploadDialogOpen = ref(false);
 const uploadKind = ref<AssetKind>('portrait');
 const activeStage = ref<WorkspaceStage>('portrait');
+const generatorOpen = ref(true);
 const mobilePane = ref<'settings' | 'gallery'>('settings');
 
 let portraitPollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -364,6 +365,16 @@ function retryPolling() {
   }
 }
 
+function closeGenerator(): void {
+  generatorOpen.value = false;
+  mobilePane.value = 'gallery';
+}
+
+function openGenerator(): void {
+  generatorOpen.value = true;
+  mobilePane.value = 'settings';
+}
+
 async function selectPortrait(record: CharacterImageRecord, image: CharacterPortraitImage) {
   if (selectingFileName.value || deletingFileName.value) {
     return;
@@ -486,8 +497,10 @@ onBeforeUnmount(() => {
       <PortraitPageHeader
         v-model:active-stage="activeStage"
         v-model:mobile-pane="mobilePane"
+        :generator-open="generatorOpen"
         :selected-image="selectedImage"
         :selected-sheet="selectedSheet"
+        @ai-create="openGenerator"
       />
     </template>
 
@@ -518,10 +531,16 @@ onBeforeUnmount(() => {
 
     <div
       v-if="activeStage === 'portrait'"
-      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]"
+      :class="[
+        'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
+        generatorOpen && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
+      ]"
     >
       <div
-        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
+        :class="[
+          'min-h-0 min-w-0 lg:flex',
+          !generatorOpen || mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex',
+        ]"
       >
         <PortraitGallery
           asset-kind="portrait"
@@ -535,7 +554,11 @@ onBeforeUnmount(() => {
         />
       </div>
       <div
-        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'settings' ? 'flex' : 'hidden lg:flex']"
+        v-if="generatorOpen"
+        :class="[
+          'min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5',
+          mobilePane === 'settings' ? 'flex' : 'hidden lg:flex',
+        ]"
       >
         <PortraitGeneratorPanel
           v-model="prompt"
@@ -545,7 +568,8 @@ onBeforeUnmount(() => {
           :busy="isBusy"
           :disabled="isGenerateDisabled"
           :draft="draft"
-          class="min-h-0 min-w-0 flex-1"
+          class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
+          @close="closeGenerator"
           @generate="generatePortraits"
           @upload="openUpload('portrait')"
         />
@@ -554,10 +578,16 @@ onBeforeUnmount(() => {
 
     <div
       v-else
-      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]"
+      :class="[
+        'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
+        generatorOpen && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
+      ]"
     >
       <div
-        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
+        :class="[
+          'min-h-0 min-w-0 lg:flex',
+          !generatorOpen || mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex',
+        ]"
       >
         <PortraitGallery
           asset-kind="sheet"
@@ -571,7 +601,11 @@ onBeforeUnmount(() => {
         />
       </div>
       <div
-        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'settings' ? 'flex' : 'hidden lg:flex']"
+        v-if="generatorOpen"
+        :class="[
+          'min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5',
+          mobilePane === 'settings' ? 'flex' : 'hidden lg:flex',
+        ]"
       >
         <CharacterSheetGeneratorPanel
           v-model="sheetPrompt"
@@ -579,7 +613,8 @@ onBeforeUnmount(() => {
           :busy="isSheetBusy"
           :disabled="isSheetGenerateDisabled"
           :reference-image="selectedPortraitImage"
-          class="min-h-0 min-w-0 flex-1"
+          class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
+          @close="closeGenerator"
           @generate="generateSheet"
           @upload="openUpload('sheet')"
         />

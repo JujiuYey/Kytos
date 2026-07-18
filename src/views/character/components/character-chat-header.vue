@@ -9,9 +9,11 @@ defineProps<{
   keyConfigured: boolean;
   mobilePane: 'chat' | 'draft';
   model: string;
+  workspaceOpen: boolean;
 }>();
 
 const emit = defineEmits<{
+  (event: 'openWorkspace'): void;
   (event: 'newSession'): void;
   (event: 'update:mobilePane', value: 'chat' | 'draft'): void;
 }>();
@@ -51,6 +53,15 @@ const emit = defineEmits<{
       </TabsTrigger>
     </TabsList>
   </Tabs>
+
+  <Button
+    size="sm"
+    :variant="workspaceOpen ? 'secondary' : 'default'"
+    @click="emit('openWorkspace')"
+  >
+    <FileText class="size-4" />
+    角色档案
+  </Button>
 
   <Button
     variant="ghost"

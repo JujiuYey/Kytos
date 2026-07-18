@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Upload, WandSparkles } from 'lucide-vue-next';
+import { WandSparkles, X } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,8 +33,8 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
+  (event: 'close'): void;
   (event: 'generate'): void;
-  (event: 'upload'): void;
   (event: 'update:count', value: number): void;
   (event: 'update:description', value: string): void;
   (event: 'update:name', value: string): void;
@@ -44,7 +44,14 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-col border-r" aria-label="表情生成设置">
+  <section class="flex min-h-0 flex-col" aria-label="表情生成设置">
+    <div class="flex h-12 shrink-0 items-center justify-between border-b px-4">
+      <h2 class="text-sm font-medium">AI 创建表情</h2>
+      <Button variant="ghost" size="icon" aria-label="关闭 AI 创建面板" @click="emit('close')">
+        <X class="size-4" />
+      </Button>
+    </div>
+
     <ScrollArea class="min-h-0 flex-1">
       <div class="space-y-7 px-5 py-5">
         <section aria-labelledby="expression-reference-heading">
@@ -211,16 +218,10 @@ const emit = defineEmits<{
     </ScrollArea>
 
     <footer class="shrink-0 border-t bg-background px-5 py-4">
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
-        <Button variant="outline" @click="emit('upload')">
-          <Upload class="size-4" />
-          上传表情
-        </Button>
-        <Button :disabled="disabled" @click="emit('generate')">
-          <WandSparkles class="size-4" />
-          {{ busy ? '正在生成表情' : '生成表情' }}
-        </Button>
-      </div>
+      <Button class="w-full" :disabled="disabled" @click="emit('generate')">
+        <WandSparkles class="size-4" />
+        {{ busy ? '正在生成表情' : '生成表情' }}
+      </Button>
       <p class="mt-2 text-center text-xs text-muted-foreground">
         使用两张正式角色参考图进行 GPT-Image-2 图生图，点击后将产生实际费用
       </p>

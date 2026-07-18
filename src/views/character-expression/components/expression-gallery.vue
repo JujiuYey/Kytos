@@ -70,14 +70,6 @@ function formatDate(value: string): string {
 
 <template>
   <section class="flex min-h-0 flex-col bg-muted/15" aria-label="表情资产库">
-    <div class="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-5">
-      <div class="min-w-0">
-        <h2 class="truncate text-sm font-medium">表情资产</h2>
-        <p class="mt-0.5 text-xs text-muted-foreground">生成和上传的表情都会保存到作品工作区</p>
-      </div>
-      <Badge variant="outline">{{ records.length }} 项记录</Badge>
-    </div>
-
     <ScrollArea class="min-h-0 flex-1">
       <div
         v-if="records.length"
