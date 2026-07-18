@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { AlertCircle, Images, Laugh, SlidersHorizontal } from 'lucide-vue-next';
+import { AlertCircle } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
@@ -22,6 +21,7 @@ import type {
 } from '@/types';
 import ExpressionGallery from './components/expression-gallery.vue';
 import ExpressionGeneratorPanel from './components/expression-generator-panel.vue';
+import ExpressionPageHeader from './components/expression-page-header.vue';
 import ExpressionRenameDialog from './components/expression-rename-dialog.vue';
 import ExpressionUploadDialog from './components/expression-upload-dialog.vue';
 
@@ -326,39 +326,7 @@ onBeforeUnmount(() => {
 <template>
   <SagPage>
     <template #header>
-      <div class="flex min-w-0 flex-1 items-center gap-3">
-        <div
-          class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
-        >
-          <Laugh class="size-4" />
-        </div>
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <h1 class="truncate text-sm font-semibold">表情管理</h1>
-            <Badge variant="outline" class="hidden sm:inline-flex">GPT-Image-2</Badge>
-          </div>
-          <p class="truncate text-xs text-muted-foreground">基于正式角色资产生成与管理表情</p>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-1 lg:hidden">
-        <Button
-          size="icon"
-          :variant="mobilePane === 'settings' ? 'secondary' : 'ghost'"
-          aria-label="显示设置"
-          @click="mobilePane = 'settings'"
-        >
-          <SlidersHorizontal class="size-4" />
-        </Button>
-        <Button
-          size="icon"
-          :variant="mobilePane === 'gallery' ? 'secondary' : 'ghost'"
-          aria-label="显示表情"
-          @click="mobilePane = 'gallery'"
-        >
-          <Images class="size-4" />
-        </Button>
-      </div>
+      <ExpressionPageHeader v-model:mobile-pane="mobilePane" />
     </template>
 
     <Alert v-if="!isInitializing && !hasReferences" class="mx-4 mt-3 shrink-0 sm:mx-5">
@@ -393,8 +361,21 @@ onBeforeUnmount(() => {
     </Alert>
 
     <div
-      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(340px,2fr)_minmax(0,5fr)]"
+      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]"
     >
+      <div
+        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
+      >
+        <ExpressionGallery
+          :deleting-file-name="deletingFileName"
+          :records="records"
+          :renaming-task-id="renamingTaskId"
+          class="min-h-0 min-w-0 flex-1"
+          @delete="requestDelete"
+          @rename="requestRename"
+        />
+      </div>
+
       <div
         :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'settings' ? 'flex' : 'hidden lg:flex']"
       >
@@ -411,19 +392,6 @@ onBeforeUnmount(() => {
           class="min-h-0 min-w-0 flex-1"
           @generate="generateExpression"
           @upload="uploadDialogOpen = true"
-        />
-      </div>
-
-      <div
-        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
-      >
-        <ExpressionGallery
-          :deleting-file-name="deletingFileName"
-          :records="records"
-          :renaming-task-id="renamingTaskId"
-          class="min-h-0 min-w-0 flex-1"
-          @delete="requestDelete"
-          @rename="requestRename"
         />
       </div>
     </div>

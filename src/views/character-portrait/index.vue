@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { AlertCircle, Camera, Check, Images, SlidersHorizontal } from 'lucide-vue-next';
+import { AlertCircle } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upload-dialog';
 import { CharacterSheetGeneratorPanel } from '@/components/sag/character-sheet-generator-panel';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
@@ -27,6 +25,7 @@ import type {
 } from '@/types';
 import { createEmptyCharacterDraft } from '@/types';
 import PortraitGallery from './components/portrait-gallery.vue';
+import PortraitPageHeader from './components/portrait-page-header.vue';
 import PortraitGeneratorPanel from './components/portrait-generator-panel.vue';
 
 type AssetKind = 'portrait' | 'sheet';
@@ -484,54 +483,12 @@ onBeforeUnmount(() => {
 <template>
   <SagPage>
     <template #header>
-      <div class="flex min-w-0 flex-1 items-center gap-3">
-        <div
-          class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
-        >
-          <Camera class="size-4" />
-        </div>
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <h1 class="truncate text-sm font-semibold">角色视觉资产</h1>
-            <Badge variant="outline" class="hidden sm:inline-flex">GPT-Image-2</Badge>
-          </div>
-          <p class="truncate text-xs text-muted-foreground">定妆照与多角度角色表</p>
-        </div>
-      </div>
-
-      <Tabs v-model="activeStage" class="order-3 w-full gap-0 sm:order-none sm:w-auto">
-        <TabsList class="grid h-9 w-full grid-cols-2 sm:w-72">
-          <TabsTrigger value="portrait" class="gap-1.5">
-            <Camera class="size-3.5" />
-            1. 定妆照
-            <Check v-if="selectedImage" class="size-3.5 text-primary" />
-          </TabsTrigger>
-          <TabsTrigger value="sheet" class="gap-1.5">
-            <Images class="size-3.5" />
-            2. 角色表
-            <Check v-if="selectedSheet" class="size-3.5 text-primary" />
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <div class="flex items-center gap-1 lg:hidden">
-        <Button
-          size="icon"
-          :variant="mobilePane === 'settings' ? 'secondary' : 'ghost'"
-          aria-label="显示设置"
-          @click="mobilePane = 'settings'"
-        >
-          <SlidersHorizontal class="size-4" />
-        </Button>
-        <Button
-          size="icon"
-          :variant="mobilePane === 'gallery' ? 'secondary' : 'ghost'"
-          aria-label="显示图片"
-          @click="mobilePane = 'gallery'"
-        >
-          <Images class="size-4" />
-        </Button>
-      </div>
+      <PortraitPageHeader
+        v-model:active-stage="activeStage"
+        v-model:mobile-pane="mobilePane"
+        :selected-image="selectedImage"
+        :selected-sheet="selectedSheet"
+      />
     </template>
 
     <Alert v-if="!isInitializing && !keyConfigured" class="mx-4 mt-3 shrink-0 sm:mx-5">
@@ -561,8 +518,22 @@ onBeforeUnmount(() => {
 
     <div
       v-if="activeStage === 'portrait'"
-      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(340px,2fr)_minmax(0,5fr)]"
+      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]"
     >
+      <div
+        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
+      >
+        <PortraitGallery
+          asset-kind="portrait"
+          :deleting-file-name="deletingFileName"
+          :records="records"
+          :selected-image="selectedImage"
+          :selecting-file-name="selectingFileName"
+          class="min-h-0 min-w-0 flex-1"
+          @delete="(record, image) => requestDelete('portrait', record, image)"
+          @select="selectPortrait"
+        />
+      </div>
       <div
         :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'settings' ? 'flex' : 'hidden lg:flex']"
       >
@@ -579,40 +550,12 @@ onBeforeUnmount(() => {
           @upload="openUpload('portrait')"
         />
       </div>
-      <div
-        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
-      >
-        <PortraitGallery
-          asset-kind="portrait"
-          :deleting-file-name="deletingFileName"
-          :records="records"
-          :selected-image="selectedImage"
-          :selecting-file-name="selectingFileName"
-          class="min-h-0 min-w-0 flex-1"
-          @delete="(record, image) => requestDelete('portrait', record, image)"
-          @select="selectPortrait"
-        />
-      </div>
     </div>
 
     <div
       v-else
-      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(340px,2fr)_minmax(0,5fr)]"
+      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]"
     >
-      <div
-        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'settings' ? 'flex' : 'hidden lg:flex']"
-      >
-        <CharacterSheetGeneratorPanel
-          v-model="sheetPrompt"
-          v-model:resolution="sheetResolution"
-          :busy="isSheetBusy"
-          :disabled="isSheetGenerateDisabled"
-          :reference-image="selectedPortraitImage"
-          class="min-h-0 min-w-0 flex-1"
-          @generate="generateSheet"
-          @upload="openUpload('sheet')"
-        />
-      </div>
       <div
         :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex']"
       >
@@ -625,6 +568,20 @@ onBeforeUnmount(() => {
           class="min-h-0 min-w-0 flex-1"
           @delete="(record, image) => requestDelete('sheet', record, image)"
           @select="selectSheet"
+        />
+      </div>
+      <div
+        :class="['min-h-0 min-w-0 lg:flex', mobilePane === 'settings' ? 'flex' : 'hidden lg:flex']"
+      >
+        <CharacterSheetGeneratorPanel
+          v-model="sheetPrompt"
+          v-model:resolution="sheetResolution"
+          :busy="isSheetBusy"
+          :disabled="isSheetGenerateDisabled"
+          :reference-image="selectedPortraitImage"
+          class="min-h-0 min-w-0 flex-1"
+          @generate="generateSheet"
+          @upload="openUpload('sheet')"
         />
       </div>
     </div>

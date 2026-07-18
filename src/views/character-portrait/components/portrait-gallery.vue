@@ -86,16 +86,6 @@ function formatDate(value: string): string {
     class="flex min-h-0 flex-col bg-muted/15"
     :aria-label="assetKind === 'portrait' ? '定妆照候选' : '角色表候选'"
   >
-    <div class="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-5">
-      <div class="min-w-0">
-        <h2 class="truncate text-sm font-medium">
-          {{ assetKind === 'portrait' ? '定妆照资产' : '多角度角色表' }}
-        </h2>
-        <p class="mt-0.5 text-xs text-muted-foreground">生成和上传的图片都会保存到作品工作区</p>
-      </div>
-      <Badge variant="outline">{{ records.length }} 项记录</Badge>
-    </div>
-
     <ScrollArea class="min-h-0 flex-1">
       <div v-if="records.length" class="mx-auto w-full max-w-5xl space-y-8 px-5 py-6 lg:px-8">
         <article v-for="record in records" :key="record.id">
