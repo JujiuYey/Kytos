@@ -34,6 +34,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke('illustration:save-conversation', request),
   selectCharacterPortrait: request => ipcRenderer.invoke('character-portrait:select', request),
   selectCharacterSheet: request => ipcRenderer.invoke('character-sheet:select', request),
+  selectIllustrationStyleReference: request =>
+    ipcRenderer.invoke('illustration:select-style-reference', request),
   setCredential: request => ipcRenderer.invoke('credential:set', request),
   setWorkspaceDirectory: workspacePath =>
     ipcRenderer.invoke('workspace:set-directory', workspacePath),

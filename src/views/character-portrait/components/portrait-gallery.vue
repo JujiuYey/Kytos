@@ -230,7 +230,11 @@ function formatDate(value: string): string {
                     }}
                   </p>
                 </div>
-                <Badge v-if="isSelected(entry)" variant="secondary" class="shrink-0 gap-1">
+                <Badge
+                  v-if="isSelected(entry)"
+                  variant="secondary"
+                  class="shrink-0 gap-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                >
                   <Check class="size-3" />
                   正式资产
                 </Badge>
@@ -244,9 +248,8 @@ function formatDate(value: string): string {
                   <Clock3 class="size-3.5 shrink-0" />
                   <span class="truncate">{{ formatDate(entry.record.createdAt) }}</span>
                 </span>
-                <div class="flex shrink-0 items-center gap-1.5">
+                <div v-if="!isSelected(entry)" class="flex shrink-0 items-center gap-1.5">
                   <Button
-                    v-if="!isSelected(entry)"
                     size="sm"
                     variant="outline"
                     :disabled="
@@ -289,7 +292,7 @@ function formatDate(value: string): string {
           </div>
           <h2 class="mt-4 text-sm font-medium">还没有角色图片</h2>
           <p class="mt-1.5 text-sm leading-6 text-muted-foreground">
-            可以通过 AI 创建或上传已有图片，建立角色的视觉资产。
+            可以创建或上传已有图片，建立角色的视觉资产。
           </p>
         </div>
       </div>

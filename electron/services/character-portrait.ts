@@ -559,6 +559,12 @@ export async function deleteCharacterPortrait(
   if (!record || !image) {
     throw new Error('未找到这张定妆照');
   }
+  if (
+    store.selectedImage?.taskId === request.taskId &&
+    store.selectedImage.fileName === request.fileName
+  ) {
+    throw new Error('正式定妆照不能删除，请先将其他图片设为正式资产');
+  }
 
   const remainingImages = record.images.filter(item => item.fileName !== request.fileName);
   const nextStore: StoredPortraitWorkspace = {
@@ -570,16 +576,6 @@ export async function deleteCharacterPortrait(
             : item,
         )
       : store.records.filter(item => item.id !== record.id),
-    selectedImage:
-      store.selectedImage?.taskId === request.taskId &&
-      store.selectedImage.fileName === request.fileName
-        ? null
-        : store.selectedImage,
-    selectedSheet:
-      store.selectedImage?.taskId === request.taskId &&
-      store.selectedImage.fileName === request.fileName
-        ? null
-        : store.selectedSheet,
   };
 
   await savePortraitStore(nextStore);
@@ -867,15 +863,16 @@ export async function deleteCharacterSheet(
   if (!record || !image) {
     throw new Error('未找到这张角色表');
   }
+  if (
+    store.selectedSheet?.taskId === request.taskId &&
+    store.selectedSheet.fileName === request.fileName
+  ) {
+    throw new Error('正式角色表不能删除，请先将其他图片设为正式资产');
+  }
 
   const remainingImages = record.images.filter(item => item.fileName !== request.fileName);
   const nextStore: StoredPortraitWorkspace = {
     ...store,
-    selectedSheet:
-      store.selectedSheet?.taskId === request.taskId &&
-      store.selectedSheet.fileName === request.fileName
-        ? null
-        : store.selectedSheet,
     sheetRecords: remainingImages.length
       ? store.sheetRecords.map(item =>
           item.id === record.id

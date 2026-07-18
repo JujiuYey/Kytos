@@ -73,7 +73,7 @@ const emit = defineEmits<{
     <DropdownMenuTrigger as-child>
       <Button size="sm" :variant="generatorOpen ? 'secondary' : 'default'">
         <WandSparkles class="size-4" />
-        AI 创建
+        创建
         <ChevronDown class="size-3.5" />
       </Button>
     </DropdownMenuTrigger>

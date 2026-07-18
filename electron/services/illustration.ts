@@ -11,16 +11,22 @@ import type {
   IllustrationBrief,
   IllustrationBriefUpdateResult,
   IllustrationSize,
+  IllustrationStyleReference,
   IllustrationTopic,
   IllustrationVersion,
   IllustrationVersionReference,
   IllustrationWorkspaceState,
   SaveIllustrationConversationRequest,
+  SelectIllustrationStyleReferenceRequest,
   UpdateIllustrationTopicRequest,
   UploadedIllustration,
   UploadIllustrationRequest,
 } from '../../shared/illustration';
-import { ILLUSTRATION_SIZES, createEmptyIllustrationBrief } from '../../shared/illustration';
+import {
+  ILLUSTRATION_SIZES,
+  ILLUSTRATION_STYLE_GUIDANCE,
+  createEmptyIllustrationBrief,
+} from '../../shared/illustration';
 import type {
   CharacterPortraitImage,
   CharacterPortraitResolution,
@@ -55,9 +61,10 @@ const BRIEF_FIELDS: (keyof IllustrationBrief)[] = [
 ];
 
 interface StoredIllustrationWorkspace {
+  selectedStyleReference: IllustrationStyleReference | null;
   topics: IllustrationTopic[];
   uploads: UploadedIllustration[];
-  version: 1;
+  version: 2;
 }
 
 interface ApiTaskImage {
@@ -144,6 +151,38 @@ function parseVersionReference(value: unknown): IllustrationVersionReference | n
   return { fileName: value.fileName, versionId: value.versionId };
 }
 
+function parseStyleReference(value: unknown): IllustrationStyleReference | null {
+  if (
+    !isRecord(value) ||
+    typeof value.fileName !== 'string' ||
+    path.basename(value.fileName) !== value.fileName
+  ) {
+    return null;
+  }
+  if (
+    value.source === 'generated' &&
+    typeof value.topicId === 'string' &&
+    ID_PATTERN.test(value.topicId) &&
+    typeof value.versionId === 'string' &&
+    ID_PATTERN.test(value.versionId)
+  ) {
+    return {
+      fileName: value.fileName,
+      source: 'generated',
+      topicId: value.topicId,
+      versionId: value.versionId,
+    };
+  }
+  if (
+    value.source === 'uploaded' &&
+    typeof value.uploadId === 'string' &&
+    ID_PATTERN.test(value.uploadId)
+  ) {
+    return { fileName: value.fileName, source: 'uploaded', uploadId: value.uploadId };
+  }
+  return null;
+}
+
 function getAssetUrl(fileName: string): string {
   return `app://bundle/workspace-assets/${ASSET_DIRECTORY}/${encodeURIComponent(fileName)}`;
 }
@@ -221,6 +260,7 @@ function parseVersion(value: unknown): IllustrationVersion | null {
     prompt: value.prompt,
     referencePortrait: parseSelection(value.referencePortrait),
     referenceSheet: parseSelection(value.referenceSheet),
+    referenceStyle: parseStyleReference(value.referenceStyle),
     resolution: value.resolution,
     size: value.size,
     status: value.status,
@@ -266,7 +306,7 @@ async function getStorePath(): Promise<string> {
 async function loadStore(): Promise<StoredIllustrationWorkspace> {
   const value = await readJsonFile(await getStorePath());
   if (!isRecord(value)) {
-    return { topics: [], uploads: [], version: 1 };
+    return { selectedStyleReference: null, topics: [], uploads: [], version: 2 };
   }
   const topics = Array.isArray(value.topics)
     ? value.topics
@@ -280,7 +320,16 @@ async function loadStore(): Promise<StoredIllustrationWorkspace> {
         .filter((upload): upload is UploadedIllustration => Boolean(upload))
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     : [];
-  return { topics, uploads, version: 1 };
+  const selectedStyleReference = parseStyleReference(value.selectedStyleReference);
+  return {
+    selectedStyleReference:
+      selectedStyleReference && resolveStyleReferenceImage(topics, uploads, selectedStyleReference)
+        ? selectedStyleReference
+        : null,
+    topics,
+    uploads,
+    version: 2,
+  };
 }
 
 async function saveStore(store: StoredIllustrationWorkspace): Promise<void> {
@@ -299,6 +348,25 @@ function replaceTopic(
   };
 }
 
+function resolveStyleReferenceImage(
+  topics: IllustrationTopic[],
+  uploads: UploadedIllustration[],
+  reference: IllustrationStyleReference,
+): CharacterPortraitImage | null {
+  if (reference.source === 'uploaded') {
+    const upload = uploads.find(
+      item => item.id === reference.uploadId && item.fileName === reference.fileName,
+    );
+    return upload
+      ? { fileName: upload.fileName, mimeType: upload.mimeType, url: upload.url }
+      : null;
+  }
+  const version = topics
+    .find(topic => topic.id === reference.topicId)
+    ?.versions.find(item => item.id === reference.versionId && item.status === 'completed');
+  return version?.images.find(image => image.fileName === reference.fileName) ?? null;
+}
+
 function requireTopic(store: StoredIllustrationWorkspace, topicId: string): IllustrationTopic {
   if (!ID_PATTERN.test(topicId)) {
     throw new Error('插画主题编号无效');
@@ -312,7 +380,31 @@ function requireTopic(store: StoredIllustrationWorkspace, topicId: string): Illu
 
 export async function getIllustrationWorkspace(): Promise<IllustrationWorkspaceState> {
   const store = await loadStore();
-  return { topics: store.topics, uploads: store.uploads };
+  return {
+    selectedStyleReference: store.selectedStyleReference,
+    topics: store.topics,
+    uploads: store.uploads,
+  };
+}
+
+export async function selectIllustrationStyleReference(
+  request: SelectIllustrationStyleReferenceRequest,
+): Promise<IllustrationWorkspaceState> {
+  const reference = parseStyleReference(request);
+  if (!reference) {
+    throw new Error('画风参考选择无效');
+  }
+  const store = await loadStore();
+  if (!resolveStyleReferenceImage(store.topics, store.uploads, reference)) {
+    throw new Error('未找到这张画风参考图');
+  }
+  const nextStore = { ...store, selectedStyleReference: reference };
+  await saveStore(nextStore);
+  return {
+    selectedStyleReference: nextStore.selectedStyleReference,
+    topics: nextStore.topics,
+    uploads: nextStore.uploads,
+  };
 }
 
 export async function getIllustrationTopic(topicId: string): Promise<IllustrationTopic> {
@@ -589,17 +681,26 @@ async function readReferenceImage(
   return `data:${image.mimeType};base64,${imageData.toString('base64')}`;
 }
 
-function buildPrompt(prompt: string, useCharacter: boolean): string {
-  if (!useCharacter) {
-    return prompt.trim();
+function buildPrompt(prompt: string, useCharacter: boolean, useStyleReference: boolean): string {
+  const lines: string[] = [];
+  if (useCharacter) {
+    lines.push(
+      '参考图中的角色是本次插画中的同一个角色。使用正式定妆照确认脸部和服装，使用角色表确认完整造型和各角度结构。',
+      '必须保持角色身份、脸型、五官、发型、身材比例、服装、鞋履、配饰和颜色一致，不要重新设计或美化角色。',
+    );
   }
-  return [
-    '参考图中的角色是本次插画中的同一个角色。使用正式定妆照确认脸部、服装与画风，使用角色表确认完整造型和各角度结构。',
-    '必须保持角色身份、脸型、五官、发型、身材比例、服装、鞋履、配饰和颜色一致，不要重新设计或美化角色。',
-    prompt.trim(),
-    '旧插画参考图只用于延续其构图、环境或情境；如果它与正式角色参考图冲突，以正式定妆照和角色表为准。',
-    '不要添加未要求的文字、边框、Logo、水印、多格排版、重复人物或重复肢体。',
-  ].join('\n');
+  lines.push(prompt.trim());
+  if (useStyleReference) {
+    lines.push(
+      '正式画风参考图只用于确认视觉语言，不要复制其中的具体人物动作、道具、环境或构图。',
+      ILLUSTRATION_STYLE_GUIDANCE,
+    );
+  }
+  lines.push(
+    '旧插画参考图只用于延续其构图、环境或情境；如果它与正式角色资产或正式画风参考冲突，以正式资产为准。',
+    '除少量风格化手写批注外，不要添加标题、大段文字、边框、Logo、水印、多格排版、重复人物或重复肢体。',
+  );
+  return lines.join('\n');
 }
 
 function validateGenerateRequest(request: GenerateIllustrationRequest): void {
@@ -631,6 +732,7 @@ export async function generateIllustration(
   const referenceImages: string[] = [];
   let referencePortrait: CharacterPortraitSelection | null = null;
   let referenceSheet: CharacterPortraitSelection | null = null;
+  const referenceStyle = store.selectedStyleReference;
   if (topic.useCharacter) {
     const portraitWorkspace = await getCharacterPortraitWorkspace();
     referencePortrait = portraitWorkspace.selectedImage;
@@ -659,6 +761,14 @@ export async function generateIllustration(
     );
   }
 
+  if (referenceStyle) {
+    const styleImage = resolveStyleReferenceImage(store.topics, store.uploads, referenceStyle);
+    if (!styleImage) {
+      throw new Error('正式画风参考已失效，请重新选择');
+    }
+    referenceImages.push(await readReferenceImage(ASSET_DIRECTORY, styleImage));
+  }
+
   let baseVersion: IllustrationVersionReference | null = null;
   if (request.baseVersion) {
     const version = topic.versions.find(item => item.id === request.baseVersion?.versionId);
@@ -670,7 +780,7 @@ export async function generateIllustration(
     referenceImages.push(await readReferenceImage(ASSET_DIRECTORY, image));
   }
 
-  const prompt = buildPrompt(request.prompt, topic.useCharacter);
+  const prompt = buildPrompt(request.prompt, topic.useCharacter, Boolean(referenceStyle));
   const apiKey = await getCredentialValue('apimart');
   const body: Record<string, unknown> = {
     model: 'gpt-image-2',
@@ -702,6 +812,7 @@ export async function generateIllustration(
     prompt,
     referencePortrait: referencePortrait ? { ...referencePortrait } : null,
     referenceSheet: referenceSheet ? { ...referenceSheet } : null,
+    referenceStyle: referenceStyle ? { ...referenceStyle } : null,
     resolution: request.resolution,
     size: request.size,
     status: 'submitted',
@@ -786,6 +897,13 @@ export async function deleteIllustrationVersion(
   if (['submitted', 'pending', 'processing'].includes(version.status)) {
     throw new Error('插画生成完成后才能删除');
   }
+  if (
+    store.selectedStyleReference?.source === 'generated' &&
+    store.selectedStyleReference.topicId === topic.id &&
+    store.selectedStyleReference.versionId === version.id
+  ) {
+    throw new Error('正式画风参考不能删除，请先将其他插画设为正式画风');
+  }
   const updatedTopic: IllustrationTopic = {
     ...topic,
     updatedAt: new Date().toISOString(),
@@ -850,6 +968,12 @@ export async function deleteIllustrationUpload(
   if (!upload) {
     throw new Error('未找到要删除的上传插画');
   }
+  if (
+    store.selectedStyleReference?.source === 'uploaded' &&
+    store.selectedStyleReference.uploadId === upload.id
+  ) {
+    throw new Error('正式画风参考不能删除，请先将其他插画设为正式画风');
+  }
   const nextStore: StoredIllustrationWorkspace = {
     ...store,
     uploads: store.uploads.filter(item => item.id !== upload.id),
@@ -866,7 +990,11 @@ export async function deleteIllustrationUpload(
       );
     }
   }
-  return { topics: nextStore.topics, uploads: nextStore.uploads };
+  return {
+    selectedStyleReference: nextStore.selectedStyleReference,
+    topics: nextStore.topics,
+    uploads: nextStore.uploads,
+  };
 }
 
 export async function deleteIllustrationTopic(
@@ -877,6 +1005,12 @@ export async function deleteIllustrationTopic(
   }
   const store = await loadStore();
   const topic = requireTopic(store, request.topicId);
+  if (
+    store.selectedStyleReference?.source === 'generated' &&
+    store.selectedStyleReference.topicId === topic.id
+  ) {
+    throw new Error('该主题包含正式画风参考，请先将其他插画设为正式画风');
+  }
   if (
     topic.versions.some(version => ['submitted', 'pending', 'processing'].includes(version.status))
   ) {
@@ -892,5 +1026,9 @@ export async function deleteIllustrationTopic(
       ),
     ),
   );
-  return { topics: nextStore.topics, uploads: nextStore.uploads };
+  return {
+    selectedStyleReference: nextStore.selectedStyleReference,
+    topics: nextStore.topics,
+    uploads: nextStore.uploads,
+  };
 }

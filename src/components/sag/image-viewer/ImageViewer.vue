@@ -178,7 +178,8 @@ watch(
     </DialogTrigger>
 
     <DialogContent
-      class="flex h-[90vh] max-h-[56rem] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden border-0 bg-foreground p-0 text-background shadow-2xl sm:max-w-6xl [&>[data-slot=dialog-close]]:rounded-md [&>[data-slot=dialog-close]]:bg-background/10 [&>[data-slot=dialog-close]]:p-2 [&>[data-slot=dialog-close]]:text-background [&>[data-slot=dialog-close]]:opacity-100 [&>[data-slot=dialog-close]]:hover:bg-background/20"
+      overlay-class="bg-black/55 backdrop-blur-[2px]"
+      class="flex h-[90vh] max-h-[56rem] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden border border-white/10 bg-black/45 p-0 text-white shadow-2xl backdrop-blur-md sm:max-w-6xl [&>[data-slot=dialog-close]]:rounded-md [&>[data-slot=dialog-close]]:bg-white/10 [&>[data-slot=dialog-close]]:p-2 [&>[data-slot=dialog-close]]:text-white [&>[data-slot=dialog-close]]:opacity-100 [&>[data-slot=dialog-close]]:hover:bg-white/20"
     >
       <DialogHeader class="sr-only">
         <DialogTitle>{{ title }}</DialogTitle>
@@ -228,7 +229,7 @@ watch(
                 <Button
                   size="icon"
                   variant="ghost"
-                  class="size-8 border border-background/20 bg-background/10 text-background shadow-md backdrop-blur-sm hover:bg-background/20 hover:text-background"
+                  class="size-8 border border-white/20 bg-black/35 text-white shadow-md backdrop-blur-sm hover:bg-black/50 hover:text-white"
                   :disabled="scale <= MIN_SCALE"
                   aria-label="缩小图片"
                   @click="zoomOut"
@@ -240,7 +241,7 @@ watch(
             </Tooltip>
 
             <span
-              class="inline-flex h-8 min-w-14 items-center justify-center rounded-md border border-background/20 bg-background/10 px-2 text-xs text-background tabular-nums shadow-md backdrop-blur-sm"
+              class="inline-flex h-8 min-w-14 items-center justify-center rounded-md border border-white/20 bg-black/35 px-2 text-xs text-white tabular-nums shadow-md backdrop-blur-sm"
             >
               {{ scaleLabel }}
             </span>
@@ -250,7 +251,7 @@ watch(
                 <Button
                   size="icon"
                   variant="ghost"
-                  class="size-8 border border-background/20 bg-background/10 text-background shadow-md backdrop-blur-sm hover:bg-background/20 hover:text-background"
+                  class="size-8 border border-white/20 bg-black/35 text-white shadow-md backdrop-blur-sm hover:bg-black/50 hover:text-white"
                   :disabled="scale >= MAX_SCALE"
                   aria-label="放大图片"
                   @click="zoomIn"
@@ -266,7 +267,7 @@ watch(
                 <Button
                   size="icon"
                   variant="ghost"
-                  class="size-8 border border-background/20 bg-background/10 text-background shadow-md backdrop-blur-sm hover:bg-background/20 hover:text-background"
+                  class="size-8 border border-white/20 bg-black/35 text-white shadow-md backdrop-blur-sm hover:bg-black/50 hover:text-white"
                   :disabled="scale === 1 && panX === 0 && panY === 0"
                   aria-label="恢复适合窗口大小"
                   @click="resetView"

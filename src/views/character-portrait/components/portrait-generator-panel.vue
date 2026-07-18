@@ -36,8 +36,8 @@ const emit = defineEmits<{
 <template>
   <section class="flex min-h-0 flex-col" aria-label="定妆照生成设置">
     <div class="flex h-12 shrink-0 items-center justify-between border-b px-4">
-      <h2 class="text-sm font-medium">AI 创建定妆照</h2>
-      <Button variant="ghost" size="icon" aria-label="关闭 AI 创建面板" @click="emit('close')">
+      <h2 class="text-sm font-medium">创建定妆照</h2>
+      <Button variant="ghost" size="icon" aria-label="关闭创建面板" @click="emit('close')">
         <X class="size-4" />
       </Button>
     </div>

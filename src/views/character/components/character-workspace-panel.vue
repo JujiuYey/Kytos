@@ -50,10 +50,10 @@ watch(
       </Button>
     </div>
 
-    <TabsContent value="draft" class="min-h-0 data-[state=inactive]:hidden">
+    <TabsContent value="draft" class="flex min-h-0 flex-col data-[state=inactive]:hidden">
       <CharacterDraftPanel :draft="draft" />
     </TabsContent>
-    <TabsContent value="profile" class="min-h-0 data-[state=inactive]:hidden">
+    <TabsContent value="profile" class="flex min-h-0 flex-col data-[state=inactive]:hidden">
       <ChatSummaryPreview
         :can-save="canSave"
         :is-saving="isSaving"

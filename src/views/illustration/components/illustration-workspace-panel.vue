@@ -6,6 +6,8 @@ import {
   ImagePlus,
   Images,
   Link2,
+  Image as ImageIcon,
+  Palette,
   Sparkles,
   Trash2,
   X,
@@ -32,6 +34,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ImageViewer } from '@/components/sag/image-viewer';
 import type {
   CharacterPortraitResolution,
+  CharacterPortraitImage,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,
@@ -43,9 +46,12 @@ const props = defineProps<{
   baseReference: IllustrationVersionReference | null;
   busy: boolean;
   prompt: string;
+  portraitReference: CharacterPortraitImage | null;
   referencesReady: boolean;
   resolution: CharacterPortraitResolution;
   size: IllustrationSize;
+  sheetReference: CharacterPortraitImage | null;
+  styleReference: CharacterPortraitImage | null;
   topic: IllustrationTopic;
 }>();
 
@@ -53,6 +59,7 @@ const emit = defineEmits<{
   (event: 'clear-base'): void;
   (event: 'delete-version', version: IllustrationVersion): void;
   (event: 'generate'): void;
+  (event: 'manage-style'): void;
   (event: 'rename', title: string): void;
   (event: 'select-base', reference: IllustrationVersionReference): void;
   (event: 'update:prompt', value: string): void;
@@ -62,6 +69,11 @@ const emit = defineEmits<{
 }>();
 
 const promptOpen = ref(false);
+const referenceAssets = computed(() => [
+  { image: props.portraitReference, label: '定妆照' },
+  { image: props.sheetReference, label: '角色表' },
+  { image: props.styleReference, label: '画风' },
+]);
 const activeStatuses = ['submitted', 'pending', 'processing'];
 const planFields = computed(() => [
   { label: '主体', value: props.topic.brief.subject },
@@ -149,6 +161,56 @@ function handleTitleChange(event: Event): void {
               @update:model-value="emit('update:useCharacter', Boolean($event))"
             />
           </div>
+        </section>
+
+        <section aria-labelledby="illustration-references-heading">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <h3 id="illustration-references-heading" class="text-sm font-medium">正式参考</h3>
+            <Badge :variant="styleReference ? 'secondary' : 'outline'">
+              {{ styleReference ? '画风已锁定' : '未选画风' }}
+            </Badge>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div
+              v-for="asset in referenceAssets"
+              :key="asset.label"
+              class="min-w-0 overflow-hidden rounded-md border bg-muted/20"
+            >
+              <ImageViewer
+                v-if="asset.image"
+                :alt="asset.label"
+                :src="asset.image.url"
+                :title="asset.label"
+                description="查看正式参考图"
+              >
+                <Button
+                  variant="ghost"
+                  class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
+                  :aria-label="`查看${asset.label}`"
+                >
+                  <AiImage
+                    :alt="asset.label"
+                    :src="asset.image.url"
+                    class="aspect-[4/3] w-full rounded-none bg-background object-contain"
+                  />
+                </Button>
+              </ImageViewer>
+              <div
+                v-else
+                class="flex aspect-[4/3] items-center justify-center bg-background text-muted-foreground"
+              >
+                <ImageIcon class="size-4" />
+              </div>
+              <p class="truncate border-t px-2 py-1.5 text-center text-xs">{{ asset.label }}</p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" class="mt-3 w-full" @click="emit('manage-style')">
+            <Palette class="size-4" />
+            {{ styleReference ? '更换正式画风' : '选择正式画风' }}
+          </Button>
+          <p class="mt-2 text-xs leading-5 text-muted-foreground">
+            生成时默认使用定妆照、角色表和正式画风；旧插画仅在点击“以此继续”后加入。
+          </p>
         </section>
 
         <section aria-labelledby="illustration-plan-heading">

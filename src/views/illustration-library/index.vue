@@ -2,9 +2,11 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
+  Check,
   Clock3,
   Image as ImageIcon,
   ImagePlus,
+  Palette,
   Search,
   Sparkles,
   Trash2,
@@ -26,6 +28,7 @@ import { SagPage } from '@/components/sag/sag-page';
 import type {
   CharacterPortraitImage,
   IllustrationTopic,
+  IllustrationStyleReference,
   IllustrationWorkspaceState,
   SaveFileRequest,
   SavedFileResult,
@@ -42,6 +45,7 @@ interface IllustrationLibraryItem {
   id: string;
   image: CharacterPortraitImage;
   source: IllustrationLibrarySource;
+  styleReference: IllustrationStyleReference;
   title: string;
   topicId: string | null;
   uploadId: string | null;
@@ -49,7 +53,11 @@ interface IllustrationLibraryItem {
 }
 
 const router = useRouter();
-const workspace = ref<IllustrationWorkspaceState>({ topics: [], uploads: [] });
+const workspace = ref<IllustrationWorkspaceState>({
+  selectedStyleReference: null,
+  topics: [],
+  uploads: [],
+});
 const sourceFilter = ref<IllustrationSourceFilter>('all');
 const searchQuery = ref('');
 const loading = ref(true);
@@ -57,6 +65,7 @@ const loadingError = ref('');
 const uploadDialogOpen = ref(false);
 const deleteTarget = ref<IllustrationLibraryItem | null>(null);
 const deletingItemId = ref('');
+const selectingStyleItemId = ref('');
 
 const libraryItems = computed<IllustrationLibraryItem[]>(() => {
   const generatedItems = workspace.value.topics.flatMap(topic => getGeneratedItems(topic));
@@ -123,6 +132,12 @@ function getGeneratedItems(topic: IllustrationTopic): IllustrationLibraryItem[] 
           id: `generated:${topic.id}:${version.id}:${image.fileName}`,
           image,
           source: 'generated' as const,
+          styleReference: {
+            fileName: image.fileName,
+            source: 'generated' as const,
+            topicId: topic.id,
+            versionId: version.id,
+          },
           title: `${topic.title} V${version.versionNumber}`,
           topicId: topic.id,
           uploadId: null,
@@ -139,6 +154,11 @@ function getUploadedItem(upload: UploadedIllustration): IllustrationLibraryItem 
     id: `uploaded:${upload.id}`,
     image: { fileName: upload.fileName, mimeType: upload.mimeType, url: upload.url },
     source: 'uploaded',
+    styleReference: {
+      fileName: upload.fileName,
+      source: 'uploaded',
+      uploadId: upload.id,
+    },
     title: removeFileExtension(upload.originalName),
     topicId: null,
     uploadId: upload.id,
@@ -177,6 +197,18 @@ function formatDate(value: string): string {
   }).format(date);
 }
 
+function isStyleReference(item: IllustrationLibraryItem): boolean {
+  const selected = workspace.value.selectedStyleReference;
+  if (!selected || selected.source !== item.styleReference.source) {
+    return false;
+  }
+  return selected.source === 'uploaded'
+    ? selected.uploadId === item.uploadId && selected.fileName === item.image.fileName
+    : selected.topicId === item.topicId &&
+        selected.versionId === item.versionId &&
+        selected.fileName === item.image.fileName;
+}
+
 async function loadWorkspace(): Promise<void> {
   loading.value = true;
   loadingError.value = '';
@@ -196,6 +228,21 @@ function uploadIllustration(request: SaveFileRequest): Promise<SavedFileResult> 
 async function handleUploaded(): Promise<void> {
   await loadWorkspace();
   toast.success('插画已保存到作品工作区');
+}
+
+async function selectStyleReference(item: IllustrationLibraryItem): Promise<void> {
+  if (selectingStyleItemId.value || isStyleReference(item)) {
+    return;
+  }
+  selectingStyleItemId.value = item.id;
+  try {
+    workspace.value = await window.desktop.selectIllustrationStyleReference(item.styleReference);
+    toast.success('已设为正式画风参考');
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    selectingStyleItemId.value = '';
+  }
 }
 
 async function confirmDelete(): Promise<void> {
@@ -247,7 +294,7 @@ onMounted(() => {
             </Badge>
           </div>
           <p class="hidden text-xs text-muted-foreground sm:block">
-            统一查看上传图片和插画创作结果
+            统一查看插画资产并选定正式画风参考
           </p>
         </div>
       </div>
@@ -355,23 +402,41 @@ onMounted(() => {
                 <Clock3 class="size-3.5 shrink-0" />
                 <span class="truncate">{{ formatDate(item.createdAt) }}</span>
               </span>
-              <TooltipProvider :delay-duration="300">
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      class="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                      :disabled="Boolean(deletingItemId)"
-                      :aria-label="`删除${item.title}`"
-                      @click="deleteTarget = item"
-                    >
-                      <Trash2 class="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>删除插画</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <div class="flex shrink-0 items-center gap-1">
+                <Badge v-if="isStyleReference(item)" variant="secondary">
+                  <Check class="size-3" />
+                  正式画风
+                </Badge>
+                <Button
+                  v-else
+                  size="sm"
+                  variant="outline"
+                  :disabled="Boolean(selectingStyleItemId)"
+                  @click="selectStyleReference(item)"
+                >
+                  <Palette class="size-4" />
+                  {{ selectingStyleItemId === item.id ? '设置中' : '设为画风' }}
+                </Button>
+                <TooltipProvider :delay-duration="300">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        class="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                        :disabled="Boolean(deletingItemId) || isStyleReference(item)"
+                        :aria-label="`删除${item.title}`"
+                        @click="deleteTarget = item"
+                      >
+                        <Trash2 class="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {{ isStyleReference(item) ? '正式画风参考不能删除' : '删除插画' }}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
           </div>
         </article>

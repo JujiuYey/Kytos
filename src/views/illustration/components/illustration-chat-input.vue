@@ -37,11 +37,12 @@ function handleSubmitClick(event: MouseEvent): void {
 </script>
 
 <template>
-  <div class="shrink-0 border-t bg-background px-4 py-3 sm:px-5">
+  <div class="shrink-0 bg-background px-4 py-3 sm:px-5">
     <PromptInputProvider @submit="handleSubmit">
       <PromptInput class="mx-auto w-full max-w-3xl">
         <PromptInputBody>
           <PromptInputTextarea
+            class="scrollbar-subtle"
             placeholder="描述想画的情境，或回答 Agent 的问题…"
             :disabled="disabled"
           />

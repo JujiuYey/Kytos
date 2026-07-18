@@ -6,6 +6,7 @@ import type {
   DeleteIllustrationVersionRequest,
   GenerateIllustrationRequest,
   SaveIllustrationConversationRequest,
+  SelectIllustrationStyleReferenceRequest,
   UpdateIllustrationTopicRequest,
   UploadIllustrationRequest,
 } from '../../shared/illustration';
@@ -18,6 +19,7 @@ import {
   getIllustrationTask,
   getIllustrationWorkspace,
   saveIllustrationConversation,
+  selectIllustrationStyleReference,
   updateIllustrationTopic,
   uploadIllustration,
 } from '../services/illustration';
@@ -76,6 +78,13 @@ export function registerIllustrationIpc(assertTrustedSender: TrustedSenderGuard)
     async (event, request: UpdateIllustrationTopicRequest) => {
       assertTrustedSender(event);
       return updateIllustrationTopic(request);
+    },
+  );
+  ipcMain.handle(
+    'illustration:select-style-reference',
+    async (event, request: SelectIllustrationStyleReferenceRequest) => {
+      assertTrustedSender(event);
+      return selectIllustrationStyleReference(request);
     },
   );
   ipcMain.handle('illustration:upload', async (event, request: UploadIllustrationRequest) => {

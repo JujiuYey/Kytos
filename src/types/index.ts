@@ -67,11 +67,13 @@ export type {
   IllustrationBrief,
   IllustrationBriefUpdateResult,
   IllustrationSize,
+  IllustrationStyleReference,
   IllustrationTopic,
   IllustrationVersion,
   IllustrationVersionReference,
   IllustrationWorkspaceState,
   SaveIllustrationConversationRequest,
+  SelectIllustrationStyleReferenceRequest,
   UpdateIllustrationTopicRequest,
   UploadedIllustration,
   UploadIllustrationRequest,
@@ -79,6 +81,7 @@ export type {
 export {
   ILLUSTRATION_AGENT_ENDPOINT,
   ILLUSTRATION_SIZES,
+  ILLUSTRATION_STYLE_GUIDANCE,
   createEmptyIllustrationBrief,
 } from '../../shared/illustration';
 export * from './setting';

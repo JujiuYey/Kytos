@@ -41,16 +41,16 @@ export const menuGroups: MenuGroup[] = [
     label: '创作',
     items: [
       {
-        title: '插画创作',
-        key: 'illustration',
-        icon: ImagePlus,
-        path: '/illustration',
-      },
-      {
         title: '插画管理',
         key: 'illustration-library',
         icon: Images,
         path: '/illustration-library',
+      },
+      {
+        title: '插画创作',
+        key: 'illustration',
+        icon: ImagePlus,
+        path: '/illustration',
       },
     ],
   },

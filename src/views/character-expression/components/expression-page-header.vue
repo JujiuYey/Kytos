@@ -38,7 +38,7 @@ const emit = defineEmits<{
     </Button>
     <Button size="sm" :variant="generatorOpen ? 'secondary' : 'default'" @click="emit('ai-create')">
       <WandSparkles class="size-4" />
-      AI 创建
+      创建
     </Button>
   </div>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { DefaultChatTransport } from 'ai';
 import type { ChatStatus } from 'ai';
 import { useChat } from '@ai-sdk/vue';
@@ -12,14 +13,17 @@ import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {
   CharacterPortraitResolution,
+  CharacterPortraitImage,
   CharacterPortraitWorkspaceState,
   CredentialStatus,
   IllustrationAgentMessage,
   IllustrationBriefUpdateResult,
   IllustrationSize,
+  IllustrationStyleReference,
   IllustrationTopic,
   IllustrationVersion,
   IllustrationVersionReference,
+  UploadedIllustration,
 } from '@/types';
 import { DEFAULT_DEEPSEEK_MODEL, ILLUSTRATION_AGENT_ENDPOINT } from '@/types';
 import IllustrationChatInput from './components/illustration-chat-input.vue';
@@ -28,11 +32,14 @@ import IllustrationHeader from './components/illustration-header.vue';
 import IllustrationWorkspacePanel from './components/illustration-workspace-panel.vue';
 
 const appStore = useAppStore();
+const router = useRouter();
 const topics = ref<IllustrationTopic[]>([]);
+const uploads = ref<UploadedIllustration[]>([]);
 const activeTopicId = ref('');
 const deepseekStatus = ref<CredentialStatus | null>(null);
 const apimartStatus = ref<CredentialStatus | null>(null);
 const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
+const selectedStyleReference = ref<IllustrationStyleReference | null>(null);
 const initializationError = ref('');
 const generationError = ref('');
 const isInitializing = ref(true);
@@ -59,6 +66,40 @@ const referencesReady = computed(
     Boolean(portraitWorkspace.value?.selectedImage) &&
     Boolean(portraitWorkspace.value?.selectedSheet),
 );
+const portraitReferenceImage = computed<CharacterPortraitImage | null>(() => {
+  const selection = portraitWorkspace.value?.selectedImage;
+  return (
+    portraitWorkspace.value?.records
+      .find(record => record.id === selection?.taskId)
+      ?.images.find(image => image.fileName === selection?.fileName) ?? null
+  );
+});
+const sheetReferenceImage = computed<CharacterPortraitImage | null>(() => {
+  const selection = portraitWorkspace.value?.selectedSheet;
+  return (
+    portraitWorkspace.value?.sheetRecords
+      .find(record => record.id === selection?.taskId)
+      ?.images.find(image => image.fileName === selection?.fileName) ?? null
+  );
+});
+const styleReferenceImage = computed<CharacterPortraitImage | null>(() => {
+  const reference = selectedStyleReference.value;
+  if (!reference) {
+    return null;
+  }
+  if (reference.source === 'uploaded') {
+    const upload = uploads.value.find(item => item.id === reference.uploadId);
+    return upload
+      ? { fileName: upload.fileName, mimeType: upload.mimeType, url: upload.url }
+      : null;
+  }
+  return (
+    topics.value
+      .find(topic => topic.id === reference.topicId)
+      ?.versions.find(version => version.id === reference.versionId)
+      ?.images.find(image => image.fileName === reference.fileName) ?? null
+  );
+});
 
 const transport = new DefaultChatTransport<IllustrationAgentMessage>({
   api: ILLUSTRATION_AGENT_ENDPOINT,
@@ -155,12 +196,6 @@ function applyToolOutputs(messageList: IllustrationAgentMessage[]): void {
   }
 }
 
-function getDefaultBaseReference(topic: IllustrationTopic): IllustrationVersionReference | null {
-  const version = topic.versions.find(item => item.status === 'completed' && item.images.length);
-  const image = version?.images[0];
-  return version && image ? { fileName: image.fileName, versionId: version.id } : null;
-}
-
 function applyTopic(topic: IllustrationTopic): void {
   activeTopicId.value = topic.id;
   messages.value = topic.messages;
@@ -168,7 +203,7 @@ function applyTopic(topic: IllustrationTopic): void {
   const latestVersion = topic.versions[0];
   size.value = latestVersion?.size ?? '16:9';
   resolution.value = latestVersion?.resolution ?? '2k';
-  baseReference.value = getDefaultBaseReference(topic);
+  baseReference.value = null;
   clearError();
   generationError.value = '';
   mobilePane.value = 'chat';
@@ -185,6 +220,8 @@ async function initialize(): Promise<void> {
       window.desktop.getCharacterPortraitWorkspace(),
     ]);
     topics.value = workspace.topics;
+    uploads.value = workspace.uploads;
+    selectedStyleReference.value = workspace.selectedStyleReference;
     deepseekStatus.value = deepseek;
     apimartStatus.value = apimart;
     portraitWorkspace.value = portraits;
@@ -319,10 +356,6 @@ async function pollTask(taskId: string): Promise<void> {
     }
     pollTimers.delete(taskId);
     if (version.status === 'completed') {
-      const image = version.images[0];
-      if (image && activeTopic.value?.versions.some(item => item.id === version.id)) {
-        baseReference.value = { fileName: image.fileName, versionId: version.id };
-      }
       toast.success(`V${version.versionNumber} 已生成并保存到工作区`);
       mobilePane.value = 'workspace';
     } else {
@@ -402,7 +435,7 @@ async function confirmDeleteVersion(): Promise<void> {
     });
     replaceTopic(updatedTopic);
     if (baseReference.value?.versionId === version.id) {
-      baseReference.value = getDefaultBaseReference(updatedTopic);
+      baseReference.value = null;
     }
     deleteVersionTarget.value = null;
   } catch (deleteError: unknown) {
@@ -488,14 +521,18 @@ onBeforeUnmount(() => {
           :base-reference="baseReference"
           :busy="generationBusy"
           :prompt="prompt"
+          :portrait-reference="portraitReferenceImage"
           :references-ready="referencesReady"
           :resolution="resolution"
           :size="size"
+          :sheet-reference="sheetReferenceImage"
+          :style-reference="styleReferenceImage"
           :topic="activeTopic"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @clear-base="baseReference = null"
           @delete-version="deleteVersionTarget = $event"
           @generate="generate"
+          @manage-style="router.push('/illustration-library')"
           @rename="renameTopic"
           @select-base="baseReference = $event"
           @update:prompt="prompt = $event"

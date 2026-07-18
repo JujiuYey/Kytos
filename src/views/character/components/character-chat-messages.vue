@@ -53,7 +53,7 @@ const startingSuggestions = [
         <template #icon>
           <Bot class="size-8" />
         </template>
-        <Suggestions class="mt-3 flex-wrap justify-center">
+        <Suggestions class="mt-3 w-full max-w-full flex-wrap justify-center">
           <Suggestion
             v-for="suggestion in startingSuggestions"
             :key="suggestion"

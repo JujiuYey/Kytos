@@ -28,6 +28,7 @@ import type {
   IllustrationVersion,
   IllustrationWorkspaceState,
   SaveIllustrationConversationRequest,
+  SelectIllustrationStyleReferenceRequest,
   UpdateIllustrationTopicRequest,
   UploadedIllustration,
   UploadIllustrationRequest,
@@ -120,6 +121,9 @@ export interface DesktopApi {
   selectCharacterSheet: (
     request: SelectCharacterSheetRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
+  selectIllustrationStyleReference: (
+    request: SelectIllustrationStyleReferenceRequest,
+  ) => Promise<IllustrationWorkspaceState>;
   setCredential: (request: SetCredentialRequest) => Promise<CredentialStatus>;
   setWorkspaceDirectory: (workspacePath: string) => Promise<DesktopSettings>;
   useSuggestedWorkspace: () => Promise<DesktopSettings>;

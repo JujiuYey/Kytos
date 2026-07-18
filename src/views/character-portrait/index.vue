@@ -550,7 +550,7 @@ onBeforeUnmount(() => {
     <div
       :class="[
         'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
-        generatorOpen && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
+        generatorOpen && 'lg:grid-cols-[minmax(0,9fr)_minmax(340px,4fr)]',
       ]"
     >
       <div
