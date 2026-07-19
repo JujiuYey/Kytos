@@ -20,10 +20,8 @@ const fieldDefinitions: Array<{
   { field: 'personality', label: '性格', placeholder: '性格特征、矛盾与弱点' },
   { field: 'motivation', label: '动机', placeholder: '真正想要什么，以及为什么' },
   { field: 'background', label: '背景', placeholder: '塑造角色的经历与环境' },
-  { field: 'appearance', label: '外形', placeholder: '辨识度、服饰与身体特征' },
   { field: 'relationships', label: '关系', placeholder: '重要人物与关系张力' },
   { field: 'speechStyle', label: '说话方式', placeholder: '语气、用词和表达习惯' },
-  { field: 'visualDirection', label: '视觉方向', placeholder: '画面风格与视觉关键词' },
 ];
 
 const progress = computed(() => getCharacterDraftProgress(props.draft));

@@ -5,6 +5,7 @@ import { AlertCircle } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { ImageReferencePickerDialog } from '@/components/sag/image-reference-picker-dialog';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
@@ -25,7 +26,6 @@ import { DEFAULT_DEEPSEEK_MODEL, MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } fro
 import ExpressionGallery from './components/expression-gallery.vue';
 import ExpressionGeneratorPanel from './components/expression-generator-panel.vue';
 import ExpressionPageHeader from './components/expression-page-header.vue';
-import ExpressionReferenceDialog from './components/expression-reference-dialog.vue';
 import ExpressionRenameDialog from './components/expression-rename-dialog.vue';
 import ExpressionUploadDialog from './components/expression-upload-dialog.vue';
 import type { ExpressionReferenceOption } from './expression-reference';
@@ -70,6 +70,10 @@ let loadRequestId = 0;
 const activeStatuses = ['submitted', 'pending', 'processing'];
 const defaultExpressionName = '开心';
 const defaultExpressionDescription = '眼睛明亮，嘴角自然上扬，带有真诚而有感染力的笑意。';
+const referenceFilters = [
+  { label: '视觉资产', value: 'visual' },
+  { label: '已有表情', value: 'expression' },
+];
 const characters = computed(() => library.value?.characters ?? []);
 const activeRecord = computed(() =>
   records.value.find(record => activeStatuses.includes(record.status)),
@@ -174,12 +178,15 @@ function referenceAssetKey(selection: CharacterExpressionReferenceSelection): st
   return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
 }
 
-function selectReferenceAssets(options: ExpressionReferenceOption[]): void {
-  selectedReferenceAssets.value = options.map(option => ({
+function selectReferenceAssets(keys: string[]): void {
+  const selectedKeySet = new Set(keys);
+  selectedReferenceAssets.value = referenceOptions.value
+    .filter(option => selectedKeySet.has(option.key))
+    .map(option => ({
     fileName: option.selection.fileName,
     kind: option.selection.kind,
     taskId: option.selection.taskId,
-  }));
+    }));
 }
 
 function replaceRecord(updatedRecord: CharacterExpressionRecord): void {
@@ -604,11 +611,15 @@ onBeforeUnmount(() => {
       @uploaded="handleUploaded"
     />
 
-    <ExpressionReferenceDialog
+    <ImageReferencePickerDialog
       v-model:open="referenceDialogOpen"
       :busy="isSubmitting"
+      description="可以混选当前角色的视觉资产和已有表情，生成时只使用这里确认的图片。"
+      :filters="referenceFilters"
+      :max-selection="MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES"
       :options="referenceOptions"
       :selected-keys="selectedReferenceKeys"
+      title="选择角色参考"
       @confirm="selectReferenceAssets"
     />
 

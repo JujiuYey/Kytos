@@ -23,7 +23,6 @@ const emit = defineEmits<{
 }>();
 
 const fieldLabels: Record<CharacterDraftField, string> = {
-  appearance: '外形',
   background: '背景',
   concept: '核心概念',
   motivation: '动机',
@@ -31,7 +30,6 @@ const fieldLabels: Record<CharacterDraftField, string> = {
   personality: '性格',
   relationships: '关系',
   speechStyle: '说话方式',
-  visualDirection: '视觉方向',
 };
 
 const startingSuggestions = [

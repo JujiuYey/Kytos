@@ -70,15 +70,21 @@ const emit = defineEmits<{
               <dd class="break-words">{{ draft.name || '尚未命名' }}</dd>
             </div>
             <div class="grid grid-cols-[72px_minmax(0,1fr)] gap-3 py-3">
-              <dt class="text-muted-foreground">外形</dt>
+              <dt class="text-muted-foreground">核心概念</dt>
               <dd class="line-clamp-4 whitespace-pre-wrap break-words">
-                {{ draft.appearance || '第一步尚未整理外形信息' }}
+                {{ draft.concept || '角色共创尚未整理核心概念' }}
               </dd>
             </div>
             <div class="grid grid-cols-[72px_minmax(0,1fr)] gap-3 py-3">
-              <dt class="text-muted-foreground">视觉方向</dt>
+              <dt class="text-muted-foreground">人物性格</dt>
               <dd class="line-clamp-4 whitespace-pre-wrap break-words">
-                {{ draft.visualDirection || '第一步尚未整理视觉方向' }}
+                {{ draft.personality || '角色共创尚未整理人物性格' }}
+              </dd>
+            </div>
+            <div class="grid grid-cols-[72px_minmax(0,1fr)] gap-3 py-3">
+              <dt class="text-muted-foreground">人物动机</dt>
+              <dd class="line-clamp-4 whitespace-pre-wrap break-words">
+                {{ draft.motivation || '角色共创尚未整理人物动机' }}
               </dd>
             </div>
           </dl>
@@ -96,7 +102,7 @@ const emit = defineEmits<{
             :model-value="modelValue"
             class="min-h-64 resize-y text-sm leading-6"
             maxlength="20000"
-            placeholder="描述角色的外形、服装、姿态、画面风格与背景"
+            placeholder="补充本次视觉探索希望强调的气质、姿态或其他约束"
             @update:model-value="emit('update:modelValue', String($event))"
           />
         </section>

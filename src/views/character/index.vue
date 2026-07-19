@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { DefaultChatTransport } from 'ai';
 import type { ChatStatus } from 'ai';
 import { useChat } from '@ai-sdk/vue';
@@ -29,6 +30,7 @@ import {
   CHARACTER_AGENT_ENDPOINT,
   DEFAULT_DEEPSEEK_MODEL,
   createEmptyCharacterDraft,
+  isCharacterDraftReady,
 } from '@/types';
 import CharacterChatHeader from './components/character-chat-header.vue';
 import CharacterChatInput from './components/character-chat-input.vue';
@@ -36,6 +38,7 @@ import CharacterChatMessages from './components/character-chat-messages.vue';
 import CharacterWorkspacePanel from './components/character-workspace-panel.vue';
 
 const appStore = useAppStore();
+const router = useRouter();
 const draft = ref<CharacterDraft>(createEmptyCharacterDraft());
 const savedProfileMarkdown = ref('');
 const proposedProfileMarkdown = ref('');
@@ -51,6 +54,7 @@ const mobilePane = ref<'chat' | 'draft'>('chat');
 const model = computed(() => appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL);
 const profileMarkdown = computed(() => proposedProfileMarkdown.value || savedProfileMarkdown.value);
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
+const canCreateVisual = computed(() => isCharacterDraftReady(draft.value));
 
 const transport = new DefaultChatTransport<CharacterAgentMessage>({
   api: CHARACTER_AGENT_ENDPOINT,
@@ -191,6 +195,10 @@ function openWorkspace(): void {
   mobilePane.value = 'draft';
 }
 
+function openCharacterVisual(): void {
+  void router.push('/character-portrait');
+}
+
 watch(messages, messageList => applyToolOutputs(messageList));
 onMounted(() => {
   void initialize();
@@ -257,6 +265,7 @@ onMounted(() => {
         aria-label="角色档案"
       >
         <CharacterWorkspacePanel
+          :can-create-visual="canCreateVisual"
           :can-save="Boolean(proposedProfileMarkdown) && !isProfileSaved"
           :draft="draft"
           :is-saving="isSaving"
@@ -264,6 +273,7 @@ onMounted(() => {
           :saved="isProfileSaved"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeWorkspace"
+          @create-visual="openCharacterVisual"
           @save="saveProfile"
         />
       </aside>

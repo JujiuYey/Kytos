@@ -6,19 +6,24 @@ export const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash';
 export const CHARACTER_DRAFT_FIELDS = [
   'name',
   'concept',
-  'appearance',
   'personality',
   'motivation',
   'background',
   'relationships',
   'speechStyle',
-  'visualDirection',
 ] as const;
+
+export const CHARACTER_CORE_FIELDS = [
+  'name',
+  'concept',
+  'personality',
+  'motivation',
+  'background',
+] as const satisfies readonly CharacterDraftField[];
 
 export type CharacterDraftField = (typeof CHARACTER_DRAFT_FIELDS)[number];
 
 export interface CharacterDraft {
-  appearance: string;
   background: string;
   concept: string;
   motivation: string;
@@ -26,7 +31,6 @@ export interface CharacterDraft {
   personality: string;
   relationships: string;
   speechStyle: string;
-  visualDirection: string;
 }
 
 export type CharacterDraftPatch = Partial<CharacterDraft>;
@@ -69,7 +73,6 @@ export type CharacterAgentMessage = UIMessage<unknown, never, CharacterAgentTool
 
 export function createEmptyCharacterDraft(): CharacterDraft {
   return {
-    appearance: '',
     background: '',
     concept: '',
     motivation: '',
@@ -77,8 +80,11 @@ export function createEmptyCharacterDraft(): CharacterDraft {
     personality: '',
     relationships: '',
     speechStyle: '',
-    visualDirection: '',
   };
+}
+
+export function isCharacterDraftReady(draft: CharacterDraft): boolean {
+  return CHARACTER_CORE_FIELDS.every(field => draft[field].trim());
 }
 
 export function getCharacterDraftProgress(draft: CharacterDraft): {

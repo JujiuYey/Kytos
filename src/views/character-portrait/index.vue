@@ -123,15 +123,18 @@ function buildPortraitPrompt(character: CharacterDraft): string {
   const characterDetails = [
     character.name && `角色姓名：${character.name}`,
     character.concept && `核心概念：${character.concept}`,
-    character.appearance && `外形设定：${character.appearance}`,
     character.personality && `性格气质：${character.personality}`,
-    character.visualDirection && `视觉方向：${character.visualDirection}`,
+    character.motivation && `内在动机：${character.motivation}`,
+    character.background && `背景经历：${character.background}`,
+    character.relationships && `人物关系：${character.relationships}`,
+    character.speechStyle && `表达方式：${character.speechStyle}`,
   ].filter((item): item is string => Boolean(item));
 
   return [
-    '为以下原创角色绘制一张专业定妆照。',
+    '根据以下人物设定探索原创角色的视觉形象，并绘制一张专业定妆照。',
     ...characterDetails,
-    '画面要求：单一角色，全身正面站立，自然中性姿态，完整展示头部、发型、五官、服装、鞋履与标志性配饰；人物居中，比例准确，轮廓清晰，服装材质和细节可辨识。',
+    '把人物的核心概念、性格、动机与经历转译成具有辨识度且内外一致的脸部特征、发型、体态和整体气质。',
+    '画面要求：单一角色，全身正面站立，自然中性姿态，完整展示头部到鞋底；人物居中，比例准确，轮廓清晰。选择符合人物处境的基础造型，但不要把服装或配饰作为唯一身份识别。',
     '禁止：裁切人物、多人、多视角拼贴、设定表排版、文字、标注、Logo、水印。',
   ].join('\n');
 }
@@ -201,7 +204,7 @@ function applyCharacterWorkspace(
   const latestGeneratedRecord = portraitWorkspace.records.find(
     record => record.source === 'generated',
   );
-  prompt.value = latestGeneratedRecord?.prompt || buildPortraitPrompt(characterDraft);
+  prompt.value = buildPortraitPrompt(characterDraft);
   imageName.value = latestGeneratedRecord?.name || '定妆照';
   size.value = latestGeneratedRecord?.size ?? '2:3';
   resolution.value = latestGeneratedRecord?.resolution ?? '1k';

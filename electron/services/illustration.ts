@@ -23,12 +23,17 @@ import type {
   UploadedIllustration,
   UploadIllustrationRequest,
 } from '../../shared/illustration';
-import { ILLUSTRATION_SIZES, createEmptyIllustrationBrief } from '../../shared/illustration';
+import {
+  ILLUSTRATION_SIZES,
+  MAX_ILLUSTRATION_REFERENCE_IMAGES,
+  createEmptyIllustrationBrief,
+} from '../../shared/illustration';
 import type {
   CharacterPortraitImage,
   CharacterPortraitResolution,
   CharacterPortraitSelection,
   CharacterPortraitTaskStatus,
+  CharacterVisualAssetSelection,
 } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
 import {
@@ -140,6 +145,18 @@ function parseSelection(value: unknown): CharacterPortraitSelection | null {
     return null;
   }
   return { fileName: value.fileName, taskId: value.taskId };
+}
+
+function parseVisualSelection(value: unknown): CharacterVisualAssetSelection | null {
+  const selection = parseSelection(value);
+  if (!selection || !isRecord(value) || (value.kind !== 'portrait' && value.kind !== 'sheet')) {
+    return null;
+  }
+  return { ...selection, kind: value.kind };
+}
+
+function visualSelectionKey(selection: CharacterVisualAssetSelection): string {
+  return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
 }
 
 function parseVersionReference(value: unknown): IllustrationVersionReference | null {
@@ -254,6 +271,12 @@ function parseVersion(value: unknown): IllustrationVersion | null {
     artStyleId: typeof value.artStyleId === 'string' ? value.artStyleId : null,
     artStyleName: typeof value.artStyleName === 'string' ? value.artStyleName : null,
     baseVersion: parseVersionReference(value.baseVersion),
+    characterReferences: Array.isArray(value.characterReferences)
+      ? value.characterReferences
+          .map(parseVisualSelection)
+          .filter((selection): selection is CharacterVisualAssetSelection => Boolean(selection))
+          .slice(0, MAX_ILLUSTRATION_REFERENCE_IMAGES)
+      : [],
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     errorMessage: typeof value.errorMessage === 'string' ? value.errorMessage : null,
     id: value.id,
@@ -752,6 +775,9 @@ function validateGenerateRequest(request: GenerateIllustrationRequest): void {
     request.prompt.length > MAX_TEXT_LENGTH ||
     !isSize(request.size) ||
     !isResolution(request.resolution) ||
+    !Array.isArray(request.characterReferences) ||
+    request.characterReferences.length > MAX_ILLUSTRATION_REFERENCE_IMAGES ||
+    request.characterReferences.some(reference => !parseVisualSelection(reference)) ||
     (request.baseVersion !== null && !parseVersionReference(request.baseVersion))
   ) {
     throw new Error('插画生成参数无效');
@@ -769,17 +795,36 @@ export async function generateIllustration(
   }
 
   const referenceImages: string[] = [];
+  let characterReferences: CharacterVisualAssetSelection[] = [];
   let referencePortrait: CharacterPortraitSelection | null = null;
   let referenceSheet: CharacterPortraitSelection | null = null;
   const artStyle = await getActiveArtStyle();
   if (topic.useCharacter) {
     const portraitWorkspace = await getCharacterPortraitWorkspace();
-    const references = getOfficialCharacterVisualReferences(portraitWorkspace);
-    if (!references.length) {
-      throw new Error('请先将至少一张角色视觉图片设为正式资产');
+    const availableReferences = getOfficialCharacterVisualReferences(portraitWorkspace);
+    const availableReferenceMap = new Map(
+      availableReferences.map(reference => [visualSelectionKey(reference.selection), reference]),
+    );
+    characterReferences = [
+      ...new Map(
+        request.characterReferences.map(reference => {
+          const selection = parseVisualSelection(reference)!;
+          return [visualSelectionKey(selection), selection];
+        }),
+      ).values(),
+    ];
+    if (!characterReferences.length) {
+      throw new Error('请先选择至少一张正式角色参考');
     }
-    referencePortrait = references[0]?.selection ?? null;
-    referenceSheet = references[1]?.selection ?? null;
+    const references = characterReferences.map(reference => {
+      const match = availableReferenceMap.get(visualSelectionKey(reference));
+      if (!match) {
+        throw new Error('选择的角色参考已失效或不再是正式资产');
+      }
+      return match;
+    });
+    referencePortrait = references.find(reference => reference.selection.kind === 'portrait')?.selection ?? null;
+    referenceSheet = references.find(reference => reference.selection.kind === 'sheet')?.selection ?? null;
     referenceImages.push(
       ...(await Promise.all(
         references.map(reference => readReferenceImage(reference.directoryName, reference.image)),
@@ -801,6 +846,10 @@ export async function generateIllustration(
     }
     baseVersion = { ...request.baseVersion };
     referenceImages.push(await readReferenceImage(ASSET_DIRECTORY, image));
+  }
+
+  if (referenceImages.length > MAX_ILLUSTRATION_REFERENCE_IMAGES) {
+    throw new Error(`插画参考图最多 ${MAX_ILLUSTRATION_REFERENCE_IMAGES} 张`);
   }
 
   const prompt = buildPrompt(request.prompt, topic.useCharacter, artStyle);
@@ -829,6 +878,7 @@ export async function generateIllustration(
     artStyleId: artStyle.id,
     artStyleName: artStyle.name,
     baseVersion,
+    characterReferences,
     createdAt: now,
     errorMessage: null,
     id: getSubmittedTaskId(payload),

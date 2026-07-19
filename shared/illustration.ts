@@ -4,11 +4,13 @@ import type {
   CharacterPortraitResolution,
   CharacterPortraitSelection,
   CharacterPortraitTaskStatus,
+  CharacterVisualAssetSelection,
 } from './character-portrait';
 import type { ArtStyle } from './art-style';
 
 export const ILLUSTRATION_AGENT_ENDPOINT = 'app://bundle/api/illustration-agent';
 export const ILLUSTRATION_SIZES = ['1:1', '3:4', '4:5', '16:9', '9:16'] as const;
+export const MAX_ILLUSTRATION_REFERENCE_IMAGES = 16;
 export type IllustrationSize = (typeof ILLUSTRATION_SIZES)[number];
 
 export interface IllustrationBrief {
@@ -63,6 +65,7 @@ export interface IllustrationVersion {
   artStyleId: string | null;
   artStyleName: string | null;
   baseVersion: IllustrationVersionReference | null;
+  characterReferences: CharacterVisualAssetSelection[];
   createdAt: string;
   errorMessage: string | null;
   id: string;
@@ -126,6 +129,7 @@ export interface SaveIllustrationConversationRequest {
 
 export interface GenerateIllustrationRequest {
   baseVersion: IllustrationVersionReference | null;
+  characterReferences: CharacterVisualAssetSelection[];
   prompt: string;
   resolution: CharacterPortraitResolution;
   size: IllustrationSize;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { watch, ref } from 'vue';
-import { FileText, ListTree, X } from 'lucide-vue-next';
+import { Camera, FileText, ListTree, X } from 'lucide-vue-next';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import type { CharacterDraft } from '@/types';
@@ -9,6 +9,7 @@ import ChatSummaryPreview from './chat-summary-preview.vue';
 
 const props = defineProps<{
   canSave: boolean;
+  canCreateVisual: boolean;
   draft: CharacterDraft;
   isSaving: boolean;
   profileMarkdown: string;
@@ -17,6 +18,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'close'): void;
+  (event: 'create-visual'): void;
   (event: 'save'): void;
 }>();
 
@@ -62,5 +64,12 @@ watch(
         @save="emit('save')"
       />
     </TabsContent>
+
+    <div v-if="canCreateVisual" class="shrink-0 border-t p-4">
+      <Button class="w-full" @click="emit('create-visual')">
+        <Camera class="size-4" />
+        创建角色视觉
+      </Button>
+    </div>
   </Tabs>
 </template>

@@ -82,10 +82,12 @@ export type {
 } from '../../shared/character-portrait';
 export {
   CHARACTER_AGENT_ENDPOINT,
+  CHARACTER_CORE_FIELDS,
   CHARACTER_DRAFT_FIELDS,
   DEFAULT_DEEPSEEK_MODEL,
   createEmptyCharacterDraft,
   getCharacterDraftProgress,
+  isCharacterDraftReady,
 } from '../../shared/character';
 export {
   CHARACTER_PORTRAIT_RESOLUTIONS,
@@ -117,6 +119,7 @@ export type {
 export {
   ILLUSTRATION_AGENT_ENDPOINT,
   ILLUSTRATION_SIZES,
+  MAX_ILLUSTRATION_REFERENCE_IMAGES,
   createEmptyIllustrationBrief,
 } from '../../shared/illustration';
 export type {

@@ -14,53 +14,58 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
-import type { ExpressionReferenceOption, ExpressionReferenceSource } from '../expression-reference';
+import type { ImageReferencePickerFilter, ImageReferencePickerOption } from './types';
 
-type ReferenceFilter = 'all' | ExpressionReferenceSource;
-
-const props = defineProps<{
-  busy: boolean;
-  open: boolean;
-  options: ExpressionReferenceOption[];
-  selectedKeys: string[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    busy: boolean;
+    description: string;
+    emptyDescription?: string;
+    filters: ImageReferencePickerFilter[];
+    maxSelection: number;
+    open: boolean;
+    options: ImageReferencePickerOption[];
+    selectedKeys: string[];
+    title: string;
+  }>(),
+  {
+    emptyDescription: '当前分类中还没有已完成的图片。',
+  },
+);
 
 const emit = defineEmits<{
-  (event: 'confirm', options: ExpressionReferenceOption[]): void;
+  (event: 'confirm', keys: string[]): void;
   (event: 'update:open', value: boolean): void;
 }>();
 
-const filter = ref<ReferenceFilter>('all');
+const filter = ref('all');
 const draftKeys = ref<string[]>([]);
 const filteredOptions = computed(() =>
   filter.value === 'all'
     ? props.options
     : props.options.filter(option => option.source === filter.value),
 );
-const visualCount = computed(
-  () => props.options.filter(option => option.source === 'visual').length,
-);
-const expressionCount = computed(
-  () => props.options.filter(option => option.source === 'expression').length,
-);
 
-function toggleOption(option: ExpressionReferenceOption): void {
+function sourceCount(source: string): number {
+  return props.options.filter(option => option.source === source).length;
+}
+
+function toggleOption(option: ImageReferencePickerOption): void {
   if (draftKeys.value.includes(option.key)) {
     draftKeys.value = draftKeys.value.filter(key => key !== option.key);
     return;
   }
-  if (draftKeys.value.length >= MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES) {
+  if (draftKeys.value.length >= props.maxSelection) {
     return;
   }
   draftKeys.value = [...draftKeys.value, option.key];
 }
 
 function confirmSelection(): void {
-  const selectedKeySet = new Set(draftKeys.value);
+  const availableKeys = new Set(props.options.map(option => option.key));
   emit(
     'confirm',
-    props.options.filter(option => selectedKeySet.has(option.key)),
+    draftKeys.value.filter(key => availableKeys.has(key)).slice(0, props.maxSelection),
   );
   emit('update:open', false);
 }
@@ -69,7 +74,10 @@ watch(
   () => props.open,
   open => {
     if (open) {
-      draftKeys.value = [...props.selectedKeys];
+      const availableKeys = new Set(props.options.map(option => option.key));
+      draftKeys.value = props.selectedKeys
+        .filter(key => availableKeys.has(key))
+        .slice(0, props.maxSelection);
       filter.value = 'all';
     }
   },
@@ -81,22 +89,19 @@ watch(
     <DialogContent class="flex h-[76vh] max-h-[820px] max-w-4xl flex-col gap-0 overflow-hidden p-0">
       <DialogHeader class="shrink-0 border-b px-5 py-4">
         <div class="flex items-center gap-2">
-          <DialogTitle>选择角色参考</DialogTitle>
-          <Badge variant="secondary">
-            {{ draftKeys.length }} / {{ MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES }}
-          </Badge>
+          <DialogTitle>{{ title }}</DialogTitle>
+          <Badge variant="secondary">{{ draftKeys.length }} / {{ maxSelection }}</Badge>
         </div>
-        <DialogDescription>
-          可以混选当前角色的视觉资产和已有表情，生成时只使用这里确认的图片。
-        </DialogDescription>
+        <DialogDescription>{{ description }}</DialogDescription>
       </DialogHeader>
 
-      <div class="flex shrink-0 border-b px-5 py-3">
-        <Tabs :model-value="filter" @update:model-value="filter = $event as ReferenceFilter">
+      <div v-if="filters.length" class="flex shrink-0 border-b px-5 py-3">
+        <Tabs :model-value="filter" @update:model-value="filter = String($event)">
           <TabsList>
             <TabsTrigger value="all">全部 {{ options.length }}</TabsTrigger>
-            <TabsTrigger value="visual">视觉资产 {{ visualCount }}</TabsTrigger>
-            <TabsTrigger value="expression">已有表情 {{ expressionCount }}</TabsTrigger>
+            <TabsTrigger v-for="item in filters" :key="item.value" :value="item.value">
+              {{ item.label }} {{ sourceCount(item.value) }}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -113,8 +118,7 @@ watch(
               :aria-pressed="draftKeys.includes(option.key)"
               :disabled="
                 busy ||
-                (!draftKeys.includes(option.key) &&
-                  draftKeys.length >= MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES)
+                (!draftKeys.includes(option.key) && draftKeys.length >= maxSelection)
               "
               :class="[
                 'relative block h-auto w-full overflow-hidden rounded-md p-0 focus-visible:ring-inset',
@@ -143,7 +147,7 @@ watch(
           <div class="max-w-sm text-center">
             <Images class="mx-auto size-6 text-muted-foreground" />
             <h3 class="mt-3 text-sm font-medium">没有可选参考</h3>
-            <p class="mt-1 text-sm text-muted-foreground">当前分类中还没有已完成的图片。</p>
+            <p class="mt-1 text-sm text-muted-foreground">{{ emptyDescription }}</p>
           </div>
         </div>
       </ScrollArea>
@@ -152,7 +156,7 @@ watch(
         <Button variant="outline" :disabled="busy" @click="emit('update:open', false)">
           取消
         </Button>
-        <Button :disabled="busy" @click="confirmSelection"> 确认选择 </Button>
+        <Button :disabled="busy" @click="confirmSelection">确认选择</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

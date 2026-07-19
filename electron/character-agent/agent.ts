@@ -3,12 +3,15 @@ import type { DeepSeekLanguageModelChatOptions } from '@ai-sdk/deepseek';
 import { ToolLoopAgent, isStepCount, tool } from 'ai';
 import { z } from 'zod';
 import type { CharacterDraft, CharacterDraftPatch } from '../../shared/character';
-import { CHARACTER_DRAFT_FIELDS, getCharacterDraftProgress } from '../../shared/character';
+import {
+  CHARACTER_DRAFT_FIELDS,
+  getCharacterDraftProgress,
+  isCharacterDraftReady,
+} from '../../shared/character';
 import { saveCharacterDraft } from '../services/character-workspace';
 
 const draftPatchSchema = z
   .object({
-    appearance: z.string().max(2_000).optional(),
     background: z.string().max(4_000).optional(),
     concept: z.string().max(1_000).optional(),
     motivation: z.string().max(2_000).optional(),
@@ -16,7 +19,6 @@ const draftPatchSchema = z
     personality: z.string().max(2_000).optional(),
     relationships: z.string().max(3_000).optional(),
     speechStyle: z.string().max(2_000).optional(),
-    visualDirection: z.string().max(2_000).optional(),
   })
   .refine(patch => Object.keys(patch).length > 0, '至少更新一个角色字段');
 
@@ -79,6 +81,9 @@ export function createCharacterAgent(options: {
 5. 不要声称已经保存最终文件。最终保存只能由用户在界面中确认。
 6. 不要输出或描述隐藏思维过程。只说明结论、建议和下一步问题。
 7. 使用简洁自然的中文，不使用客服腔。
+8. 角色共创只讨论这个人是谁：核心概念、性格、动机、经历、关系、说话和行为方式。不要追问或设计画风、发型、五官、体型、服装、配饰、颜色等视觉方案，这些由角色视觉、画风管理和后续造型管理负责。
+9. 用户主动提供视觉想法时，可以简短确认，但不要写入角色草稿；提醒用户后续在角色视觉或造型管理中处理。
+10. 完成稿只整理人物身份与内在设定，不得生成“外形”“视觉方向”“画风”“服装”或“配饰”章节。
 
 当前草稿：
 ${JSON.stringify(currentDraft, null, 2)}`,
@@ -98,7 +103,7 @@ ${JSON.stringify(currentDraft, null, 2)}`,
           return {
             draft: currentDraft,
             markdown: markdown.trim(),
-            ready: progress.completion >= 55,
+            ready: isCharacterDraftReady(currentDraft),
             missingFields: progress.missingFields,
           };
         },
