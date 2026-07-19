@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Check, Image as ImageIcon, Palette, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next';
+import { Image as ImageIcon, Palette, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -14,7 +14,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
-import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
   ArtStyle,
   ArtStyleSource,
@@ -44,9 +43,6 @@ const deleteDialogOpen = computed({
 });
 
 const styles = computed(() => workspace.value?.styles ?? []);
-const activeStyle = computed(
-  () => styles.value.find(style => style.id === workspace.value?.activeStyleId) ?? null,
-);
 const presetCount = computed(() => styles.value.filter(style => style.source === 'preset').length);
 const customCount = computed(() => styles.value.filter(style => style.source === 'custom').length);
 const filteredStyles = computed(() => {
@@ -82,21 +78,6 @@ function openCreate(): void {
 function openEdit(style: ArtStyle): void {
   editorTarget.value = style;
   editorOpen.value = true;
-}
-
-async function selectStyle(style: ArtStyle): Promise<void> {
-  if (mutatingStyleId.value || style.id === workspace.value?.activeStyleId) {
-    return;
-  }
-  mutatingStyleId.value = style.id;
-  try {
-    workspace.value = await window.desktop.selectArtStyle({ id: style.id });
-    toast.success(`已使用“${style.name}”`);
-  } catch (error: unknown) {
-    toast.error(error instanceof Error ? error.message : String(error));
-  } finally {
-    mutatingStyleId.value = '';
-  }
 }
 
 async function saveStyle(request: SaveArtStyleRequest): Promise<void> {
@@ -152,7 +133,7 @@ onMounted(() => {
             <Badge variant="secondary" class="shrink-0 tabular-nums">{{ styles.length }}</Badge>
           </div>
           <p class="hidden text-xs text-muted-foreground sm:block">
-            当前画风会统一用于插画创作和故事分镜
+            管理创作时可选择的预置与自定义画风
           </p>
         </div>
       </div>
@@ -176,17 +157,6 @@ onMounted(() => {
         <InputGroupAddon><Search class="size-4" /></InputGroupAddon>
         <InputGroupInput v-model="searchQuery" placeholder="搜索画风名称或规则" />
       </InputGroup>
-    </div>
-
-    <div
-      v-if="activeStyle"
-      class="flex shrink-0 items-center gap-3 border-b bg-muted/20 px-4 py-2.5 sm:px-5"
-    >
-      <SagStatusBadge tone="success"><Check class="size-3" />当前画风</SagStatusBadge>
-      <span class="truncate text-sm font-medium">{{ activeStyle.name }}</span>
-      <span class="hidden truncate text-xs text-muted-foreground md:inline">{{
-        activeStyle.description
-      }}</span>
     </div>
 
     <Alert v-if="loadingError" variant="destructive" class="mx-4 mt-4 shrink-0 sm:mx-5">
@@ -267,48 +237,37 @@ onMounted(() => {
               {{ style.prompt }}
             </p>
 
-            <div class="mt-auto flex items-center justify-between gap-2 pt-4">
-              <Button
-                size="sm"
-                :variant="style.id === workspace?.activeStyleId ? 'secondary' : 'outline'"
-                :disabled="Boolean(mutatingStyleId) || style.id === workspace?.activeStyleId"
-                @click="selectStyle(style)"
-              >
-                <Check v-if="style.id === workspace?.activeStyleId" class="size-4" />
-                {{ style.id === workspace?.activeStyleId ? '正在使用' : '使用画风' }}
-              </Button>
-              <div v-if="style.source === 'custom'" class="flex items-center gap-1">
-                <TooltipProvider :delay-duration="300">
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        class="size-8"
-                        aria-label="编辑画风"
-                        @click="openEdit(style)"
-                      >
-                        <Pencil class="size-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>编辑画风</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        class="size-8 text-muted-foreground hover:text-destructive"
-                        aria-label="删除画风"
-                        @click="deleteTarget = style"
-                      >
-                        <Trash2 class="size-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>删除画风</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+            <div v-if="style.source === 'custom'" class="mt-auto flex justify-end gap-1 pt-4">
+              <TooltipProvider :delay-duration="300">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      class="size-8"
+                      aria-label="编辑画风"
+                      @click="openEdit(style)"
+                    >
+                      <Pencil class="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>编辑画风</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      class="size-8 text-muted-foreground hover:text-destructive"
+                      aria-label="删除画风"
+                      @click="deleteTarget = style"
+                    >
+                      <Trash2 class="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>删除画风</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </article>
@@ -332,7 +291,7 @@ onMounted(() => {
     <SagConfirmDialog
       v-model:open="deleteDialogOpen"
       title="删除这个画风？"
-      description="画风规则和参考图会被永久删除；如果它正在使用，将自动切换到默认预置画风。"
+      description="画风规则和参考图会被永久删除。已经生成的历史版本仍会保留当时使用的画风名称。"
       confirm-text="删除画风"
       :loading="Boolean(mutatingStyleId)"
       @confirm="confirmDelete"

@@ -59,7 +59,6 @@ const desktopApi: DesktopApi = {
   selectCharacterSheet: request => ipcRenderer.invoke('character-sheet:select', request),
   selectIllustrationStyleReference: request =>
     ipcRenderer.invoke('illustration:select-style-reference', request),
-  selectArtStyle: request => ipcRenderer.invoke('art-style:select', request),
   selectStoryShotVersion: request => ipcRenderer.invoke('story:select-shot-version', request),
   setCredential: request => ipcRenderer.invoke('credential:set', request),
   setCharacterVisualAssetOfficial: request =>

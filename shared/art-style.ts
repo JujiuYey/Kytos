@@ -1,6 +1,6 @@
 import type { CharacterPortraitImage } from './character-portrait';
 
-export const DEFAULT_ART_STYLE_ID = 'preset-minimal-line-art';
+export const MINIMAL_LINE_ART_STYLE_ID = 'preset-minimal-line-art';
 
 export type ArtStyleSource = 'custom' | 'preset';
 
@@ -21,7 +21,6 @@ export interface ArtStyle {
 }
 
 export interface ArtStyleWorkspaceState {
-  activeStyleId: string;
   styles: ArtStyle[];
 }
 
@@ -38,9 +37,5 @@ export interface SaveArtStyleRequest {
 }
 
 export interface DeleteArtStyleRequest {
-  id: string;
-}
-
-export interface SelectArtStyleRequest {
   id: string;
 }

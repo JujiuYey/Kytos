@@ -5,9 +5,7 @@ export type {
   ArtStyleWorkspaceState,
   DeleteArtStyleRequest,
   SaveArtStyleRequest,
-  SelectArtStyleRequest,
 } from '../../shared/art-style';
-export { DEFAULT_ART_STYLE_ID } from '../../shared/art-style';
 export type {
   CredentialService,
   CredentialStatus,

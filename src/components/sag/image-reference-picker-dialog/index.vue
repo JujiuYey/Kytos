@@ -117,8 +117,7 @@ watch(
               :aria-label="`${draftKeys.includes(option.key) ? '取消选择' : '选择'}${option.label}`"
               :aria-pressed="draftKeys.includes(option.key)"
               :disabled="
-                busy ||
-                (!draftKeys.includes(option.key) && draftKeys.length >= maxSelection)
+                busy || (!draftKeys.includes(option.key) && draftKeys.length >= maxSelection)
               "
               :class="[
                 'relative block h-auto w-full overflow-hidden rounded-md p-0 focus-visible:ring-inset',

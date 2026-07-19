@@ -12,11 +12,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/app';
 import type {
+  ArtStyle,
   CharacterPortraitResolution,
   CharacterPortraitWorkspaceState,
   CredentialStatus,
   IllustrationSize,
-  IllustrationWorkspaceState,
   StoryAgentMessage,
   StoryDraftUpdateResult,
   StoryProject,
@@ -28,6 +28,7 @@ import type {
   StoryboardUpdateResult,
 } from '@/types';
 import { DEFAULT_DEEPSEEK_MODEL, STORY_AGENT_ENDPOINT } from '@/types';
+import { cloneJsonData } from '@/utils/serialization';
 import StoryChatInput from './components/story-chat-input.vue';
 import StoryChatMessages from './components/story-chat-messages.vue';
 import StoryHeader from './components/story-header.vue';
@@ -42,7 +43,7 @@ const activeStoryId = ref('');
 const deepseekStatus = ref<CredentialStatus | null>(null);
 const apimartStatus = ref<CredentialStatus | null>(null);
 const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
-const illustrationWorkspace = ref<IllustrationWorkspaceState | null>(null);
+const artStyles = ref<ArtStyle[]>([]);
 const initializationError = ref('');
 const operationError = ref('');
 const isInitializing = ref(true);
@@ -70,7 +71,9 @@ const apimartConfigured = computed(() => Boolean(apimartStatus.value?.configured
 const characterAssetsReady = computed(() =>
   Boolean(portraitWorkspace.value?.officialAssets.length),
 );
-const styleReady = computed(() => Boolean(illustrationWorkspace.value?.activeArtStyle));
+const styleReady = computed(() =>
+  artStyles.value.some(style => style.id === activeStory.value?.artStyleId),
+);
 const assetsReady = computed(() => characterAssetsReady.value && styleReady.value);
 
 const transport = new DefaultChatTransport<StoryAgentMessage>({
@@ -267,18 +270,18 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   initializationError.value = '';
   try {
-    const [workspace, deepseek, apimart, portraits, illustrations] = await Promise.all([
+    const [workspace, deepseek, apimart, portraits, artStyleWorkspace] = await Promise.all([
       window.desktop.getStoryWorkspace(),
       window.desktop.getCredentialStatus('deepseek'),
       window.desktop.getCredentialStatus('apimart'),
       window.desktop.getCharacterPortraitWorkspace(),
-      window.desktop.getIllustrationWorkspace(),
+      window.desktop.getArtStyleWorkspace(),
     ]);
     stories.value = workspace.stories;
     deepseekStatus.value = deepseek;
     apimartStatus.value = apimart;
     portraitWorkspace.value = portraits;
-    illustrationWorkspace.value = illustrations;
+    artStyles.value = artStyleWorkspace.styles;
 
     const requestedStoryId =
       typeof route.query.storyId === 'string' ? route.query.storyId : undefined;
@@ -317,7 +320,12 @@ async function persistFinishedConversation(): Promise<void> {
     return;
   }
   try {
-    replaceStory(await window.desktop.saveStoryConversation({ messages: messages.value, storyId }));
+    replaceStory(
+      await window.desktop.saveStoryConversation({
+        messages: cloneJsonData(messages.value),
+        storyId,
+      }),
+    );
   } catch (saveError: unknown) {
     toast.error(saveError instanceof Error ? saveError.message : String(saveError));
   } finally {
@@ -366,6 +374,7 @@ function selectStory(storyId: string): void {
 
 async function updateProject(
   patch: Partial<{
+    artStyleId: string;
     confirmStoryboard: boolean;
     keyShotId: string;
     resolution: CharacterPortraitResolution;
@@ -706,12 +715,15 @@ onBeforeUnmount(() => {
         <StoryWorkspacePanel
           v-model:tab="workspaceTab"
           :apimart-configured="apimartConfigured"
+          :art-styles="artStyles"
           :assets-ready="assetsReady"
           :busy="navigationBusy"
+          :character-assets-ready="characterAssetsReady"
           :story="activeStory"
           :submitting-shot-ids="submittingShotIds"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @add-shot="openAddShot"
+          @update:art-style-id="updateProject({ artStyleId: $event })"
           @confirm-storyboard="updateProject({ confirmStoryboard: true })"
           @configure-service="router.push('/settings')"
           @delete-shot="deleteShotTarget = $event"
@@ -720,6 +732,7 @@ onBeforeUnmount(() => {
           @generate-remaining="generateRemaining"
           @generate-shot="submitShotGeneration"
           @manage-assets="manageAssets"
+          @manage-style="router.push('/art-style')"
           @move-shot="moveShot"
           @rename="updateProject({ title: $event })"
           @select-version="selectVersion"

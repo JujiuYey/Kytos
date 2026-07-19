@@ -17,6 +17,7 @@ export type CharacterPortraitTaskStatus =
   | 'cancelled';
 
 export interface GenerateCharacterPortraitRequest {
+  artStyleId: string;
   count: number;
   name: string;
   prompt: string;
@@ -48,10 +49,14 @@ export interface CharacterImageRecord<TSize extends CharacterImageSize = Charact
   updatedAt: string;
 }
 
-export interface CharacterPortraitRecord
-  extends CharacterImageRecord<CharacterPortraitSize>, GenerateCharacterPortraitRequest {}
+export interface CharacterPortraitRecord extends CharacterImageRecord<CharacterPortraitSize> {
+  artStyleId: string | null;
+  artStyleName: string | null;
+}
 
 export interface CharacterSheetRecord extends CharacterImageRecord<typeof CHARACTER_SHEET_SIZE> {
+  artStyleId: string | null;
+  artStyleName: string | null;
   count: 1;
   name: string;
   referenceAssets: CharacterVisualAssetSelection[];
@@ -90,6 +95,7 @@ export interface DeleteCharacterPortraitRequest {
 }
 
 export interface GenerateCharacterSheetRequest {
+  artStyleId: string;
   name: string;
   prompt: string;
   referenceAssets: CharacterVisualAssetSelection[];

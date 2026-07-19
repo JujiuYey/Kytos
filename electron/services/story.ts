@@ -45,7 +45,7 @@ import {
   getOfficialCharacterVisualReferences,
 } from './character-portrait';
 import { getCredentialValue } from './credentials';
-import { getActiveArtStyle, readActiveArtStyleReference } from './art-style';
+import { getArtStyle, readArtStyleReference } from './art-style';
 import { readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 
@@ -374,7 +374,12 @@ function parseStory(value: unknown, migrateResolutionStale: boolean): StoryProje
     typeof value.keyShotId === 'string' && shots.some(shot => shot.id === value.keyShotId)
       ? value.keyShotId
       : (shots[0]?.id ?? null);
+  const latestVersion = shots
+    .flatMap(shot => shot.versions)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
   return {
+    artStyleId:
+      typeof value.artStyleId === 'string' ? value.artStyleId : (latestVersion?.artStyleId ?? null),
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     draft: parseDraft(value.draft),
     id: value.id,
@@ -459,6 +464,7 @@ export async function getStory(storyId: string): Promise<StoryProject> {
 export async function createStory(_request: CreateStoryRequest): Promise<StoryProject> {
   const now = new Date().toISOString();
   const story: StoryProject = {
+    artStyleId: null,
     createdAt: now,
     draft: createEmptyStoryDraft(),
     id: `story_${randomUUID()}`,
@@ -495,17 +501,31 @@ export async function updateStory(request: UpdateStoryRequest): Promise<StoryPro
   if (request.resolution !== undefined && !isResolution(request.resolution)) {
     throw new Error('故事图片清晰度无效');
   }
+  if (
+    request.artStyleId !== undefined &&
+    request.artStyleId !== null &&
+    typeof request.artStyleId !== 'string'
+  ) {
+    throw new Error('故事画风无效');
+  }
   if (request.confirmStoryboard !== undefined && typeof request.confirmStoryboard !== 'boolean') {
     throw new Error('分镜确认状态无效');
   }
   const store = await loadStore();
   const story = requireStory(store, request.storyId);
+  if (request.artStyleId && !(await getArtStyle(request.artStyleId))) {
+    throw new Error('未找到选择的画风');
+  }
   if (request.keyShotId !== undefined && !story.shots.some(shot => shot.id === request.keyShotId)) {
     throw new Error('关键帧选择无效');
   }
   const sizeChanged = request.size !== undefined && request.size !== story.size;
+  const artStyleChanged =
+    request.artStyleId !== undefined && request.artStyleId !== story.artStyleId;
   const outputSettingsChanged =
-    sizeChanged || (request.resolution !== undefined && request.resolution !== story.resolution);
+    sizeChanged ||
+    artStyleChanged ||
+    (request.resolution !== undefined && request.resolution !== story.resolution);
   if (request.confirmStoryboard && (!story.storyReady || !isStoryboardComplete(story.shots))) {
     throw new Error('故事和分镜完整后才能确认');
   }
@@ -526,11 +546,13 @@ export async function updateStory(request: UpdateStoryRequest): Promise<StoryPro
     return {
       ...shot,
       imageStale:
-        Boolean(shot.selectedVersionId) && (shot.imageStale || sizeChanged || dependsOnPreviousKey),
+        Boolean(shot.selectedVersionId) &&
+        (shot.imageStale || sizeChanged || artStyleChanged || dependsOnPreviousKey),
     };
   });
   const updatedStory: StoryProject = {
     ...story,
+    artStyleId: request.artStyleId === undefined ? story.artStyleId : request.artStyleId,
     keyShotId: request.keyShotId ?? story.keyShotId,
     resolution: request.resolution ?? story.resolution,
     shots,
@@ -992,9 +1014,9 @@ function buildPrompt(
     '参考图中的角色是故事主角。必须保持角色身份、脸型、五官、发型、身材比例、服装、鞋履、配饰和颜色一致，不要重新设计角色。',
     prompt.trim(),
     artStyle.referenceImage
-      ? '当前画风参考图只用于确认视觉语言，不要复制其中的具体人物动作、道具、环境或构图。'
+      ? '所选画风参考图只用于确认视觉语言，不要复制其中的具体人物动作、道具、环境或构图。'
       : '',
-    `当前画风：${artStyle.name}`,
+    `所选画风：${artStyle.name}`,
     artStyle.prompt,
     '故事连续性参考图只用于延续角色状态、场景、时间和关键道具，不要照搬上一镜的景别或构图。',
     '只生成一个画面。不要添加标题、大段文字、边框、Logo、水印、漫画格、多格排版、重复人物或重复肢体。',
@@ -1040,14 +1062,17 @@ export async function generateStoryShot(
   const referencePortrait = characterReferences[0]!.selection;
   const referenceSheet = characterReferences[1]?.selection ?? null;
 
-  const artStyle = await getActiveArtStyle();
+  const artStyle = story.artStyleId ? await getArtStyle(story.artStyleId) : null;
+  if (!artStyle) {
+    throw new Error('请先为这个故事选择画风');
+  }
 
   const referenceImages = await Promise.all(
     characterReferences.map(reference =>
       readReferenceImage(reference.directoryName, reference.image),
     ),
   );
-  const styleReferenceData = await readActiveArtStyleReference(artStyle);
+  const styleReferenceData = await readArtStyleReference(artStyle);
   if (styleReferenceData) {
     referenceImages.push(styleReferenceData);
   }

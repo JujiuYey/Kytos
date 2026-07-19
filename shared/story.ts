@@ -69,6 +69,7 @@ export interface StoryShot extends StoryShotContent {
 }
 
 export interface StoryProject {
+  artStyleId: string | null;
   createdAt: string;
   draft: StoryDraft;
   id: string;
@@ -144,6 +145,7 @@ export interface SaveStoryConversationRequest {
 }
 
 export interface UpdateStoryRequest {
+  artStyleId?: string | null;
   confirmStoryboard?: boolean;
   keyShotId?: string;
   resolution?: CharacterPortraitResolution;

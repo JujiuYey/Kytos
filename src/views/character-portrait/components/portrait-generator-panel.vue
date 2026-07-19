@@ -12,9 +12,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { CharacterDraft, CharacterPortraitResolution, CharacterPortraitSize } from '@/types';
+import type {
+  ArtStyle,
+  CharacterDraft,
+  CharacterPortraitResolution,
+  CharacterPortraitSize,
+} from '@/types';
 
 defineProps<{
+  artStyleId: string;
+  artStyles: ArtStyle[];
   busy: boolean;
   count: number;
   disabled: boolean;
@@ -28,6 +35,7 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'close'): void;
   (event: 'generate'): void;
+  (event: 'update:artStyleId', value: string): void;
   (event: 'update:count', value: number): void;
   (event: 'update:modelValue', value: string): void;
   (event: 'update:name', value: string): void;
@@ -56,6 +64,23 @@ const emit = defineEmits<{
             placeholder="例如：定妆照、日常造型、战斗形态"
             @update:model-value="emit('update:name', String($event))"
           />
+        </div>
+        <div class="space-y-2">
+          <Label for="portrait-art-style">画风</Label>
+          <Select
+            :model-value="artStyleId || undefined"
+            :disabled="busy"
+            @update:model-value="emit('update:artStyleId', String($event))"
+          >
+            <SelectTrigger id="portrait-art-style" class="w-full">
+              <SelectValue placeholder="选择画风" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="style in artStyles" :key="style.id" :value="style.id">
+                {{ style.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <section aria-labelledby="portrait-source-heading">
           <div class="mb-3">

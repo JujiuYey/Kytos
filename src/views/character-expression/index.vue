@@ -183,9 +183,9 @@ function selectReferenceAssets(keys: string[]): void {
   selectedReferenceAssets.value = referenceOptions.value
     .filter(option => selectedKeySet.has(option.key))
     .map(option => ({
-    fileName: option.selection.fileName,
-    kind: option.selection.kind,
-    taskId: option.selection.taskId,
+      fileName: option.selection.fileName,
+      kind: option.selection.kind,
+      taskId: option.selection.taskId,
     }));
 }
 

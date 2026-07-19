@@ -6,6 +6,7 @@ import {
   Image as ImageIcon,
   ImagePlus,
   Palette,
+  PencilLine,
   Search,
   Sparkles,
   Trash2,
@@ -25,7 +26,6 @@ import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
 import type {
-  ArtStyle,
   CharacterPortraitImage,
   IllustrationTopic,
   IllustrationStyleReference,
@@ -53,20 +53,8 @@ interface IllustrationLibraryItem {
 }
 
 const router = useRouter();
-const fallbackArtStyle: ArtStyle = {
-  createdAt: '',
-  description: '',
-  id: '',
-  name: '',
-  palette: [],
-  prompt: '',
-  referenceImage: null,
-  source: 'preset',
-  updatedAt: '',
-};
 const workspace = ref<IllustrationWorkspaceState>({
-  activeArtStyle: fallbackArtStyle,
-  selectedStyleReference: null,
+  artStyles: [],
   topics: [],
   uploads: [],
 });
@@ -240,12 +228,25 @@ async function selectStyleReference(item: IllustrationLibraryItem): Promise<void
       ...item.styleReference,
       name: item.title,
     });
-    toast.success('已导入画风管理并设为当前画风');
+    toast.success('已导入画风管理');
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : String(error));
   } finally {
     selectingStyleItemId.value = '';
   }
+}
+
+function reviseIllustration(item: IllustrationLibraryItem): void {
+  if (item.source !== 'generated' || !item.topicId || !item.versionId) {
+    return;
+  }
+  void router.push({
+    path: '/illustration',
+    query: {
+      revisionTopicId: item.topicId,
+      revisionVersionId: item.versionId,
+    },
+  });
 }
 
 async function confirmDelete(): Promise<void> {
@@ -404,6 +405,15 @@ onMounted(() => {
                 <span class="truncate">{{ formatDate(item.createdAt) }}</span>
               </span>
               <div class="flex shrink-0 items-center gap-1">
+                <Button
+                  v-if="item.source === 'generated'"
+                  size="sm"
+                  variant="outline"
+                  @click="reviseIllustration(item)"
+                >
+                  <PencilLine class="size-4" />
+                  继续修改
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"

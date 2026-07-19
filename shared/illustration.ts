@@ -4,9 +4,9 @@ import type {
   CharacterPortraitResolution,
   CharacterPortraitSelection,
   CharacterPortraitTaskStatus,
-  CharacterVisualAssetSelection,
 } from './character-portrait';
 import type { ArtStyle } from './art-style';
+import type { CharacterExpressionReferenceSelection } from './character-expression';
 
 export const ILLUSTRATION_AGENT_ENDPOINT = 'app://bundle/api/illustration-agent';
 export const ILLUSTRATION_SIZES = ['1:1', '3:4', '4:5', '16:9', '9:16'] as const;
@@ -65,7 +65,7 @@ export interface IllustrationVersion {
   artStyleId: string | null;
   artStyleName: string | null;
   baseVersion: IllustrationVersionReference | null;
-  characterReferences: CharacterVisualAssetSelection[];
+  characterReferences: CharacterExpressionReferenceSelection[];
   createdAt: string;
   errorMessage: string | null;
   id: string;
@@ -84,6 +84,7 @@ export interface IllustrationVersion {
 }
 
 export interface IllustrationTopic {
+  artStyleId: string | null;
   brief: IllustrationBrief;
   createdAt: string;
   id: string;
@@ -106,8 +107,7 @@ export interface UploadedIllustration {
 }
 
 export interface IllustrationWorkspaceState {
-  activeArtStyle: ArtStyle;
-  selectedStyleReference: IllustrationStyleReference | null;
+  artStyles: ArtStyle[];
   topics: IllustrationTopic[];
   uploads: UploadedIllustration[];
 }
@@ -117,6 +117,7 @@ export interface CreateIllustrationTopicRequest {
 }
 
 export interface UpdateIllustrationTopicRequest {
+  artStyleId?: string | null;
   title?: string;
   topicId: string;
   useCharacter?: boolean;
@@ -129,8 +130,9 @@ export interface SaveIllustrationConversationRequest {
 
 export interface GenerateIllustrationRequest {
   baseVersion: IllustrationVersionReference | null;
-  characterReferences: CharacterVisualAssetSelection[];
+  characterReferences: CharacterExpressionReferenceSelection[];
   prompt: string;
+  revisionPrompt: string | null;
   resolution: CharacterPortraitResolution;
   size: IllustrationSize;
   topicId: string;

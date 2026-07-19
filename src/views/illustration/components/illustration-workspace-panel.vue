@@ -2,15 +2,13 @@
 import { computed, ref } from 'vue';
 import {
   ChevronDown,
-  GitBranch,
   ImagePlus,
   Images,
-  Link2,
   Image as ImageIcon,
   Palette,
+  PencilLine,
   Sparkles,
   Trash2,
-  X,
 } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
@@ -40,15 +38,19 @@ import type {
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,
-  IllustrationVersionReference,
 } from '@/types';
+
+interface IllustrationCharacterReferencePreview {
+  image: CharacterPortraitImage;
+  label: string;
+}
 
 const props = defineProps<{
   apimartConfigured: boolean;
-  artStyle: ArtStyle;
-  baseReference: IllustrationVersionReference | null;
+  artStyle: ArtStyle | null;
+  artStyles: ArtStyle[];
   busy: boolean;
-  characterReferences: CharacterPortraitImage[];
+  characterReferences: IllustrationCharacterReferencePreview[];
   prompt: string;
   referencesReady: boolean;
   resolution: CharacterPortraitResolution;
@@ -58,13 +60,14 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: 'clear-base'): void;
   (event: 'delete-version', version: IllustrationVersion): void;
   (event: 'generate'): void;
   (event: 'manage-style'): void;
+  (event: 'open-reference-picker'): void;
   (event: 'rename', title: string): void;
-  (event: 'select-base', reference: IllustrationVersionReference): void;
+  (event: 'revise', version: IllustrationVersion): void;
   (event: 'update:prompt', value: string): void;
+  (event: 'update:artStyleId', value: string): void;
   (event: 'update:resolution', value: CharacterPortraitResolution): void;
   (event: 'update:size', value: IllustrationSize): void;
   (event: 'update:useCharacter', value: boolean): void;
@@ -72,11 +75,8 @@ const emit = defineEmits<{
 
 const promptOpen = ref(false);
 const referenceAssets = computed(() => [
-  ...props.characterReferences.map((image, index) => ({
-    image,
-    label: image.name || `正式资产 ${index + 1}`,
-  })),
-  { image: props.styleReference, label: props.artStyle.name },
+  ...(props.topic.useCharacter ? props.characterReferences : []),
+  ...(props.artStyle ? [{ image: props.styleReference, label: props.artStyle.name }] : []),
 ]);
 const activeStatuses = ['submitted', 'pending', 'processing'];
 const planFields = computed(() => [
@@ -88,17 +88,13 @@ const planFields = computed(() => [
   { label: '风格', value: props.topic.brief.style },
   { label: '细节', value: props.topic.brief.details },
 ]);
-const baseVersionNumber = computed(
-  () =>
-    props.topic.versions.find(version => version.id === props.baseReference?.versionId)
-      ?.versionNumber,
-);
 const generateDisabled = computed(
   () =>
     props.busy ||
     !props.topic.ready ||
     !props.prompt.trim() ||
     !props.apimartConfigured ||
+    !props.artStyle ||
     (props.topic.useCharacter && !props.referencesReady),
 );
 
@@ -149,6 +145,24 @@ function handleTitleChange(event: Event): void {
             />
           </div>
 
+          <div class="space-y-2">
+            <Label for="illustration-art-style">画风</Label>
+            <Select
+              :model-value="topic.artStyleId ?? undefined"
+              :disabled="busy"
+              @update:model-value="emit('update:artStyleId', String($event))"
+            >
+              <SelectTrigger id="illustration-art-style" class="w-full">
+                <SelectValue placeholder="选择画风" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="style in artStyles" :key="style.id" :value="style.id">
+                  {{ style.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div
             class="flex items-center justify-between gap-4 rounded-md border px-3 py-3 md:hidden"
           >
@@ -170,8 +184,8 @@ function handleTitleChange(event: Event): void {
         <section aria-labelledby="illustration-references-heading">
           <div class="mb-3 flex items-center justify-between gap-3">
             <h3 id="illustration-references-heading" class="text-sm font-medium">正式参考</h3>
-            <SagStatusBadge tone="success">
-              {{ artStyle.name }}
+            <SagStatusBadge :tone="artStyle ? 'success' : 'info'">
+              {{ artStyle?.name || '未选择画风' }}
             </SagStatusBadge>
           </div>
           <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -208,12 +222,27 @@ function handleTitleChange(event: Event): void {
               <p class="truncate border-t px-2 py-1.5 text-center text-xs">{{ asset.label }}</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" class="mt-3 w-full" @click="emit('manage-style')">
-            <Palette class="size-4" />
-            管理画风
-          </Button>
+          <div :class="['mt-3 grid gap-2', topic.useCharacter && 'sm:grid-cols-2']">
+            <Button
+              v-if="topic.useCharacter"
+              variant="outline"
+              size="sm"
+              @click="emit('open-reference-picker')"
+            >
+              <Images class="size-4" />
+              {{ characterReferences.length ? '更换角色参考' : '选择角色参考' }}
+            </Button>
+            <Button variant="outline" size="sm" @click="emit('manage-style')">
+              <Palette class="size-4" />
+              管理画风
+            </Button>
+          </div>
           <p class="mt-2 text-xs leading-5 text-muted-foreground">
-            生成时默认使用全部正式角色视觉和当前画风；旧插画仅在点击“以此继续”后加入。
+            {{
+              topic.useCharacter
+                ? '生成时使用已选角色参考和这张卡片选择的画风；已有版本可单独继续修改。'
+                : '生成时使用这张卡片选择的画风；已有版本可单独继续修改。'
+            }}
           </p>
         </section>
 
@@ -297,27 +326,6 @@ function handleTitleChange(event: Event): void {
           </div>
         </section>
 
-        <section v-if="baseReference" class="rounded-md border px-3 py-3" aria-label="旧版本参考">
-          <div class="flex items-center justify-between gap-3">
-            <div class="flex min-w-0 items-center gap-2 text-sm">
-              <GitBranch class="size-4 shrink-0 text-muted-foreground" />
-              <span class="truncate">下一版参考 V{{ baseVersionNumber }}</span>
-            </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              class="size-7"
-              aria-label="取消旧版本参考"
-              @click="emit('clear-base')"
-            >
-              <X class="size-3.5" />
-            </Button>
-          </div>
-          <p class="mt-1 text-xs leading-5 text-muted-foreground">
-            旧版本只延续构图和情境；角色身份仍以正式角色资产为准。
-          </p>
-        </section>
-
         <section aria-labelledby="illustration-versions-heading">
           <div class="mb-3 flex items-center justify-between gap-3">
             <h3 id="illustration-versions-heading" class="text-sm font-medium">生成版本</h3>
@@ -338,6 +346,9 @@ function handleTitleChange(event: Event): void {
                       topic.versions.find(item => item.id === version.baseVersion?.versionId)
                         ?.versionNumber
                     }}
+                  </span>
+                  <span v-if="version.artStyleName" class="truncate text-muted-foreground">
+                    {{ version.artStyleName }}
                   </span>
                 </div>
                 <SagStatusBadge
@@ -413,15 +424,9 @@ function handleTitleChange(event: Event): void {
                       {{ version.size }} · {{ version.resolution.toUpperCase() }}
                     </span>
                     <div class="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        @click="
-                          emit('select-base', { fileName: image.fileName, versionId: version.id })
-                        "
-                      >
-                        <Link2 class="size-4" />
-                        以此继续
+                      <Button size="sm" variant="ghost" @click="emit('revise', version)">
+                        <PencilLine class="size-4" />
+                        基于此修改
                       </Button>
                       <TooltipProvider :delay-duration="300">
                         <Tooltip>
@@ -460,13 +465,7 @@ function handleTitleChange(event: Event): void {
     <footer class="shrink-0 border-t bg-background px-5 py-4">
       <Button class="w-full" :disabled="generateDisabled" @click="emit('generate')">
         <Sparkles class="size-4" />
-        {{
-          busy
-            ? '正在生成插画'
-            : baseReference
-              ? `基于 V${baseVersionNumber} 生成新版本`
-              : '生成插画'
-        }}
+        {{ busy ? '正在生成插画' : '生成插画' }}
       </Button>
       <p class="mt-2 text-center text-xs text-muted-foreground">
         使用 GPT-Image-2，点击后将产生实际费用

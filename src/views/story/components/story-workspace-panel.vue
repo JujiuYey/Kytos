@@ -36,6 +36,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type {
+  ArtStyle,
   CharacterPortraitResolution,
   IllustrationSize,
   StoryProject,
@@ -47,8 +48,10 @@ import { STORY_SHOT_LIMITS } from '@/types';
 
 const props = defineProps<{
   apimartConfigured: boolean;
+  artStyles: ArtStyle[];
   assetsReady: boolean;
   busy: boolean;
+  characterAssetsReady: boolean;
   story: StoryProject;
   submittingShotIds: string[];
   tab: 'story' | 'storyboard' | 'final';
@@ -64,12 +67,14 @@ const emit = defineEmits<{
   (event: 'generate-remaining'): void;
   (event: 'generate-shot', shot: StoryShot): void;
   (event: 'manage-assets'): void;
+  (event: 'manage-style'): void;
   (event: 'move-shot', payload: { direction: -1 | 1; shot: StoryShot }): void;
   (event: 'rename', title: string): void;
   (event: 'select-version', payload: { shot: StoryShot; version: StoryShotVersion }): void;
   (event: 'set-base', payload: { reference: StoryVersionReference; shot: StoryShot }): void;
   (event: 'set-key-shot', shot: StoryShot): void;
   (event: 'update:resolution', value: CharacterPortraitResolution): void;
+  (event: 'update:artStyleId', value: string): void;
   (event: 'update:size', value: IllustrationSize): void;
   (event: 'update:tab', value: 'story' | 'storyboard' | 'final'): void;
 }>();
@@ -262,9 +267,42 @@ function handleTitleChange(event: Event): void {
                 <h3 id="story-output-heading" class="text-sm font-medium">统一输出</h3>
                 <SagStatusBadge :tone="apimartConfigured && assetsReady ? 'success' : 'error'">
                   {{
-                    !apimartConfigured ? '缺少 API Key' : assetsReady ? '参考就绪' : '参考不完整'
+                    !apimartConfigured
+                      ? '缺少 API Key'
+                      : !characterAssetsReady
+                        ? '缺少角色参考'
+                        : !story.artStyleId
+                          ? '未选择画风'
+                          : '参考就绪'
                   }}
                 </SagStatusBadge>
+              </div>
+              <div class="mb-3 space-y-2">
+                <Label for="story-art-style">画风</Label>
+                <div class="flex gap-2">
+                  <Select
+                    :model-value="story.artStyleId ?? undefined"
+                    :disabled="structureLocked"
+                    @update:model-value="emit('update:artStyleId', String($event))"
+                  >
+                    <SelectTrigger id="story-art-style" class="min-w-0 flex-1">
+                      <SelectValue placeholder="选择画风" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="style in artStyles" :key="style.id" :value="style.id">
+                        {{ style.name }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    aria-label="管理画风"
+                    @click="emit('manage-style')"
+                  >
+                    <Palette class="size-4" />
+                  </Button>
+                </div>
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div class="space-y-2">
@@ -305,14 +343,14 @@ function handleTitleChange(event: Event): void {
                 </div>
               </div>
               <Button
-                v-if="!assetsReady"
+                v-if="!characterAssetsReady"
                 variant="outline"
                 size="sm"
                 class="mt-3 w-full"
                 @click="emit('manage-assets')"
               >
                 <Palette class="size-4" />
-                准备角色和画风
+                准备角色视觉
               </Button>
               <Button
                 v-if="!apimartConfigured"

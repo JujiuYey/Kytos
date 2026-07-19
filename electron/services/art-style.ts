@@ -6,9 +6,8 @@ import type {
   ArtStyleWorkspaceState,
   DeleteArtStyleRequest,
   SaveArtStyleRequest,
-  SelectArtStyleRequest,
 } from '../../shared/art-style';
-import { DEFAULT_ART_STYLE_ID } from '../../shared/art-style';
+import { MINIMAL_LINE_ART_STYLE_ID } from '../../shared/art-style';
 import type { CharacterPortraitImage } from '../../shared/character-portrait';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
@@ -32,16 +31,15 @@ interface StoredCustomArtStyle extends Omit<ArtStyle, 'referenceImage' | 'source
 }
 
 interface StoredArtStyleWorkspace {
-  activeStyleId: string;
   styles: StoredCustomArtStyle[];
-  version: 1;
+  version: 2;
 }
 
 const PRESET_STYLES: ArtStyle[] = [
   {
     createdAt: '2026-01-01T00:00:00.000Z',
     description: '纤细黑色手绘线条、大面积留白与少量红色强调，适合角色日常和知识插画。',
-    id: DEFAULT_ART_STYLE_ID,
+    id: MINIMAL_LINE_ART_STYLE_ID,
     name: '极简手绘线稿',
     palette: ['#fafafa', '#171717', '#ef3b24', '#a3a3a3'],
     prompt:
@@ -246,24 +244,21 @@ async function getAssetDirectory(): Promise<string> {
 }
 
 async function loadStore(): Promise<StoredArtStyleWorkspace> {
-  const value = await readJsonFile(await getStorePath());
+  const storePath = await getStorePath();
+  const value = await readJsonFile(storePath);
   if (!isRecord(value)) {
-    return { activeStyleId: DEFAULT_ART_STYLE_ID, styles: [], version: 1 };
+    return { styles: [], version: 2 };
   }
   const styles = Array.isArray(value.styles)
     ? value.styles
         .map(parseCustomStyle)
         .filter((style): style is StoredCustomArtStyle => Boolean(style))
     : [];
-  const availableIds = new Set([
-    ...PRESET_STYLES.map(style => style.id),
-    ...styles.map(style => style.id),
-  ]);
-  const activeStyleId =
-    typeof value.activeStyleId === 'string' && availableIds.has(value.activeStyleId)
-      ? value.activeStyleId
-      : DEFAULT_ART_STYLE_ID;
-  return { activeStyleId, styles, version: 1 };
+  const store: StoredArtStyleWorkspace = { styles, version: 2 };
+  if (value.version !== 2 || 'activeStyleId' in value) {
+    await writeJsonFile(storePath, store);
+  }
+  return store;
 }
 
 async function saveStore(store: StoredArtStyleWorkspace): Promise<void> {
@@ -285,7 +280,6 @@ function toArtStyle(style: StoredCustomArtStyle): ArtStyle {
 
 function toWorkspace(store: StoredArtStyleWorkspace): ArtStyleWorkspaceState {
   return {
-    activeStyleId: store.activeStyleId,
     styles: [
       ...PRESET_STYLES.map(style => ({ ...style, palette: [...style.palette] })),
       ...store.styles.map(toArtStyle),
@@ -354,13 +348,6 @@ export async function getArtStyleWorkspace(): Promise<ArtStyleWorkspaceState> {
   return toWorkspace(await loadStore());
 }
 
-export async function getActiveArtStyle(): Promise<ArtStyle> {
-  const workspace = await getArtStyleWorkspace();
-  return (
-    workspace.styles.find(style => style.id === workspace.activeStyleId) ?? workspace.styles[0]!
-  );
-}
-
 export async function saveArtStyle(request: SaveArtStyleRequest): Promise<ArtStyleWorkspaceState> {
   validateStyleContent(request);
   const store = await loadStore();
@@ -406,25 +393,6 @@ export async function saveArtStyle(request: SaveArtStyleRequest): Promise<ArtSty
   return toWorkspace(nextStore);
 }
 
-export async function selectArtStyle(
-  request: SelectArtStyleRequest,
-): Promise<ArtStyleWorkspaceState> {
-  if (!request || typeof request.id !== 'string' || !ID_PATTERN.test(request.id)) {
-    throw new Error('画风选择无效');
-  }
-  const store = await loadStore();
-  const availableIds = new Set([
-    ...PRESET_STYLES.map(style => style.id),
-    ...store.styles.map(style => style.id),
-  ]);
-  if (!availableIds.has(request.id)) {
-    throw new Error('未找到这个画风');
-  }
-  const nextStore = { ...store, activeStyleId: request.id };
-  await saveStore(nextStore);
-  return toWorkspace(nextStore);
-}
-
 export async function deleteArtStyle(
   request: DeleteArtStyleRequest,
 ): Promise<ArtStyleWorkspaceState> {
@@ -438,7 +406,6 @@ export async function deleteArtStyle(
   }
   const nextStore = {
     ...store,
-    activeStyleId: store.activeStyleId === target.id ? DEFAULT_ART_STYLE_ID : store.activeStyleId,
     styles: store.styles.filter(style => style.id !== target.id),
   };
   await saveStore(nextStore);
@@ -463,13 +430,17 @@ export async function importArtStyleReference(options: {
       mimeType: options.image.mimeType,
     },
   });
-  const imported = workspace.styles.find(
-    style => style.source === 'custom' && style.name === options.name,
-  );
-  return imported ? selectArtStyle({ id: imported.id }) : workspace;
+  return workspace;
 }
 
-export async function readActiveArtStyleReference(style: ArtStyle): Promise<string | null> {
+export async function getArtStyle(styleId: string): Promise<ArtStyle | null> {
+  if (!ID_PATTERN.test(styleId)) {
+    return null;
+  }
+  return (await getArtStyleWorkspace()).styles.find(style => style.id === styleId) ?? null;
+}
+
+export async function readArtStyleReference(style: ArtStyle): Promise<string | null> {
   if (!style.referenceImage) {
     return null;
   }

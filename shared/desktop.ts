@@ -3,7 +3,6 @@ import type {
   ArtStyleWorkspaceState,
   DeleteArtStyleRequest,
   SaveArtStyleRequest,
-  SelectArtStyleRequest,
 } from './art-style';
 import type {
   CharacterLibraryState,
@@ -190,7 +189,6 @@ export interface DesktopApi {
   selectIllustrationStyleReference: (
     request: SelectIllustrationStyleReferenceRequest,
   ) => Promise<IllustrationWorkspaceState>;
-  selectArtStyle: (request: SelectArtStyleRequest) => Promise<ArtStyleWorkspaceState>;
   selectStoryShotVersion: (request: SelectStoryShotVersionRequest) => Promise<StoryProject>;
   setCredential: (request: SetCredentialRequest) => Promise<CredentialStatus>;
   setCharacterVisualAssetOfficial: (

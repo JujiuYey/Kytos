@@ -28,7 +28,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import type {
   ArtStyle,
-  ArtStyleWorkspaceState,
   CharacterImageRecord,
   CharacterPortraitImage,
   CharacterPortraitResolution,
@@ -63,7 +62,6 @@ const selectedNodeId = ref('generator');
 const credentialStatus = ref<CredentialStatus | null>(null);
 const isInitializing = ref(true);
 const isSubmitting = ref(false);
-const isSelectingArtStyle = ref(false);
 const errorMessage = ref('');
 const inspectorOpen = ref(false);
 const canvasSection = ref<HTMLElement | null>(null);
@@ -106,7 +104,6 @@ const generateDisabled = computed(() => {
     isInitializing.value ||
     isSubmitting.value ||
     ACTIVE_STATUSES.includes(generator.data.status) ||
-    isSelectingArtStyle.value ||
     !keyConfigured.value ||
     !selectedArtStyleId.value ||
     connectedAssetCount.value < 1 ||
@@ -175,6 +172,9 @@ function initializeGraph(
   options: WorkflowAssetOption[],
 ): void {
   const latestSheet = workspace.sheetRecords.find(record => record.source === 'generated');
+  selectedArtStyleId.value = artStyles.value.some(style => style.id === latestSheet?.artStyleId)
+    ? (latestSheet?.artStyleId ?? '')
+    : '';
   const assetNodes: WorkflowNode[] = options.slice(0, 1).map((option, index) => ({
     ariaLabel: `参考图：${option.label}`,
     data: {
@@ -194,7 +194,7 @@ function initializeGraph(
     kind: 'generator',
     label: '图片生成',
     name: latestSheet?.name || '角色表',
-    prompt: latestSheet?.prompt || buildSheetPrompt(),
+    prompt: latestSheet?.artStyleId ? latestSheet.prompt : buildSheetPrompt(),
     progress: latestSheet?.progress || 0,
     resolution: latestSheet?.resolution || '1k',
     status: toRunStatus(latestSheet?.status),
@@ -427,32 +427,19 @@ function updateGeneratorResolution(value: CharacterPortraitResolution): void {
   nodes.value = [...nodes.value];
 }
 
-async function updateArtStyle(styleId: string): Promise<void> {
+function updateArtStyle(styleId: string): void {
   if (
-    isSelectingArtStyle.value ||
     isSubmitting.value ||
     styleId === selectedArtStyleId.value ||
     !artStyles.value.some(style => style.id === styleId)
   ) {
     return;
   }
-  isSelectingArtStyle.value = true;
-  try {
-    const workspace = await window.desktop.selectArtStyle({ id: styleId });
-    applyArtStyleWorkspace(workspace);
-    toast.success(
-      `已使用“${artStyles.value.find(style => style.id === styleId)?.name || '所选画风'}”`,
-    );
-  } catch (styleError: unknown) {
-    toast.error(styleError instanceof Error ? styleError.message : String(styleError));
-  } finally {
-    isSelectingArtStyle.value = false;
-  }
+  selectedArtStyleId.value = styleId;
 }
 
-function applyArtStyleWorkspace(workspace: ArtStyleWorkspaceState): void {
+function applyArtStyleWorkspace(workspace: { styles: ArtStyle[] }): void {
   artStyles.value = workspace.styles;
-  selectedArtStyleId.value = workspace.activeStyleId;
 }
 
 function updateGeneratorStatus(
@@ -570,6 +557,7 @@ async function generateFromNode(generatorId = 'generator'): Promise<void> {
   });
   try {
     const record = await window.desktop.generateCharacterSheet({
+      artStyleId: selectedArtStyleId.value,
       name: generator.data.name.trim(),
       prompt: generator.data.prompt.trim(),
       referenceAssets,
@@ -751,7 +739,7 @@ onBeforeUnmount(() => {
                   <SheetDescription>当前工作流节点属性</SheetDescription>
                 </SheetHeader>
                 <WorkflowInspector
-                  :art-style-disabled="isSelectingArtStyle || isSubmitting"
+                  :art-style-disabled="isSubmitting"
                   :art-styles="artStyles"
                   :asset-options="assetOptions"
                   :generate-disabled="generateDisabled"
@@ -773,7 +761,7 @@ onBeforeUnmount(() => {
 
       <div class="hidden min-h-0 min-w-0 p-3 md:flex md:p-4">
         <WorkflowInspector
-          :art-style-disabled="isSelectingArtStyle || isSubmitting"
+          :art-style-disabled="isSubmitting"
           :art-styles="artStyles"
           :asset-options="assetOptions"
           :generate-disabled="generateDisabled"
