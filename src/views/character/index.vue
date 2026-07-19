@@ -199,6 +199,10 @@ onMounted(() => {
 
 <template>
   <SagPage>
+    <template #before-header>
+      <CharacterContextBar active-section="character" />
+    </template>
+
     <template #header>
       <CharacterChatHeader
         v-model:mobile-pane="mobilePane"
@@ -210,8 +214,6 @@ onMounted(() => {
         @new-session="isResetDialogOpen = true"
       />
     </template>
-
-    <CharacterContextBar active-section="character" />
 
     <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />

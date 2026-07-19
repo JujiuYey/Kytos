@@ -3,6 +3,7 @@ export const CHARACTER_PORTRAIT_RESOLUTIONS = ['1k', '2k', '4k'] as const;
 export const CHARACTER_SHEET_SIZE = '16:9' as const;
 
 export type CharacterPortraitSize = (typeof CHARACTER_PORTRAIT_SIZES)[number];
+export type CharacterImageSize = CharacterPortraitSize | typeof CHARACTER_SHEET_SIZE;
 export type CharacterPortraitResolution = (typeof CHARACTER_PORTRAIT_RESOLUTIONS)[number];
 export type CharacterImageSource = 'generated' | 'uploaded';
 export type CharacterPortraitTaskStatus =
@@ -26,11 +27,7 @@ export interface CharacterPortraitImage {
   url: string;
 }
 
-export interface CharacterImageRecord<
-  TSize extends CharacterPortraitSize | typeof CHARACTER_SHEET_SIZE =
-    | CharacterPortraitSize
-    | typeof CHARACTER_SHEET_SIZE,
-> {
+export interface CharacterImageRecord<TSize extends CharacterImageSize = CharacterImageSize> {
   count: number;
   createdAt: string;
   errorMessage: string | null;

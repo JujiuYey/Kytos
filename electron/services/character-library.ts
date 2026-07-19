@@ -3,17 +3,23 @@ import { constants, copyFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   CharacterLibraryState,
+  CharacterLibraryVisualAsset,
   CharacterSummary,
   CreateCharacterRequest,
   DeleteCharacterRequest,
   SelectCharacterRequest,
   UpdateCharacterRequest,
 } from '../../shared/character-library';
+import type { CharacterImageSize, CharacterPortraitSize } from '../../shared/character-portrait';
+import { CHARACTER_PORTRAIT_SIZES, CHARACTER_SHEET_SIZE } from '../../shared/character-portrait';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 
 const STORE_FILE_NAME = 'character-library.json';
 const CHARACTER_DIRECTORY = 'characters';
+const PORTRAIT_STORE_FILE_NAME = 'character-portraits.json';
+const PORTRAIT_ASSET_DIRECTORY = 'character-portraits';
+const SHEET_ASSET_DIRECTORY = 'character-sheets';
 const LEGACY_CHARACTER_FILES = [
   'character-draft.json',
   'character-expressions.json',
@@ -23,7 +29,9 @@ const LEGACY_CHARACTER_FILES = [
 const MAX_NAME_LENGTH = 100;
 const ID_PATTERN = /^character_[A-Za-z0-9-]{1,200}$/;
 
-interface StoredCharacterLibrary extends CharacterLibraryState {
+interface StoredCharacterLibrary {
+  activeCharacterId: string;
+  characters: CharacterSummary[];
   version: 2;
 }
 
@@ -98,6 +106,97 @@ function parseStore(value: unknown): StoredCharacterLibrary | null {
 
 function getStorePath(workspacePath: string): string {
   return path.join(workspacePath, STORE_FILE_NAME);
+}
+
+function isPortraitSize(value: unknown): value is CharacterPortraitSize {
+  return CHARACTER_PORTRAIT_SIZES.includes(value as CharacterPortraitSize);
+}
+
+function isImageSize(value: unknown): value is CharacterImageSize {
+  return isPortraitSize(value) || value === CHARACTER_SHEET_SIZE;
+}
+
+interface VisualAssetCandidate {
+  asset: CharacterLibraryVisualAsset;
+  createdAt: string;
+}
+
+function parseVisualAssetRecords(
+  value: unknown,
+  kind: CharacterLibraryVisualAsset['kind'],
+): VisualAssetCandidate[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const directory = kind === 'portrait' ? PORTRAIT_ASSET_DIRECTORY : SHEET_ASSET_DIRECTORY;
+  const candidates: VisualAssetCandidate[] = [];
+  for (const record of value) {
+    if (!isRecord(record) || !isImageSize(record.size) || !Array.isArray(record.images)) {
+      continue;
+    }
+    if (
+      (kind === 'portrait' && !isPortraitSize(record.size)) ||
+      (kind === 'sheet' && record.size !== CHARACTER_SHEET_SIZE)
+    ) {
+      continue;
+    }
+    const image = record.images.find(
+      item =>
+        isRecord(item) &&
+        typeof item.fileName === 'string' &&
+        path.basename(item.fileName) === item.fileName,
+    );
+    if (isRecord(image) && typeof image.fileName === 'string') {
+      candidates.push({
+        asset: {
+          kind,
+          size: record.size,
+          url: `app://bundle/workspace-assets/${directory}/${encodeURIComponent(image.fileName)}`,
+        },
+        createdAt: typeof record.createdAt === 'string' ? record.createdAt : '',
+      });
+    }
+  }
+  return candidates;
+}
+
+function parseCharacterVisualAsset(value: unknown): CharacterLibraryVisualAsset | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const candidates = [
+    ...parseVisualAssetRecords(value.records, 'portrait'),
+    ...parseVisualAssetRecords(value.sheetRecords, 'sheet'),
+  ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  return candidates[0]?.asset ?? null;
+}
+
+async function getCharacterVisualAsset(
+  workspacePath: string,
+  characterId: string,
+): Promise<CharacterLibraryVisualAsset | null> {
+  try {
+    const value = await readJsonFile(
+      path.join(workspacePath, CHARACTER_DIRECTORY, characterId, PORTRAIT_STORE_FILE_NAME),
+    );
+    return parseCharacterVisualAsset(value);
+  } catch {
+    return null;
+  }
+}
+
+async function toCharacterLibraryState(
+  store: StoredCharacterLibrary,
+): Promise<CharacterLibraryState> {
+  const workspacePath = await getWorkspaceDirectory();
+  const characters = await Promise.all(
+    store.characters.map(async character => ({
+      ...character,
+      visualAsset: await getCharacterVisualAsset(workspacePath, character.id),
+    })),
+  );
+  return { activeCharacterId: store.activeCharacterId, characters };
 }
 
 async function getLegacyCharacterName(workspacePath: string): Promise<string> {
@@ -233,8 +332,7 @@ function findCharacter(store: StoredCharacterLibrary, characterId: string): Char
 }
 
 export async function getCharacterLibrary(): Promise<CharacterLibraryState> {
-  const { version: _version, ...state } = await loadStore();
-  return state;
+  return toCharacterLibraryState(await loadStore());
 }
 
 export async function getActiveCharacterDirectory(): Promise<string> {
@@ -246,7 +344,7 @@ export async function createCharacter(
   request: CreateCharacterRequest,
 ): Promise<CharacterLibraryState> {
   const name = validateName(request?.name);
-  return mutateStore(async store => {
+  const store = await mutateStore(async store => {
     const now = new Date().toISOString();
     const character: CharacterSummary = {
       createdAt: now,
@@ -261,13 +359,14 @@ export async function createCharacter(
       characters: [character, ...store.characters],
     };
   });
+  return toCharacterLibraryState(store);
 }
 
 export async function updateCharacter(
   request: UpdateCharacterRequest,
 ): Promise<CharacterLibraryState> {
   const name = validateName(request?.name);
-  return mutateStore(async store => {
+  const store = await mutateStore(async store => {
     const character = findCharacter(store, request.characterId);
     const now = new Date().toISOString();
     await updateCharacterDraftName(await getWorkspaceDirectory(), character.id, name);
@@ -278,6 +377,7 @@ export async function updateCharacter(
       ),
     };
   });
+  return toCharacterLibraryState(store);
 }
 
 export async function updateActiveCharacterName(name: string): Promise<void> {
@@ -303,7 +403,7 @@ export async function updateActiveCharacterName(name: string): Promise<void> {
 export async function deleteCharacter(
   request: DeleteCharacterRequest,
 ): Promise<CharacterLibraryState> {
-  return mutateStore(store => {
+  const store = await mutateStore(store => {
     findCharacter(store, request?.characterId);
     if (store.characters.length === 1) {
       throw new Error('至少保留一个角色');
@@ -313,13 +413,15 @@ export async function deleteCharacter(
       store.activeCharacterId === request.characterId ? characters[0].id : store.activeCharacterId;
     return { ...store, activeCharacterId, characters };
   });
+  return toCharacterLibraryState(store);
 }
 
 export async function selectCharacter(
   request: SelectCharacterRequest,
 ): Promise<CharacterLibraryState> {
-  return mutateStore(store => {
+  const store = await mutateStore(store => {
     const character = findCharacter(store, request?.characterId);
     return { ...store, activeCharacterId: character.id };
   });
+  return toCharacterLibraryState(store);
 }

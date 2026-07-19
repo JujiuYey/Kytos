@@ -18,6 +18,8 @@ export type {
   SaveCharacterProfileRequest,
 } from '../../shared/character';
 export type {
+  CharacterLibraryCharacter,
+  CharacterLibraryVisualAsset,
   CharacterLibraryState,
   CharacterSummary,
   CreateCharacterRequest,
@@ -37,6 +39,7 @@ export type {
 export { CHARACTER_EXPRESSION_SIZES } from '../../shared/character-expression';
 export type {
   CharacterImageRecord,
+  CharacterImageSize,
   CharacterImageSource,
   CharacterPortraitImage,
   CharacterPortraitRecord,

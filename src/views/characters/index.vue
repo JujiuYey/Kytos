@@ -11,6 +11,7 @@ import {
   UsersRound,
 } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
+import { Image as AiImage } from '@/components/ai-elements/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
-import type { CharacterLibraryState, CharacterSummary } from '@/types';
+import type { CharacterImageSize, CharacterLibraryState, CharacterSummary } from '@/types';
 
 type EditorMode = 'create' | 'rename';
 
@@ -51,6 +52,27 @@ const deleteTarget = ref<CharacterSummary | null>(null);
 
 const characters = computed(() => library.value?.characters ?? []);
 const editorTitle = computed(() => (editorMode.value === 'create' ? '新建角色' : '重命名角色'));
+
+const visualAssetAspectClasses: Record<CharacterImageSize, string> = {
+  '1:1': 'aspect-square',
+  '16:9': 'aspect-video',
+  '2:3': 'aspect-[2/3]',
+  '3:4': 'aspect-[3/4]',
+  '4:5': 'aspect-[4/5]',
+};
+const skeletonAspectClasses = ['aspect-[2/3]', 'aspect-square', 'aspect-[3/4]', 'aspect-[4/5]'];
+
+function getVisualAssetAspectClass(size: CharacterImageSize): string {
+  return visualAssetAspectClasses[size];
+}
+
+function getSkeletonAspectClass(index: number): string {
+  return skeletonAspectClasses[(index - 1) % skeletonAspectClasses.length] ?? 'aspect-[3/4]';
+}
+
+function getVisualAssetLabel(kind: 'portrait' | 'sheet'): string {
+  return kind === 'portrait' ? '定妆照' : '角色表';
+}
 
 async function loadLibrary(): Promise<void> {
   loading.value = true;
@@ -167,54 +189,112 @@ onMounted(() => {
       </AlertDescription>
     </Alert>
 
-    <ScrollArea class="min-h-0 flex-1">
-      <div v-if="loading" class="mx-auto w-full max-w-5xl space-y-3 px-4 py-5 sm:px-5">
-        <Skeleton v-for="index in 4" :key="index" class="h-20 w-full" />
+    <ScrollArea class="min-h-0 flex-1 bg-muted/10">
+      <div
+        v-if="loading"
+        class="mx-auto w-full max-w-7xl columns-1 gap-5 px-4 py-5 sm:columns-2 sm:px-5 xl:columns-3 2xl:columns-4"
+      >
+        <article
+          v-for="index in 6"
+          :key="index"
+          class="mb-5 inline-block w-full break-inside-avoid overflow-hidden rounded-md border bg-background align-top"
+        >
+          <Skeleton :class="[getSkeletonAspectClass(index), 'w-full rounded-none']" />
+          <div class="space-y-3 border-t px-3 py-3">
+            <Skeleton class="h-4 w-3/5" />
+            <Skeleton class="h-8 w-full" />
+          </div>
+        </article>
       </div>
 
-      <div v-else class="mx-auto w-full max-w-5xl px-4 py-5 sm:px-5">
-        <div class="divide-y border-y">
-          <article
-            v-for="character in characters"
-            :key="character.id"
-            class="flex min-w-0 flex-wrap items-center gap-3 py-4"
+      <div
+        v-else
+        class="mx-auto w-full max-w-7xl columns-1 gap-5 px-4 py-5 sm:columns-2 sm:px-5 xl:columns-3 2xl:columns-4"
+      >
+        <article
+          v-for="character in characters"
+          :key="character.id"
+          class="mb-5 inline-block w-full break-inside-avoid overflow-hidden rounded-md border bg-background align-top"
+        >
+          <Button
+            variant="ghost"
+            class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
+            :disabled="busy"
+            :aria-label="`进入角色 ${character.name}`"
+            @click="openCharacter(character)"
           >
-            <div class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted">
-              <UserRound class="size-5 text-muted-foreground" />
+            <AiImage
+              v-if="character.visualAsset"
+              :alt="`${character.name}的${getVisualAssetLabel(character.visualAsset.kind)}`"
+              :src="character.visualAsset.url"
+              :class="[
+                getVisualAssetAspectClass(character.visualAsset.size),
+                'w-full rounded-none bg-muted/30 object-cover transition-opacity hover:opacity-95',
+              ]"
+            />
+            <div
+              v-else
+              class="flex aspect-[3/4] w-full flex-col items-center justify-center gap-3 bg-muted/30 px-4 text-muted-foreground"
+            >
+              <UserRound class="size-10" />
+              <span class="text-xs">尚无定妆照或角色表</span>
             </div>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
+          </Button>
+
+          <div class="space-y-3 border-t px-3 py-3">
+            <div class="flex min-w-0 items-start justify-between gap-2">
+              <div class="min-w-0">
                 <h2 class="truncate text-sm font-medium">{{ character.name }}</h2>
-                <SagStatusBadge v-if="library?.activeCharacterId === character.id" tone="success">
-                  <Check class="size-3" />
-                  当前角色
-                </SagStatusBadge>
+                <p class="mt-1 truncate text-xs text-muted-foreground">
+                  {{
+                    character.visualAsset
+                      ? `首张${getVisualAssetLabel(character.visualAsset.kind)}`
+                      : '等待创建定妆照或角色表'
+                  }}
+                </p>
               </div>
-              <p class="mt-1 text-xs text-muted-foreground">角色特征、角色视觉与表情资产</p>
+              <SagStatusBadge
+                v-if="library?.activeCharacterId === character.id"
+                tone="success"
+                class="shrink-0"
+              >
+                <Check class="size-3" />
+                当前角色
+              </SagStatusBadge>
             </div>
-            <Button size="sm" :disabled="busy" @click="openCharacter(character)"> 进入角色 </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger as-child>
-                <Button size="icon" variant="ghost" aria-label="管理角色">
-                  <MoreHorizontal class="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem @select="openEditor('rename', character)">
-                  <Pencil class="size-4" />
-                  重命名
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  class="text-destructive focus:text-destructive"
-                  @select="deleteTarget = character"
-                >
-                  <Trash2 class="size-4" />
-                  移除角色
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </article>
-        </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                :disabled="busy"
+                @click="openCharacter(character)"
+              >
+                进入角色
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button size="icon-sm" variant="ghost" :aria-label="`管理角色 ${character.name}`">
+                    <MoreHorizontal class="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem @select="openEditor('rename', character)">
+                    <Pencil class="size-4" />
+                    重命名
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    class="text-destructive focus:text-destructive"
+                    @select="deleteTarget = character"
+                  >
+                    <Trash2 class="size-4" />
+                    移除角色
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </article>
       </div>
     </ScrollArea>
 
