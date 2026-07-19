@@ -9,9 +9,6 @@ import type { ArtStyle } from './art-style';
 
 export const ILLUSTRATION_AGENT_ENDPOINT = 'app://bundle/api/illustration-agent';
 export const ILLUSTRATION_SIZES = ['1:1', '3:4', '4:5', '16:9', '9:16'] as const;
-export const ILLUSTRATION_STYLE_GUIDANCE =
-  '白底极简手绘线稿插画。使用纤细、自然、略带手绘抖动感的黑色线条，大面积留白，场景元素保持稀疏。整体以黑白灰为主；画面包含当前角色时保留其红橙色头发，其余仅在杯子、箭头或关键提示上使用少量亮红色强调。不使用写实光影、厚涂、3D、复杂纹理或彩色背景。保留少量松散的中文手写批注和细箭头作为视觉语言，不做漫画分镜或装饰边框。';
-
 export type IllustrationSize = (typeof ILLUSTRATION_SIZES)[number];
 
 export interface IllustrationBrief {
@@ -148,7 +145,9 @@ export interface DeleteIllustrationUploadRequest {
   uploadId: string;
 }
 
-export type SelectIllustrationStyleReferenceRequest = IllustrationStyleReference;
+export type SelectIllustrationStyleReferenceRequest = IllustrationStyleReference & {
+  name?: string;
+};
 
 export interface UploadIllustrationRequest {
   fileData: Uint8Array;

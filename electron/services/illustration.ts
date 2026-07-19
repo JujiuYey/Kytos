@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import type { ArtStyle } from '../../shared/art-style';
 import type { IllustrationAgentMessage } from '../../shared/illustration';
 import type {
   CreateIllustrationTopicRequest,
@@ -22,11 +23,7 @@ import type {
   UploadedIllustration,
   UploadIllustrationRequest,
 } from '../../shared/illustration';
-import {
-  ILLUSTRATION_SIZES,
-  ILLUSTRATION_STYLE_GUIDANCE,
-  createEmptyIllustrationBrief,
-} from '../../shared/illustration';
+import { ILLUSTRATION_SIZES, createEmptyIllustrationBrief } from '../../shared/illustration';
 import type {
   CharacterPortraitImage,
   CharacterPortraitResolution,
@@ -34,6 +31,11 @@ import type {
   CharacterPortraitTaskStatus,
 } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
+import {
+  getActiveArtStyle,
+  importArtStyleReference,
+  readActiveArtStyleReference,
+} from './art-style';
 import {
   getCharacterPortraitWorkspace,
   getOfficialCharacterVisualReferences,
@@ -47,6 +49,7 @@ const STORE_FILE_NAME = 'illustrations.json';
 const ASSET_DIRECTORY = 'illustrations';
 const MAX_TITLE_LENGTH = 100;
 const MAX_TEXT_LENGTH = 20_000;
+const MAX_STORED_PROMPT_LENGTH = 50_000;
 const MAX_REFERENCE_IMAGE_SIZE = 20 * 1024 * 1024;
 const MAX_RESULT_IMAGE_SIZE = 50 * 1024 * 1024;
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/;
@@ -240,7 +243,7 @@ function parseVersion(value: unknown): IllustrationVersion | null {
     !Number.isInteger(value.versionNumber) ||
     value.versionNumber < 1 ||
     typeof value.prompt !== 'string' ||
-    value.prompt.length > MAX_TEXT_LENGTH ||
+    value.prompt.length > MAX_STORED_PROMPT_LENGTH ||
     !isSize(value.size) ||
     !isResolution(value.resolution) ||
     !isTaskStatus(value.status)
@@ -248,6 +251,8 @@ function parseVersion(value: unknown): IllustrationVersion | null {
     return null;
   }
   return {
+    artStyleId: typeof value.artStyleId === 'string' ? value.artStyleId : null,
+    artStyleName: typeof value.artStyleName === 'string' ? value.artStyleName : null,
     baseVersion: parseVersionReference(value.baseVersion),
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     errorMessage: typeof value.errorMessage === 'string' ? value.errorMessage : null,
@@ -381,8 +386,32 @@ function requireTopic(store: StoredIllustrationWorkspace, topicId: string): Illu
 
 export async function getIllustrationWorkspace(): Promise<IllustrationWorkspaceState> {
   const store = await loadStore();
+  let activeArtStyle = await getActiveArtStyle();
+  if (store.selectedStyleReference) {
+    const legacyImage = resolveStyleReferenceImage(
+      store.topics,
+      store.uploads,
+      store.selectedStyleReference,
+    );
+    if (legacyImage) {
+      const migrated = await importArtStyleReference({
+        image: legacyImage,
+        name: '原正式画风',
+        sourcePath: path.join(
+          await getWorkspaceDirectory(),
+          'assets',
+          ASSET_DIRECTORY,
+          legacyImage.fileName,
+        ),
+      });
+      activeArtStyle =
+        migrated.styles.find(style => style.id === migrated.activeStyleId) ?? activeArtStyle;
+    }
+    await saveStore({ ...store, selectedStyleReference: null });
+  }
   return {
-    selectedStyleReference: store.selectedStyleReference,
+    activeArtStyle,
+    selectedStyleReference: null,
     topics: store.topics,
     uploads: store.uploads,
   };
@@ -396,15 +425,26 @@ export async function selectIllustrationStyleReference(
     throw new Error('画风参考选择无效');
   }
   const store = await loadStore();
-  if (!resolveStyleReferenceImage(store.topics, store.uploads, reference)) {
+  const image = resolveStyleReferenceImage(store.topics, store.uploads, reference);
+  if (!image) {
     throw new Error('未找到这张画风参考图');
   }
-  const nextStore = { ...store, selectedStyleReference: reference };
-  await saveStore(nextStore);
+  const imported = await importArtStyleReference({
+    image,
+    name:
+      typeof request.name === 'string' && request.name.trim()
+        ? request.name.trim().slice(0, MAX_TITLE_LENGTH)
+        : image.name || '插画画风',
+    sourcePath: path.join(await getWorkspaceDirectory(), 'assets', ASSET_DIRECTORY, image.fileName),
+  });
+  const activeArtStyle =
+    imported.styles.find(style => style.id === imported.activeStyleId) ?? imported.styles[0]!;
+  await saveStore({ ...store, selectedStyleReference: null });
   return {
-    selectedStyleReference: nextStore.selectedStyleReference,
-    topics: nextStore.topics,
-    uploads: nextStore.uploads,
+    activeArtStyle,
+    selectedStyleReference: null,
+    topics: store.topics,
+    uploads: store.uploads,
   };
 }
 
@@ -682,7 +722,7 @@ async function readReferenceImage(
   return `data:${image.mimeType};base64,${imageData.toString('base64')}`;
 }
 
-function buildPrompt(prompt: string, useCharacter: boolean, useStyleReference: boolean): string {
+function buildPrompt(prompt: string, useCharacter: boolean, artStyle: ArtStyle): string {
   const lines: string[] = [];
   if (useCharacter) {
     lines.push(
@@ -691,14 +731,12 @@ function buildPrompt(prompt: string, useCharacter: boolean, useStyleReference: b
     );
   }
   lines.push(prompt.trim());
-  if (useStyleReference) {
-    lines.push(
-      '正式画风参考图只用于确认视觉语言，不要复制其中的具体人物动作、道具、环境或构图。',
-      ILLUSTRATION_STYLE_GUIDANCE,
-    );
+  if (artStyle.referenceImage) {
+    lines.push('当前画风参考图只用于确认视觉语言，不要复制其中的具体人物动作、道具、环境或构图。');
   }
+  lines.push(`当前画风：${artStyle.name}`, artStyle.prompt);
   lines.push(
-    '旧插画参考图只用于延续其构图、环境或情境；如果它与正式角色资产或正式画风参考冲突，以正式资产为准。',
+    '旧插画参考图只用于延续其构图、环境或情境；如果它与正式角色资产或当前画风冲突，以正式资产和当前画风为准。',
     '除少量风格化手写批注外，不要添加标题、大段文字、边框、Logo、水印、多格排版、重复人物或重复肢体。',
   );
   return lines.join('\n');
@@ -733,7 +771,7 @@ export async function generateIllustration(
   const referenceImages: string[] = [];
   let referencePortrait: CharacterPortraitSelection | null = null;
   let referenceSheet: CharacterPortraitSelection | null = null;
-  const referenceStyle = store.selectedStyleReference;
+  const artStyle = await getActiveArtStyle();
   if (topic.useCharacter) {
     const portraitWorkspace = await getCharacterPortraitWorkspace();
     const references = getOfficialCharacterVisualReferences(portraitWorkspace);
@@ -749,12 +787,9 @@ export async function generateIllustration(
     );
   }
 
-  if (referenceStyle) {
-    const styleImage = resolveStyleReferenceImage(store.topics, store.uploads, referenceStyle);
-    if (!styleImage) {
-      throw new Error('正式画风参考已失效，请重新选择');
-    }
-    referenceImages.push(await readReferenceImage(ASSET_DIRECTORY, styleImage));
+  const styleReferenceData = await readActiveArtStyleReference(artStyle);
+  if (styleReferenceData) {
+    referenceImages.push(styleReferenceData);
   }
 
   let baseVersion: IllustrationVersionReference | null = null;
@@ -768,7 +803,7 @@ export async function generateIllustration(
     referenceImages.push(await readReferenceImage(ASSET_DIRECTORY, image));
   }
 
-  const prompt = buildPrompt(request.prompt, topic.useCharacter, Boolean(referenceStyle));
+  const prompt = buildPrompt(request.prompt, topic.useCharacter, artStyle);
   const apiKey = await getCredentialValue('apimart');
   const body: Record<string, unknown> = {
     model: 'gpt-image-2',
@@ -791,6 +826,8 @@ export async function generateIllustration(
 
   const now = new Date().toISOString();
   const version: IllustrationVersion = {
+    artStyleId: artStyle.id,
+    artStyleName: artStyle.name,
     baseVersion,
     createdAt: now,
     errorMessage: null,
@@ -800,7 +837,7 @@ export async function generateIllustration(
     prompt,
     referencePortrait: referencePortrait ? { ...referencePortrait } : null,
     referenceSheet: referenceSheet ? { ...referenceSheet } : null,
-    referenceStyle: referenceStyle ? { ...referenceStyle } : null,
+    referenceStyle: null,
     resolution: request.resolution,
     size: request.size,
     status: 'submitted',
@@ -979,6 +1016,7 @@ export async function deleteIllustrationUpload(
     }
   }
   return {
+    activeArtStyle: await getActiveArtStyle(),
     selectedStyleReference: nextStore.selectedStyleReference,
     topics: nextStore.topics,
     uploads: nextStore.uploads,
@@ -1015,6 +1053,7 @@ export async function deleteIllustrationTopic(
     ),
   );
   return {
+    activeArtStyle: await getActiveArtStyle(),
     selectedStyleReference: nextStore.selectedStyleReference,
     topics: nextStore.topics,
     uploads: nextStore.uploads,

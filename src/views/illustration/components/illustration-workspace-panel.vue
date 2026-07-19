@@ -36,6 +36,7 @@ import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
   CharacterPortraitResolution,
   CharacterPortraitImage,
+  ArtStyle,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,
@@ -44,6 +45,7 @@ import type {
 
 const props = defineProps<{
   apimartConfigured: boolean;
+  artStyle: ArtStyle;
   baseReference: IllustrationVersionReference | null;
   busy: boolean;
   characterReferences: CharacterPortraitImage[];
@@ -74,7 +76,7 @@ const referenceAssets = computed(() => [
     image,
     label: image.name || `正式资产 ${index + 1}`,
   })),
-  { image: props.styleReference, label: '画风' },
+  { image: props.styleReference, label: props.artStyle.name },
 ]);
 const activeStatuses = ['submitted', 'pending', 'processing'];
 const planFields = computed(() => [
@@ -168,8 +170,8 @@ function handleTitleChange(event: Event): void {
         <section aria-labelledby="illustration-references-heading">
           <div class="mb-3 flex items-center justify-between gap-3">
             <h3 id="illustration-references-heading" class="text-sm font-medium">正式参考</h3>
-            <SagStatusBadge :tone="styleReference ? 'success' : 'neutral'">
-              {{ styleReference ? '画风已锁定' : '未选画风' }}
+            <SagStatusBadge tone="success">
+              {{ artStyle.name }}
             </SagStatusBadge>
           </div>
           <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -208,10 +210,10 @@ function handleTitleChange(event: Event): void {
           </div>
           <Button variant="outline" size="sm" class="mt-3 w-full" @click="emit('manage-style')">
             <Palette class="size-4" />
-            {{ styleReference ? '更换正式画风' : '选择正式画风' }}
+            管理画风
           </Button>
           <p class="mt-2 text-xs leading-5 text-muted-foreground">
-            生成时默认使用全部正式角色视觉和正式画风；旧插画仅在点击“以此继续”后加入。
+            生成时默认使用全部正式角色视觉和当前画风；旧插画仅在点击“以此继续”后加入。
           </p>
         </section>
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import type { ArtStyle } from '../../shared/art-style';
 import type {
   CharacterPortraitImage,
   CharacterPortraitResolution,
@@ -9,7 +10,7 @@ import type {
 } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
 import type { IllustrationSize, IllustrationStyleReference } from '../../shared/illustration';
-import { ILLUSTRATION_SIZES, ILLUSTRATION_STYLE_GUIDANCE } from '../../shared/illustration';
+import { ILLUSTRATION_SIZES } from '../../shared/illustration';
 import type {
   CreateStoryRequest,
   CreateStoryShotRequest,
@@ -44,14 +45,13 @@ import {
   getOfficialCharacterVisualReferences,
 } from './character-portrait';
 import { getCredentialValue } from './credentials';
-import { getIllustrationWorkspace } from './illustration';
+import { getActiveArtStyle, readActiveArtStyleReference } from './art-style';
 import { readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 
 const API_BASE_URL = 'https://api.apimart.ai';
 const STORE_FILE_NAME = 'stories.json';
 const ASSET_DIRECTORY = 'story-frames';
-const ILLUSTRATION_ASSET_DIRECTORY = 'illustrations';
 const MAX_TITLE_LENGTH = 100;
 const MAX_TEXT_LENGTH = 20_000;
 const MAX_STORED_PROMPT_LENGTH = 50_000;
@@ -261,6 +261,8 @@ function parseVersion(value: unknown): StoryShotVersion | null {
     return null;
   }
   return {
+    artStyleId: typeof value.artStyleId === 'string' ? value.artStyleId : null,
+    artStyleName: typeof value.artStyleName === 'string' ? value.artStyleName : null,
     baseVersion: parseVersionReference(value.baseVersion),
     continuityVersion: parseVersionReference(value.continuityVersion),
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
@@ -976,29 +978,12 @@ function resolveContinuityReference(
   return null;
 }
 
-function resolveStyleReferenceImage(
-  reference: IllustrationStyleReference,
-  workspace: Awaited<ReturnType<typeof getIllustrationWorkspace>>,
-): CharacterPortraitImage | null {
-  if (reference.source === 'uploaded') {
-    const upload = workspace.uploads.find(
-      item => item.id === reference.uploadId && item.fileName === reference.fileName,
-    );
-    return upload
-      ? { fileName: upload.fileName, mimeType: upload.mimeType, url: upload.url }
-      : null;
-  }
-  return (
-    workspace.topics
-      .find(topic => topic.id === reference.topicId)
-      ?.versions.find(
-        version => version.id === reference.versionId && version.status === 'completed',
-      )
-      ?.images.find(image => image.fileName === reference.fileName) ?? null
-  );
-}
-
-function buildPrompt(story: StoryProject, shot: StoryShot, prompt: string): string {
+function buildPrompt(
+  story: StoryProject,
+  shot: StoryShot,
+  prompt: string,
+  artStyle: ArtStyle,
+): string {
   return [
     '你正在创作同一个短篇故事中的一幅连续叙事插画。',
     `故事梗概：${story.draft.summary}`,
@@ -1006,8 +991,11 @@ function buildPrompt(story: StoryProject, shot: StoryShot, prompt: string): stri
     `本镜连续性：${shot.continuity || '保持与前后画面中的角色、场景和时间一致。'}`,
     '参考图中的角色是故事主角。必须保持角色身份、脸型、五官、发型、身材比例、服装、鞋履、配饰和颜色一致，不要重新设计角色。',
     prompt.trim(),
-    '正式画风参考图只用于确认视觉语言，不要复制其中的具体人物动作、道具、环境或构图。',
-    ILLUSTRATION_STYLE_GUIDANCE,
+    artStyle.referenceImage
+      ? '当前画风参考图只用于确认视觉语言，不要复制其中的具体人物动作、道具、环境或构图。'
+      : '',
+    `当前画风：${artStyle.name}`,
+    artStyle.prompt,
     '故事连续性参考图只用于延续角色状态、场景、时间和关键道具，不要照搬上一镜的景别或构图。',
     '只生成一个画面。不要添加标题、大段文字、边框、Logo、水印、漫画格、多格排版、重复人物或重复肢体。',
   ].join('\n');
@@ -1052,24 +1040,17 @@ export async function generateStoryShot(
   const referencePortrait = characterReferences[0]!.selection;
   const referenceSheet = characterReferences[1]?.selection ?? null;
 
-  const illustrationWorkspace = await getIllustrationWorkspace();
-  const referenceStyle = illustrationWorkspace.selectedStyleReference;
-  if (!referenceStyle) {
-    throw new Error('请先在插画管理中选择正式画风参考');
-  }
-  const styleImage = resolveStyleReferenceImage(referenceStyle, illustrationWorkspace);
-  if (!styleImage) {
-    throw new Error('正式画风参考已失效，请重新选择');
-  }
+  const artStyle = await getActiveArtStyle();
 
-  const referenceImages = [
-    ...(await Promise.all(
-      characterReferences.map(reference =>
-        readReferenceImage(reference.directoryName, reference.image),
-      ),
-    )),
-    await readReferenceImage(ILLUSTRATION_ASSET_DIRECTORY, styleImage),
-  ];
+  const referenceImages = await Promise.all(
+    characterReferences.map(reference =>
+      readReferenceImage(reference.directoryName, reference.image),
+    ),
+  );
+  const styleReferenceData = await readActiveArtStyleReference(artStyle);
+  if (styleReferenceData) {
+    referenceImages.push(styleReferenceData);
+  }
 
   let continuityVersion = resolveContinuityReference(story, shot);
   if (continuityVersion) {
@@ -1093,7 +1074,7 @@ export async function generateStoryShot(
     }
   }
 
-  const prompt = buildPrompt(story, shot, request.prompt);
+  const prompt = buildPrompt(story, shot, request.prompt, artStyle);
   const apiKey = await getCredentialValue('apimart');
   const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
     body: JSON.stringify({
@@ -1113,6 +1094,8 @@ export async function generateStoryShot(
 
   const now = new Date().toISOString();
   const version: StoryShotVersion = {
+    artStyleId: artStyle.id,
+    artStyleName: artStyle.name,
     baseVersion,
     continuityVersion,
     createdAt: now,
@@ -1123,7 +1106,7 @@ export async function generateStoryShot(
     prompt,
     referencePortrait: { ...referencePortrait },
     referenceSheet: referenceSheet ? { ...referenceSheet } : null,
-    referenceStyle: { ...referenceStyle },
+    referenceStyle: null,
     resolution: story.resolution,
     size: story.size,
     status: 'submitted',

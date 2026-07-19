@@ -76,7 +76,8 @@ export function createStoryAgent(options: {
   characterDraft: CharacterDraft;
   model: string;
   story: StoryProject;
-  styleReferenceConfigured: boolean;
+  styleName: string;
+  stylePrompt: string;
 }) {
   const deepSeek = createDeepSeek({ apiKey: options.apiKey });
   let currentDraft = options.story.draft;
@@ -112,7 +113,9 @@ export function createStoryAgent(options: {
 当前角色档案：
 ${JSON.stringify(options.characterDraft, null, 2)}
 
-正式画风参考：${options.styleReferenceConfigured ? '已配置' : '未配置，故事可以继续创作，但生成图片前需要用户先选择正式画风'}
+当前画风：${options.styleName}
+画风约束：
+${options.stylePrompt}
 
 当前故事草稿：
 ${JSON.stringify(currentDraft, null, 2)}

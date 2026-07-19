@@ -70,7 +70,7 @@ const apimartConfigured = computed(() => Boolean(apimartStatus.value?.configured
 const characterAssetsReady = computed(() =>
   Boolean(portraitWorkspace.value?.officialAssets.length),
 );
-const styleReady = computed(() => Boolean(illustrationWorkspace.value?.selectedStyleReference));
+const styleReady = computed(() => Boolean(illustrationWorkspace.value?.activeArtStyle));
 const assetsReady = computed(() => characterAssetsReady.value && styleReady.value);
 
 const transport = new DefaultChatTransport<StoryAgentMessage>({

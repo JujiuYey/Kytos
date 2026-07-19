@@ -2,6 +2,14 @@
 import { Camera, Images, SlidersHorizontal, Upload, WandSparkles, Workflow } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { CharacterLibraryCharacter } from '@/types';
 
 type WorkspaceStage = 'portrait' | 'sheet';
 
@@ -9,13 +17,18 @@ defineProps<{
   assetCount: number;
   canvasOpen: boolean;
   cardOpen: boolean;
+  characters: CharacterLibraryCharacter[];
+  characterSelectionDisabled: boolean;
   mobilePane: 'settings' | 'gallery';
+  operationDisabled: boolean;
+  selectedCharacterId: string;
 }>();
 
 const emit = defineEmits<{
   (event: 'ai-create', value: WorkspaceStage): void;
   (event: 'upload'): void;
   (event: 'update:mobilePane', value: 'settings' | 'gallery'): void;
+  (event: 'update:selectedCharacterId', value: string): void;
 }>();
 </script>
 
@@ -35,7 +48,22 @@ const emit = defineEmits<{
     </div>
   </div>
 
-  <Button size="sm" variant="outline" @click="emit('upload')">
+  <Select
+    :model-value="selectedCharacterId"
+    :disabled="characterSelectionDisabled"
+    @update:model-value="emit('update:selectedCharacterId', String($event))"
+  >
+    <SelectTrigger class="w-44 shrink-0" aria-label="选择角色">
+      <SelectValue placeholder="选择角色" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem v-for="character in characters" :key="character.id" :value="character.id">
+        {{ character.name }}
+      </SelectItem>
+    </SelectContent>
+  </Select>
+
+  <Button size="sm" variant="outline" :disabled="operationDisabled" @click="emit('upload')">
     <Upload class="size-4" />
     上传图片
   </Button>
@@ -43,6 +71,7 @@ const emit = defineEmits<{
   <Button
     size="sm"
     :variant="cardOpen ? 'secondary' : 'outline'"
+    :disabled="operationDisabled"
     @click="emit('ai-create', 'portrait')"
   >
     <WandSparkles class="size-4" />
@@ -51,6 +80,7 @@ const emit = defineEmits<{
   <Button
     size="sm"
     :variant="canvasOpen ? 'secondary' : 'outline'"
+    :disabled="operationDisabled"
     @click="emit('ai-create', 'sheet')"
   >
     <Workflow class="size-4" />

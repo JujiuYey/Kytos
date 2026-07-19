@@ -117,7 +117,6 @@ export type {
 export {
   ILLUSTRATION_AGENT_ENDPOINT,
   ILLUSTRATION_SIZES,
-  ILLUSTRATION_STYLE_GUIDANCE,
   createEmptyIllustrationBrief,
 } from '../../shared/illustration';
 export type {

@@ -9,10 +9,10 @@ import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upl
 import { CharacterPortraitWorkflow } from '@/components/sag/character-portrait-workflow';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
-import CharacterContextBar from '@/components/sag/character-context-bar.vue';
 import type {
   CharacterDraft,
   CharacterImageRecord,
+  CharacterLibraryState,
   CharacterPortraitImage,
   CharacterPortraitRecord,
   CharacterPortraitResolution,
@@ -35,6 +35,8 @@ type CreationTarget = 'portrait' | 'sheet';
 type WorkspaceMode = 'cards' | 'canvas';
 
 const router = useRouter();
+const library = ref<CharacterLibraryState | null>(null);
+const selectedCharacterId = ref('');
 const draft = ref<CharacterDraft>(createEmptyCharacterDraft());
 const credentialStatus = ref<CredentialStatus | null>(null);
 const records = ref<CharacterPortraitRecord[]>([]);
@@ -71,13 +73,33 @@ const mobilePane = ref<'settings' | 'gallery'>('settings');
 
 let portraitPollTimer: ReturnType<typeof setTimeout> | null = null;
 let isDisposed = false;
+let loadRequestId = 0;
 
 const activeStatuses = ['submitted', 'pending', 'processing'];
+const characters = computed(() => library.value?.characters ?? []);
 const activeRecord = computed(() =>
   records.value.find(record => activeStatuses.includes(record.status)),
 );
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
 const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
+const characterSelectionDisabled = computed(
+  () =>
+    isInitializing.value ||
+    isBusy.value ||
+    workspaceMode.value === 'canvas' ||
+    Boolean(selectingFileName.value) ||
+    Boolean(renamingFileName.value) ||
+    Boolean(deletingFileName.value),
+);
+const operationDisabled = computed(
+  () =>
+    isInitializing.value ||
+    isBusy.value ||
+    !selectedCharacterId.value ||
+    Boolean(selectingFileName.value) ||
+    Boolean(renamingFileName.value) ||
+    Boolean(deletingFileName.value),
+);
 const assetCount = computed(
   () =>
     records.value.reduce((total, record) => total + record.images.length, 0) +
@@ -87,6 +109,7 @@ const isGenerateDisabled = computed(
   () =>
     isInitializing.value ||
     isBusy.value ||
+    !selectedCharacterId.value ||
     !keyConfigured.value ||
     !imageName.value.trim() ||
     imageName.value.length > 80 ||
@@ -109,7 +132,6 @@ function buildPortraitPrompt(character: CharacterDraft): string {
     '为以下原创角色绘制一张专业定妆照。',
     ...characterDetails,
     '画面要求：单一角色，全身正面站立，自然中性姿态，完整展示头部、发型、五官、服装、鞋履与标志性配饰；人物居中，比例准确，轮廓清晰，服装材质和细节可辨识。',
-    '背景要求：干净的浅灰色摄影棚背景，柔和均匀布光，不使用复杂场景。',
     '禁止：裁切人物、多人、多视角拼贴、设定表排版、文字、标注、Logo、水印。',
   ].join('\n');
 }
@@ -169,51 +191,112 @@ async function pollPortraitTask(taskId: string) {
   }
 }
 
-async function initialize() {
+function applyCharacterWorkspace(
+  characterDraft: CharacterDraft,
+  portraitWorkspace: CharacterPortraitWorkspaceState,
+): void {
+  draft.value = characterDraft;
+  applyWorkspace(portraitWorkspace);
+
+  const latestGeneratedRecord = portraitWorkspace.records.find(
+    record => record.source === 'generated',
+  );
+  prompt.value = latestGeneratedRecord?.prompt || buildPortraitPrompt(characterDraft);
+  imageName.value = latestGeneratedRecord?.name || '定妆照';
+  size.value = latestGeneratedRecord?.size ?? '2:3';
+  resolution.value = latestGeneratedRecord?.resolution ?? '1k';
+  count.value = latestGeneratedRecord?.count ?? 2;
+
+  const unfinishedRecord = portraitWorkspace.records.find(record =>
+    activeStatuses.includes(record.status),
+  );
+  const unfinishedSheet = portraitWorkspace.sheetRecords.find(record =>
+    activeStatuses.includes(record.status),
+  );
+  if (unfinishedRecord) {
+    schedulePoll(unfinishedRecord.id);
+  }
+  if (unfinishedSheet) {
+    workspaceMode.value = 'canvas';
+    generatorOpen.value = false;
+  }
+  if (unfinishedRecord || unfinishedSheet) {
+    mobilePane.value = 'gallery';
+  }
+}
+
+async function loadCharacterWorkspace(characterId: string): Promise<void> {
+  const requestId = ++loadRequestId;
+  clearPollTimer();
+  isPolling.value = false;
+  isInitializing.value = true;
+  errorMessage.value = '';
+  records.value = [];
+  sheetRecords.value = [];
+  officialAssets.value = [];
+  try {
+    const [characterWorkspace, portraitWorkspace] = await Promise.all([
+      window.desktop.getCharacterWorkspace(),
+      window.desktop.getCharacterPortraitWorkspace({ characterId }),
+    ]);
+    if (requestId !== loadRequestId || selectedCharacterId.value !== characterId) {
+      return;
+    }
+    applyCharacterWorkspace(characterWorkspace.draft, portraitWorkspace);
+  } catch (initializationError: unknown) {
+    if (requestId !== loadRequestId) {
+      return;
+    }
+    errorMessage.value =
+      initializationError instanceof Error
+        ? initializationError.message
+        : String(initializationError);
+  } finally {
+    if (requestId === loadRequestId) {
+      isInitializing.value = false;
+    }
+  }
+}
+
+async function initialize(): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   try {
-    const [characterWorkspace, portraitWorkspace, status] = await Promise.all([
-      window.desktop.getCharacterWorkspace(),
-      window.desktop.getCharacterPortraitWorkspace(),
+    const [characterLibrary, status] = await Promise.all([
+      window.desktop.getCharacterLibrary(),
       window.desktop.getCredentialStatus('apimart'),
     ]);
-    draft.value = characterWorkspace.draft;
-    applyWorkspace(portraitWorkspace);
+    library.value = characterLibrary;
     credentialStatus.value = status;
-
-    const latestGeneratedRecord = portraitWorkspace.records.find(
-      record => record.source === 'generated',
-    );
-    prompt.value = latestGeneratedRecord?.prompt || buildPortraitPrompt(characterWorkspace.draft);
-    if (latestGeneratedRecord) {
-      size.value = latestGeneratedRecord.size;
-      resolution.value = latestGeneratedRecord.resolution;
-      count.value = latestGeneratedRecord.count;
-    }
-
-    const unfinishedRecord = portraitWorkspace.records.find(record =>
-      activeStatuses.includes(record.status),
-    );
-    const unfinishedSheet = portraitWorkspace.sheetRecords.find(record =>
-      activeStatuses.includes(record.status),
-    );
-    if (unfinishedRecord) {
-      schedulePoll(unfinishedRecord.id);
-    }
-    if (unfinishedSheet) {
-      workspaceMode.value = 'canvas';
-      generatorOpen.value = false;
-    }
-    if (unfinishedRecord || unfinishedSheet) {
-      mobilePane.value = 'gallery';
-    }
+    selectedCharacterId.value = characterLibrary.activeCharacterId;
+    await loadCharacterWorkspace(characterLibrary.activeCharacterId);
   } catch (initializationError: unknown) {
     errorMessage.value =
       initializationError instanceof Error
         ? initializationError.message
         : String(initializationError);
   } finally {
+    isInitializing.value = false;
+  }
+}
+
+async function selectCharacter(characterId: string): Promise<void> {
+  if (
+    characterSelectionDisabled.value ||
+    characterId === selectedCharacterId.value ||
+    !characters.value.some(character => character.id === characterId)
+  ) {
+    return;
+  }
+  isInitializing.value = true;
+  errorMessage.value = '';
+  try {
+    library.value = await window.desktop.selectCharacter({ characterId });
+    selectedCharacterId.value = characterId;
+    await loadCharacterWorkspace(characterId);
+  } catch (selectionError: unknown) {
+    errorMessage.value =
+      selectionError instanceof Error ? selectionError.message : String(selectionError);
     isInitializing.value = false;
   }
 }
@@ -257,6 +340,9 @@ function closeGenerator(): void {
 }
 
 function openGenerator(stage: CreationTarget): void {
+  if (operationDisabled.value) {
+    return;
+  }
   if (stage === 'sheet') {
     workspaceMode.value = 'canvas';
     generatorOpen.value = false;
@@ -270,7 +356,11 @@ function openGenerator(stage: CreationTarget): void {
 
 async function refreshPortraitWorkspace(): Promise<void> {
   try {
-    applyWorkspace(await window.desktop.getCharacterPortraitWorkspace());
+    applyWorkspace(
+      await window.desktop.getCharacterPortraitWorkspace({
+        characterId: selectedCharacterId.value,
+      }),
+    );
   } catch (refreshError: unknown) {
     errorMessage.value =
       refreshError instanceof Error ? refreshError.message : String(refreshError);
@@ -339,16 +429,26 @@ async function deleteAsset() {
 }
 
 function openUpload() {
+  if (operationDisabled.value) {
+    return;
+  }
   uploadDialogOpen.value = true;
 }
 
 function uploadVisualAsset(request: UploadCharacterVisualAssetRequest): Promise<SavedFileResult> {
+  if (!selectedCharacterId.value) {
+    return Promise.reject(new Error('请先选择角色'));
+  }
   return window.desktop.uploadCharacterVisualAsset(request);
 }
 
 async function handleUploaded() {
   try {
-    applyWorkspace(await window.desktop.getCharacterPortraitWorkspace());
+    applyWorkspace(
+      await window.desktop.getCharacterPortraitWorkspace({
+        characterId: selectedCharacterId.value,
+      }),
+    );
     mobilePane.value = 'gallery';
     toast.success('角色视觉图片已上传');
   } catch (uploadError: unknown) {
@@ -405,18 +505,19 @@ onBeforeUnmount(() => {
 
 <template>
   <SagPage>
-    <template #before-header>
-      <CharacterContextBar active-section="character-portrait" />
-    </template>
-
     <template #header>
       <PortraitPageHeader
         v-model:mobile-pane="mobilePane"
+        :characters="characters"
+        :character-selection-disabled="characterSelectionDisabled"
         :asset-count="assetCount"
         :canvas-open="workspaceMode === 'canvas'"
         :card-open="workspaceMode === 'cards' && generatorOpen"
+        :operation-disabled="operationDisabled"
+        :selected-character-id="selectedCharacterId"
         @ai-create="openGenerator"
         @upload="openUpload"
+        @update:selected-character-id="selectCharacter"
       />
     </template>
 

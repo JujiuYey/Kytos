@@ -9,6 +9,7 @@ import { getWorkspaceDirectory } from './services/workspace';
 const APP_SCHEME = 'app';
 const APP_HOST = 'bundle';
 const WORKSPACE_IMAGE_DIRECTORIES = [
+  'art-styles',
   'character-expressions',
   'character-portraits',
   'character-sheets',
@@ -21,11 +22,11 @@ export function registerAppScheme(): void {
     {
       scheme: APP_SCHEME,
       privileges: {
-        standard: true,
-        secure: true,
-        supportFetchAPI: true,
-        corsEnabled: true,
-        stream: true,
+        standard: true,        // 当成标准协议,URL 解析更严格
+        secure: true,          // 标记为 https 同级,允许 Service Worker 等
+        supportFetchAPI: true, // 允许 fetch()
+        corsEnabled: true,     // 允许跨域请求
+        stream: true,          // 支持流式响应
       },
     },
   ]);

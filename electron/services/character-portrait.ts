@@ -28,6 +28,7 @@ import {
   MAX_CHARACTER_SHEET_REFERENCE_IMAGES,
 } from '../../shared/character-portrait';
 import type { SaveFileRequest, SavedFileResult } from '../../shared/desktop';
+import { getActiveArtStyle, readActiveArtStyleReference } from './art-style';
 import { getActiveCharacterDirectory, getCharacterDirectory } from './character-library';
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
@@ -38,6 +39,7 @@ const PORTRAIT_STORE_FILE_NAME = 'character-portraits.json';
 const PORTRAIT_ASSET_DIRECTORY = 'character-portraits';
 const SHEET_ASSET_DIRECTORY = 'character-sheets';
 const MAX_PROMPT_LENGTH = 20_000;
+const MAX_STORED_PROMPT_LENGTH = 50_000;
 const MAX_NAME_LENGTH = 80;
 const MAX_REFERENCE_IMAGE_SIZE = 20 * 1024 * 1024;
 const TASK_ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/;
@@ -119,7 +121,7 @@ function parsePortraitRecord(value: unknown): CharacterPortraitRecord | null {
     typeof value.id !== 'string' ||
     !TASK_ID_PATTERN.test(value.id) ||
     typeof value.prompt !== 'string' ||
-    value.prompt.length > MAX_PROMPT_LENGTH ||
+    value.prompt.length > MAX_STORED_PROMPT_LENGTH ||
     !isPortraitSize(value.size) ||
     !isPortraitResolution(value.resolution) ||
     typeof value.count !== 'number' ||
@@ -164,7 +166,7 @@ function parseSheetRecord(value: unknown): CharacterSheetRecord | null {
     typeof value.id !== 'string' ||
     !TASK_ID_PATTERN.test(value.id) ||
     typeof value.prompt !== 'string' ||
-    value.prompt.length > MAX_PROMPT_LENGTH ||
+    value.prompt.length > MAX_STORED_PROMPT_LENGTH ||
     value.size !== CHARACTER_SHEET_SIZE ||
     !isPortraitResolution(value.resolution) ||
     !isTaskStatus(value.status)
@@ -876,15 +878,22 @@ export async function generateCharacterPortrait(
   request: GenerateCharacterPortraitRequest,
 ): Promise<CharacterPortraitRecord> {
   validateGenerateRequest(request);
+  const artStyle = await getActiveArtStyle();
+  const prompt = [request.prompt.trim(), `当前画风：${artStyle.name}`, artStyle.prompt].join('\n');
+  const styleReferenceData = await readActiveArtStyleReference(artStyle);
   const apiKey = await getCredentialValue('apimart');
+  const body: Record<string, unknown> = {
+    model: 'gpt-image-2',
+    n: request.count,
+    prompt,
+    resolution: request.resolution,
+    size: request.size,
+  };
+  if (styleReferenceData) {
+    body.image_urls = [styleReferenceData];
+  }
   const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
-    body: JSON.stringify({
-      model: 'gpt-image-2',
-      prompt: request.prompt.trim(),
-      n: request.count,
-      size: request.size,
-      resolution: request.resolution,
-    }),
+    body: JSON.stringify(body),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
@@ -896,7 +905,7 @@ export async function generateCharacterPortrait(
   const record: CharacterPortraitRecord = {
     ...request,
     name: request.name.trim(),
-    prompt: request.prompt.trim(),
+    prompt,
     createdAt: now,
     errorMessage: null,
     id: getSubmittedTaskId(payload),
@@ -1009,6 +1018,14 @@ export async function generateCharacterSheet(
       return `data:${image.mimeType};base64,${referenceData.toString('base64')}`;
     }),
   );
+  const artStyle = await getActiveArtStyle();
+  const prompt = [request.prompt.trim(), `当前画风：${artStyle.name}`, artStyle.prompt].join('\n');
+  if (referenceImageUrls.length < MAX_CHARACTER_SHEET_REFERENCE_IMAGES) {
+    const styleReferenceData = await readActiveArtStyleReference(artStyle);
+    if (styleReferenceData) {
+      referenceImageUrls.push(styleReferenceData);
+    }
+  }
 
   const apiKey = await getCredentialValue('apimart');
   const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
@@ -1016,7 +1033,7 @@ export async function generateCharacterSheet(
       image_urls: referenceImageUrls,
       model: 'gpt-image-2',
       n: 1,
-      prompt: request.prompt.trim(),
+      prompt,
       resolution: request.resolution,
       size: CHARACTER_SHEET_SIZE,
     }),
@@ -1037,7 +1054,7 @@ export async function generateCharacterSheet(
     name: request.name.trim(),
     originalName: null,
     progress: 0,
-    prompt: request.prompt.trim(),
+    prompt,
     referenceAssets,
     referenceImage: referenceAssets[0]
       ? { fileName: referenceAssets[0].fileName, taskId: referenceAssets[0].taskId }

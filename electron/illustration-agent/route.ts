@@ -2,7 +2,8 @@ import { createAgentUIStreamResponse } from 'ai';
 import { DEFAULT_DEEPSEEK_MODEL } from '../../shared/character';
 import { loadCharacterDraft } from '../services/character-workspace';
 import { getCredentialValue } from '../services/credentials';
-import { getIllustrationTopic, getIllustrationWorkspace } from '../services/illustration';
+import { getIllustrationTopic } from '../services/illustration';
+import { getActiveArtStyle } from '../services/art-style';
 import { createIllustrationAgent } from './agent';
 
 interface IllustrationAgentRequestBody {
@@ -66,17 +67,18 @@ export async function handleIllustrationAgentRequest(request: Request): Promise<
       throw new Error('插画对话请求过大');
     }
     const body = parseRequestBody(await request.json());
-    const [apiKey, characterDraft, topic, workspace] = await Promise.all([
+    const [apiKey, characterDraft, topic, artStyle] = await Promise.all([
       getCredentialValue('deepseek'),
       loadCharacterDraft(),
       getIllustrationTopic(body.topicId),
-      getIllustrationWorkspace(),
+      getActiveArtStyle(),
     ]);
     const agent = createIllustrationAgent({
       apiKey,
       characterDraft,
       model: resolveModel(body.model),
-      styleReferenceConfigured: Boolean(workspace.selectedStyleReference),
+      styleName: artStyle.name,
+      stylePrompt: artStyle.prompt,
       topic,
     });
     return await createAgentUIStreamResponse({

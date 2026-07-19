@@ -1,4 +1,5 @@
 import type { BrowserWindow } from 'electron';
+import { registerArtStyleIpc } from './art-style';
 import { registerCharacterExpressionIpc } from './character-expression';
 import { registerCharacterIpc } from './character';
 import { registerCharacterLibraryIpc } from './character-library';
@@ -12,6 +13,7 @@ import { createTrustedSenderGuard } from './trusted-sender';
 
 export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): void {
   const assertTrustedSender = createTrustedSenderGuard(getMainWindow);
+  registerArtStyleIpc(assertTrustedSender);
   registerCharacterIpc(assertTrustedSender);
   registerCharacterLibraryIpc(assertTrustedSender);
   registerCharacterExpressionIpc(assertTrustedSender);

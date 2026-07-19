@@ -27,6 +27,8 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import type {
+  ArtStyle,
+  ArtStyleWorkspaceState,
   CharacterImageRecord,
   CharacterPortraitImage,
   CharacterPortraitResolution,
@@ -54,11 +56,14 @@ const emit = defineEmits<{
 
 const nodes = shallowRef<WorkflowNode[]>([]);
 const edges = shallowRef<Edge[]>([]);
+const artStyles = ref<ArtStyle[]>([]);
+const selectedArtStyleId = ref('');
 const assetOptions = ref<WorkflowAssetOption[]>([]);
 const selectedNodeId = ref('generator');
 const credentialStatus = ref<CredentialStatus | null>(null);
 const isInitializing = ref(true);
 const isSubmitting = ref(false);
+const isSelectingArtStyle = ref(false);
 const errorMessage = ref('');
 const inspectorOpen = ref(false);
 const canvasSection = ref<HTMLElement | null>(null);
@@ -101,7 +106,9 @@ const generateDisabled = computed(() => {
     isInitializing.value ||
     isSubmitting.value ||
     ACTIVE_STATUSES.includes(generator.data.status) ||
+    isSelectingArtStyle.value ||
     !keyConfigured.value ||
+    !selectedArtStyleId.value ||
     connectedAssetCount.value < 1 ||
     connectedAssetCount.value > MAX_CHARACTER_SHEET_REFERENCE_IMAGES ||
     !resultNode ||
@@ -420,6 +427,34 @@ function updateGeneratorResolution(value: CharacterPortraitResolution): void {
   nodes.value = [...nodes.value];
 }
 
+async function updateArtStyle(styleId: string): Promise<void> {
+  if (
+    isSelectingArtStyle.value ||
+    isSubmitting.value ||
+    styleId === selectedArtStyleId.value ||
+    !artStyles.value.some(style => style.id === styleId)
+  ) {
+    return;
+  }
+  isSelectingArtStyle.value = true;
+  try {
+    const workspace = await window.desktop.selectArtStyle({ id: styleId });
+    applyArtStyleWorkspace(workspace);
+    toast.success(
+      `已使用“${artStyles.value.find(style => style.id === styleId)?.name || '所选画风'}”`,
+    );
+  } catch (styleError: unknown) {
+    toast.error(styleError instanceof Error ? styleError.message : String(styleError));
+  } finally {
+    isSelectingArtStyle.value = false;
+  }
+}
+
+function applyArtStyleWorkspace(workspace: ArtStyleWorkspaceState): void {
+  artStyles.value = workspace.styles;
+  selectedArtStyleId.value = workspace.activeStyleId;
+}
+
 function updateGeneratorStatus(
   generatorId: string,
   update: Partial<Omit<WorkflowGeneratorNodeData, 'kind'>>,
@@ -560,11 +595,13 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   try {
-    const [workspace, status] = await Promise.all([
+    const [workspace, status, artStyleWorkspace] = await Promise.all([
       window.desktop.getCharacterPortraitWorkspace(),
       window.desktop.getCredentialStatus('apimart'),
+      window.desktop.getArtStyleWorkspace(),
     ]);
     credentialStatus.value = status;
+    applyArtStyleWorkspace(artStyleWorkspace);
     assetOptions.value = createAssetOptions(workspace);
     initializeGraph(workspace, assetOptions.value);
   } catch (initializationError: unknown) {
@@ -714,11 +751,15 @@ onBeforeUnmount(() => {
                   <SheetDescription>当前工作流节点属性</SheetDescription>
                 </SheetHeader>
                 <WorkflowInspector
+                  :art-style-disabled="isSelectingArtStyle || isSubmitting"
+                  :art-styles="artStyles"
                   :asset-options="assetOptions"
                   :generate-disabled="generateDisabled"
                   :node="selectedNode"
                   :reference-count="connectedAssetCount"
+                  :selected-art-style-id="selectedArtStyleId"
                   @generate="generateFromNode()"
+                  @update-art-style="updateArtStyle"
                   @update-asset="updateAsset"
                   @update-name="updateGeneratorName"
                   @update-prompt="updatePrompt"
@@ -732,12 +773,16 @@ onBeforeUnmount(() => {
 
       <div class="hidden min-h-0 min-w-0 p-3 md:flex md:p-4">
         <WorkflowInspector
+          :art-style-disabled="isSelectingArtStyle || isSubmitting"
+          :art-styles="artStyles"
           :asset-options="assetOptions"
           :generate-disabled="generateDisabled"
           :node="selectedNode"
           :reference-count="connectedAssetCount"
+          :selected-art-style-id="selectedArtStyleId"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @generate="generateFromNode()"
+          @update-art-style="updateArtStyle"
           @update-asset="updateAsset"
           @update-name="updateGeneratorName"
           @update-prompt="updatePrompt"

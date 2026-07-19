@@ -312,7 +312,7 @@ function handleTitleChange(event: Event): void {
                 @click="emit('manage-assets')"
               >
                 <Palette class="size-4" />
-                准备角色和画风参考
+                准备角色和画风
               </Button>
               <Button
                 v-if="!apimartConfigured"

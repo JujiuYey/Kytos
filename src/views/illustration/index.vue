@@ -13,13 +13,13 @@ import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {
   CharacterPortraitResolution,
+  ArtStyle,
   CharacterPortraitImage,
   CharacterPortraitWorkspaceState,
   CredentialStatus,
   IllustrationAgentMessage,
   IllustrationBriefUpdateResult,
   IllustrationSize,
-  IllustrationStyleReference,
   IllustrationTopic,
   IllustrationVersion,
   IllustrationVersionReference,
@@ -39,7 +39,7 @@ const activeTopicId = ref('');
 const deepseekStatus = ref<CredentialStatus | null>(null);
 const apimartStatus = ref<CredentialStatus | null>(null);
 const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
-const selectedStyleReference = ref<IllustrationStyleReference | null>(null);
+const activeArtStyle = ref<ArtStyle | null>(null);
 const initializationError = ref('');
 const generationError = ref('');
 const isInitializing = ref(true);
@@ -69,22 +69,7 @@ const characterReferenceImages = computed<CharacterPortraitImage[]>(() =>
   }),
 );
 const styleReferenceImage = computed<CharacterPortraitImage | null>(() => {
-  const reference = selectedStyleReference.value;
-  if (!reference) {
-    return null;
-  }
-  if (reference.source === 'uploaded') {
-    const upload = uploads.value.find(item => item.id === reference.uploadId);
-    return upload
-      ? { fileName: upload.fileName, mimeType: upload.mimeType, url: upload.url }
-      : null;
-  }
-  return (
-    topics.value
-      .find(topic => topic.id === reference.topicId)
-      ?.versions.find(version => version.id === reference.versionId)
-      ?.images.find(image => image.fileName === reference.fileName) ?? null
-  );
+  return activeArtStyle.value?.referenceImage ?? null;
 });
 
 function findOfficialVisualImage(index: number): CharacterPortraitImage | null {
@@ -221,7 +206,7 @@ async function initialize(): Promise<void> {
     ]);
     topics.value = workspace.topics;
     uploads.value = workspace.uploads;
-    selectedStyleReference.value = workspace.selectedStyleReference;
+    activeArtStyle.value = workspace.activeArtStyle;
     deepseekStatus.value = deepseek;
     apimartStatus.value = apimart;
     portraitWorkspace.value = portraits;
@@ -518,6 +503,7 @@ onBeforeUnmount(() => {
       >
         <IllustrationWorkspacePanel
           :apimart-configured="apimartConfigured"
+          :art-style="activeArtStyle!"
           :base-reference="baseReference"
           :busy="generationBusy"
           :prompt="prompt"
@@ -531,7 +517,7 @@ onBeforeUnmount(() => {
           @clear-base="baseReference = null"
           @delete-version="deleteVersionTarget = $event"
           @generate="generate"
-          @manage-style="router.push('/illustration-library')"
+          @manage-style="router.push('/art-style')"
           @rename="renameTopic"
           @select-base="baseReference = $event"
           @update:prompt="prompt = $event"

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopApi } from '../shared/desktop';
 
 const desktopApi: DesktopApi = {
+  deleteArtStyle: request => ipcRenderer.invoke('art-style:delete', request),
   createCharacter: request => ipcRenderer.invoke('character-library:create-character', request),
   createStory: request => ipcRenderer.invoke('story:create', request),
   createStoryShot: request => ipcRenderer.invoke('story:create-shot', request),
@@ -27,6 +28,7 @@ const desktopApi: DesktopApi = {
   generateStoryShot: request => ipcRenderer.invoke('story:generate-shot', request),
   getCharacterExpressionTask: request =>
     ipcRenderer.invoke('character-expression:get-task', request),
+  getArtStyleWorkspace: () => ipcRenderer.invoke('art-style:get-workspace'),
   getCharacterExpressionWorkspace: request =>
     ipcRenderer.invoke('character-expression:get-workspace', request),
   getCharacterLibrary: () => ipcRenderer.invoke('character-library:get'),
@@ -47,6 +49,7 @@ const desktopApi: DesktopApi = {
   renameCharacterVisualAsset: request => ipcRenderer.invoke('character-visual:rename', request),
   selectDirectory: () => ipcRenderer.invoke('dialog:select-directory'),
   saveFile: request => ipcRenderer.invoke('file:save', request),
+  saveArtStyle: request => ipcRenderer.invoke('art-style:save', request),
   saveCharacterProfile: request => ipcRenderer.invoke('character:save-profile', request),
   saveIllustrationConversation: request =>
     ipcRenderer.invoke('illustration:save-conversation', request),
@@ -56,6 +59,7 @@ const desktopApi: DesktopApi = {
   selectCharacterSheet: request => ipcRenderer.invoke('character-sheet:select', request),
   selectIllustrationStyleReference: request =>
     ipcRenderer.invoke('illustration:select-style-reference', request),
+  selectArtStyle: request => ipcRenderer.invoke('art-style:select', request),
   selectStoryShotVersion: request => ipcRenderer.invoke('story:select-shot-version', request),
   setCredential: request => ipcRenderer.invoke('credential:set', request),
   setCharacterVisualAssetOfficial: request =>

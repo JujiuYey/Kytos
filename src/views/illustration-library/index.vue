@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  Check,
   Clock3,
   Image as ImageIcon,
   ImagePlus,
@@ -25,8 +24,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
-import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
+  ArtStyle,
   CharacterPortraitImage,
   IllustrationTopic,
   IllustrationStyleReference,
@@ -54,7 +53,19 @@ interface IllustrationLibraryItem {
 }
 
 const router = useRouter();
+const fallbackArtStyle: ArtStyle = {
+  createdAt: '',
+  description: '',
+  id: '',
+  name: '',
+  palette: [],
+  prompt: '',
+  referenceImage: null,
+  source: 'preset',
+  updatedAt: '',
+};
 const workspace = ref<IllustrationWorkspaceState>({
+  activeArtStyle: fallbackArtStyle,
   selectedStyleReference: null,
   topics: [],
   uploads: [],
@@ -198,18 +209,6 @@ function formatDate(value: string): string {
   }).format(date);
 }
 
-function isStyleReference(item: IllustrationLibraryItem): boolean {
-  const selected = workspace.value.selectedStyleReference;
-  if (!selected || selected.source !== item.styleReference.source) {
-    return false;
-  }
-  return selected.source === 'uploaded'
-    ? selected.uploadId === item.uploadId && selected.fileName === item.image.fileName
-    : selected.topicId === item.topicId &&
-        selected.versionId === item.versionId &&
-        selected.fileName === item.image.fileName;
-}
-
 async function loadWorkspace(): Promise<void> {
   loading.value = true;
   loadingError.value = '';
@@ -232,13 +231,16 @@ async function handleUploaded(): Promise<void> {
 }
 
 async function selectStyleReference(item: IllustrationLibraryItem): Promise<void> {
-  if (selectingStyleItemId.value || isStyleReference(item)) {
+  if (selectingStyleItemId.value) {
     return;
   }
   selectingStyleItemId.value = item.id;
   try {
-    workspace.value = await window.desktop.selectIllustrationStyleReference(item.styleReference);
-    toast.success('已设为正式画风参考');
+    workspace.value = await window.desktop.selectIllustrationStyleReference({
+      ...item.styleReference,
+      name: item.title,
+    });
+    toast.success('已导入画风管理并设为当前画风');
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : String(error));
   } finally {
@@ -294,9 +296,7 @@ onMounted(() => {
               {{ libraryItems.length }}
             </Badge>
           </div>
-          <p class="hidden text-xs text-muted-foreground sm:block">
-            统一查看插画资产并选定正式画风参考
-          </p>
+          <p class="hidden text-xs text-muted-foreground sm:block">统一查看、上传和整理插画资产</p>
         </div>
       </div>
 
@@ -404,19 +404,14 @@ onMounted(() => {
                 <span class="truncate">{{ formatDate(item.createdAt) }}</span>
               </span>
               <div class="flex shrink-0 items-center gap-1">
-                <SagStatusBadge v-if="isStyleReference(item)" tone="success">
-                  <Check class="size-3" />
-                  正式画风
-                </SagStatusBadge>
                 <Button
-                  v-else
                   size="sm"
                   variant="outline"
                   :disabled="Boolean(selectingStyleItemId)"
                   @click="selectStyleReference(item)"
                 >
                   <Palette class="size-4" />
-                  {{ selectingStyleItemId === item.id ? '设置中' : '设为画风' }}
+                  {{ selectingStyleItemId === item.id ? '导入中' : '导入画风' }}
                 </Button>
                 <TooltipProvider :delay-duration="300">
                   <Tooltip>
@@ -425,16 +420,14 @@ onMounted(() => {
                         size="icon"
                         variant="ghost"
                         class="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                        :disabled="Boolean(deletingItemId) || isStyleReference(item)"
+                        :disabled="Boolean(deletingItemId)"
                         :aria-label="`删除${item.title}`"
                         @click="deleteTarget = item"
                       >
                         <Trash2 class="size-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      {{ isStyleReference(item) ? '正式画风参考不能删除' : '删除插画' }}
-                    </TooltipContent>
+                    <TooltipContent> 删除插画 </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>

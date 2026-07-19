@@ -30,6 +30,11 @@ export interface SaveArtStyleRequest {
   id?: string;
   name: string;
   prompt: string;
+  referenceImage?: {
+    fileData: Uint8Array;
+    fileName: string;
+    mimeType: string;
+  } | null;
 }
 
 export interface DeleteArtStyleRequest {
