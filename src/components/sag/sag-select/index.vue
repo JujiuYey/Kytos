@@ -2,6 +2,7 @@
 import type { AcceptableValue } from 'reka-ui';
 import { X } from 'lucide-vue-next';
 import { isNil } from 'es-toolkit';
+import { computed } from 'vue';
 
 interface Option {
   label: string;

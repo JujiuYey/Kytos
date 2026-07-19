@@ -15,6 +15,7 @@ function openExternalUrl(url: string): void {
 
 export function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
+    title: 'Kytos',
     width: 1200,
     height: 800,
     minWidth: 800,

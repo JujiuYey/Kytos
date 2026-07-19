@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { Input } from '@/components/ui/input';
 import { Search, Box } from 'lucide-vue-next';
 
-const props = withDefaults(defineProps<{
-  list?: Recordable[];
-  current?: string;
-}>(), {
-  list: () => [],
-  current: '',
-});
+const props = withDefaults(
+  defineProps<{
+    list?: Recordable[];
+    current?: string;
+  }>(),
+  {
+    list: () => [],
+    current: '',
+  },
+);
 
 const emit = defineEmits<{
   (e: 'select', id: string): void;
@@ -22,9 +25,7 @@ const filteredList = computed(() => {
     return props.list;
   }
   const query = searchQuery.value.toLowerCase();
-  return props.list.filter((item: Recordable) =>
-    item.name.toLowerCase().includes(query),
-  );
+  return props.list.filter((item: Recordable) => item.name.toLowerCase().includes(query));
 });
 
 function handleSelect(id: string) {
@@ -37,12 +38,7 @@ function handleSelect(id: string) {
     <div class="mb-4">
       <div class="relative">
         <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          v-model="searchQuery"
-          type="search"
-          placeholder="搜索..."
-          class="w-full pl-8"
-        />
+        <Input v-model="searchQuery" type="search" placeholder="搜索..." class="w-full pl-8" />
       </div>
     </div>
 

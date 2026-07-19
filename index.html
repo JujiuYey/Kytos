@@ -1,124 +1,122 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kytos</title>
+  </head>
 
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bridge-demo</title>
-</head>
-
-<body>
-  <div id="app">
-    <style>
-      html,
-      body {
-        padding: 0;
-        margin: 0;
-      }
-
-      .first-loading-wrap {
-        display: flex;
-        width: 100%;
-        height: 100vh;
-        justify-content: center;
-        align-items: center;
-        flex-direction: column;
-      }
-
-      .first-loading-wrap>h1 {
-        font-size: 128px;
-      }
-
-      .first-loading-wrap .loading-wrap {
-        padding: 98px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-
-      .dot {
-        animation: fierce-rotate 1.2s infinite linear;
-        transform: rotate(45deg);
-        position: relative;
-        display: inline-block;
-        width: 48px;
-        height: 48px;
-        box-sizing: border-box;
-      }
-
-      .dot i {
-        width: 24px;
-        height: 24px;
-        position: absolute;
-        display: block;
-        background-color: #1677ff;
-        border-radius: 100%;
-        transform: scale(0.75);
-        transform-origin: 50% 50%;
-        opacity: 0.3;
-        animation: fierce-spin-move 1s infinite linear alternate;
-      }
-
-      .dot i:nth-child(1) {
-        top: 0;
-        left: 0;
-      }
-
-      .dot i:nth-child(2) {
-        top: 0;
-        right: 0;
-        -webkit-animation-delay: 0.4s;
-        animation-delay: 0.4s;
-      }
-
-      .dot i:nth-child(3) {
-        right: 0;
-        bottom: 0;
-        -webkit-animation-delay: 0.8s;
-        animation-delay: 0.8s;
-      }
-
-      .dot i:nth-child(4) {
-        bottom: 0;
-        left: 0;
-        -webkit-animation-delay: 1.2s;
-        animation-delay: 1.2s;
-      }
-
-      @keyframes fierce-rotate {
-        to {
-          -webkit-transform: rotate(405deg);
-          transform: rotate(405deg);
+  <body>
+    <div id="app">
+      <style>
+        html,
+        body {
+          padding: 0;
+          margin: 0;
         }
-      }
 
-      @-webkit-keyframes fierce-rotate {
-        to {
-          -webkit-transform: rotate(405deg);
-          transform: rotate(405deg);
+        .first-loading-wrap {
+          display: flex;
+          width: 100%;
+          height: 100vh;
+          justify-content: center;
+          align-items: center;
+          flex-direction: column;
         }
-      }
 
-      @keyframes fierce-spin-move {
-        to {
-          opacity: 1;
+        .first-loading-wrap > h1 {
+          font-size: 128px;
         }
-      }
 
-      @-webkit-keyframes fierce-spin-move {
-        to {
-          opacity: 1;
+        .first-loading-wrap .loading-wrap {
+          padding: 98px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
         }
-      }
-    </style>
-    <div class="first-loading-wrap">
-      <div class="loading-wrap">
-        <span class="dot dot-spin"><i></i><i></i><i></i><i></i></span>
+
+        .dot {
+          animation: fierce-rotate 1.2s infinite linear;
+          transform: rotate(45deg);
+          position: relative;
+          display: inline-block;
+          width: 48px;
+          height: 48px;
+          box-sizing: border-box;
+        }
+
+        .dot i {
+          width: 24px;
+          height: 24px;
+          position: absolute;
+          display: block;
+          background-color: #1677ff;
+          border-radius: 100%;
+          transform: scale(0.75);
+          transform-origin: 50% 50%;
+          opacity: 0.3;
+          animation: fierce-spin-move 1s infinite linear alternate;
+        }
+
+        .dot i:nth-child(1) {
+          top: 0;
+          left: 0;
+        }
+
+        .dot i:nth-child(2) {
+          top: 0;
+          right: 0;
+          -webkit-animation-delay: 0.4s;
+          animation-delay: 0.4s;
+        }
+
+        .dot i:nth-child(3) {
+          right: 0;
+          bottom: 0;
+          -webkit-animation-delay: 0.8s;
+          animation-delay: 0.8s;
+        }
+
+        .dot i:nth-child(4) {
+          bottom: 0;
+          left: 0;
+          -webkit-animation-delay: 1.2s;
+          animation-delay: 1.2s;
+        }
+
+        @keyframes fierce-rotate {
+          to {
+            -webkit-transform: rotate(405deg);
+            transform: rotate(405deg);
+          }
+        }
+
+        @-webkit-keyframes fierce-rotate {
+          to {
+            -webkit-transform: rotate(405deg);
+            transform: rotate(405deg);
+          }
+        }
+
+        @keyframes fierce-spin-move {
+          to {
+            opacity: 1;
+          }
+        }
+
+        @-webkit-keyframes fierce-spin-move {
+          to {
+            opacity: 1;
+          }
+        }
+      </style>
+      <div class="first-loading-wrap">
+        <div class="loading-wrap">
+          <span class="dot dot-spin"><i></i><i></i><i></i><i></i></span>
+        </div>
       </div>
     </div>
-  </div>
-  <script type="module" src="/src/main.ts"></script>
-</body>
-
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

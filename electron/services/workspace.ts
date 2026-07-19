@@ -17,7 +17,7 @@ function getSettingsFilePath(): string {
 }
 
 export function getSuggestedWorkspacePath(): string {
-  return path.join(app.getPath('documents'), 'IP Creator');
+  return path.join(app.getPath('documents'), 'Kytos');
 }
 
 async function loadStoredSettings(): Promise<StoredSettings> {
@@ -59,7 +59,7 @@ async function ensureDirectoryWritable(directoryPath: string): Promise<void> {
     throw new Error('选择的位置不是文件夹');
   }
 
-  const probePath = path.join(directoryPath, `.ip-creator-write-test-${randomUUID()}`);
+  const probePath = path.join(directoryPath, `.kytos-write-test-${randomUUID()}`);
   try {
     await writeFile(probePath, '', { flag: 'wx' });
   } finally {

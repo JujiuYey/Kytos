@@ -12,7 +12,7 @@ const props = defineProps<{
 
 const { usage, modelId } = useContextValue();
 
-const reasoningTokens = computed(() => usage.value?.reasoningTokens ?? 0);
+const reasoningTokens = computed(() => usage.value?.outputTokenDetails.reasoningTokens ?? 0);
 
 const reasoningCostText = computed(() => {
   if (!modelId.value || !reasoningTokens.value) {
@@ -35,15 +35,10 @@ const reasoningCostText = computed(() => {
   <slot v-if="$slots.default" />
   <div
     v-else-if="reasoningTokens > 0"
-    :class="
-      cn('flex items-center justify-between text-xs', props.class)
-    "
+    :class="cn('flex items-center justify-between text-xs', props.class)"
     v-bind="$attrs"
   >
     <span class="text-muted-foreground">Reasoning</span>
-    <TokensWithCost
-      :cost-text="reasoningCostText"
-      :tokens="reasoningTokens"
-    />
+    <TokensWithCost :cost-text="reasoningCostText" :tokens="reasoningTokens" />
   </div>
 </template>

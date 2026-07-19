@@ -11,15 +11,18 @@ function parseStackFrame(line: string): StackFrame {
   // Pattern: at functionName (filePath:line:column)
   const withParensMatch = trimmed.match(STACK_FRAME_WITH_PARENS_REGEX);
   if (withParensMatch) {
-    const [, functionName, filePath, lineNum, colNum] = withParensMatch;
-    const isInternal
-      = filePath.includes('node_modules')
-        || filePath.startsWith('node:')
-        || filePath.includes('internal/');
+    const functionName = withParensMatch[1] ?? null;
+    const filePath = withParensMatch[2] ?? null;
+    const lineNum = withParensMatch[3];
+    const colNum = withParensMatch[4];
+    const isInternal =
+      (filePath?.includes('node_modules') ?? false) ||
+      (filePath?.startsWith('node:') ?? false) ||
+      (filePath?.includes('internal/') ?? false);
     return {
       raw: trimmed,
-      functionName: functionName ?? null,
-      filePath: filePath ?? null,
+      functionName,
+      filePath,
       lineNumber: lineNum ? Number.parseInt(lineNum, 10) : null,
       columnNumber: colNum ? Number.parseInt(colNum, 10) : null,
       isInternal,
@@ -30,10 +33,10 @@ function parseStackFrame(line: string): StackFrame {
   const withoutFnMatch = trimmed.match(STACK_FRAME_WITHOUT_FN_REGEX);
   if (withoutFnMatch) {
     const [, filePath, lineNum, colNum] = withoutFnMatch;
-    const isInternal
-      = (filePath?.includes('node_modules') ?? false)
-        || (filePath?.startsWith('node:') ?? false)
-        || (filePath?.includes('internal/') ?? false);
+    const isInternal =
+      (filePath?.includes('node_modules') ?? false) ||
+      (filePath?.startsWith('node:') ?? false) ||
+      (filePath?.includes('internal/') ?? false);
     return {
       raw: trimmed,
       functionName: null,
@@ -67,15 +70,15 @@ export function parseStackTrace(trace: string): ParsedStackTrace {
     };
   }
 
-  const firstLine = lines[0].trim();
+  const firstLine = lines[0]?.trim() ?? '';
   let errorType: string | null = null;
   let errorMessage = firstLine;
 
   // Try to extract error type from "ErrorType: message" format
   const errorMatch = firstLine.match(ERROR_TYPE_REGEX);
   if (errorMatch) {
-    errorType = errorMatch[1];
-    errorMessage = errorMatch[2] || '';
+    errorType = errorMatch[1] ?? null;
+    errorMessage = errorMatch[2] ?? '';
   }
 
   // Parse stack frames (lines starting with "at")

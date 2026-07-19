@@ -3,15 +3,13 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 
 const config = {
   packagerConfig: {
-    appBundleId: 'com.jujiuyey.ip-creator',
+    appBundleId: 'com.jujiuyey.kytos',
     asar: true,
-    executableName: 'ip-creator',
-    name: 'IP Creator',
+    executableName: 'Kytos',
+    name: 'Kytos',
   },
   rebuildConfig: {},
-  makers: [
-    new MakerZIP({}, ['darwin']),
-  ],
+  makers: [new MakerZIP({}, ['darwin'])],
   plugins: [
     new VitePlugin({
       build: [

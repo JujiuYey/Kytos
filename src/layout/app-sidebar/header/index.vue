@@ -15,7 +15,7 @@ import { SidebarHeader, SidebarMenuButton } from '@/components/ui/sidebar';
         <component :is="GalleryVerticalEnd" class="size-4" />
       </div>
       <div class="grid flex-1 text-sm leading-tight text-left">
-        <span class="font-semibold truncate">ip-creator</span>
+        <span class="font-semibold truncate">Kytos</span>
       </div>
     </SidebarMenuButton>
   </SidebarHeader>

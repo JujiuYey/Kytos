@@ -12,7 +12,7 @@ const props = defineProps<{
 
 const { usage, modelId } = useContextValue();
 
-const cacheTokens = computed(() => usage.value?.cachedInputTokens ?? 0);
+const cacheTokens = computed(() => usage.value?.inputTokenDetails.cacheReadTokens ?? 0);
 
 const cacheCostText = computed(() => {
   if (!modelId.value || !cacheTokens.value) {
@@ -35,9 +35,7 @@ const cacheCostText = computed(() => {
   <slot v-if="$slots.default" />
   <div
     v-else-if="cacheTokens > 0"
-    :class="
-      cn('flex items-center justify-between text-xs', props.class)
-    "
+    :class="cn('flex items-center justify-between text-xs', props.class)"
     v-bind="$attrs"
   >
     <span class="text-muted-foreground">Cache</span>

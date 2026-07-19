@@ -62,7 +62,7 @@ async function chooseWorkspace() {
         >
           <HardDrive class="size-4" />
         </div>
-        <span class="text-sm font-semibold">IP Creator</span>
+        <span class="text-sm font-semibold">Kytos</span>
       </div>
 
       <section aria-labelledby="setup-title">

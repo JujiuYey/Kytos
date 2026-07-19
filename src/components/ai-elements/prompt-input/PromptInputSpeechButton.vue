@@ -78,13 +78,16 @@ onMounted(() => {
     sr.interimResults = true;
     sr.lang = 'en-US';
 
-    sr.onstart = () => isListening.value = true;
-    sr.onend = () => isListening.value = false;
+    sr.onstart = () => (isListening.value = true);
+    sr.onend = () => (isListening.value = false);
 
     sr.onresult = (event: SpeechRecognitionEvent) => {
       let finalTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
+        if (!result) {
+          continue;
+        }
         if (result.isFinal) {
           finalTranscript += result[0]?.transcript ?? '';
         }
@@ -124,11 +127,13 @@ function toggleListening() {
 <template>
   <PromptInputButton
     :disabled="!recognition"
-    :class="cn(
-      'relative transition-all duration-200',
-      isListening && 'animate-pulse bg-accent text-accent-foreground',
-      props.class,
-    )"
+    :class="
+      cn(
+        'relative transition-all duration-200',
+        isListening && 'animate-pulse bg-accent text-accent-foreground',
+        props.class,
+      )
+    "
     v-bind="props"
     @click="toggleListening"
   >

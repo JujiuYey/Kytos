@@ -1,7 +1,12 @@
 import type { FormProps, FormField } from '@/components/sag/sag-form/types';
+import { reactive } from 'vue';
 
 type ValidationRuleParams = Record<string, any> | any[] | string | number | boolean;
-type ValidationRuleFunction = (value: any, params?: any, formData?: Record<string, any>) => boolean | string;
+type ValidationRuleFunction = (
+  value: any,
+  params?: any,
+  formData?: Record<string, any>,
+) => boolean | string;
 
 // 导出类型供外部使用
 export type { ValidationRuleFunction, ValidationRuleParams };
