@@ -6,7 +6,7 @@ import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upload-dialog';
-import { CharacterSheetGeneratorPanel } from '@/components/sag/character-sheet-generator-panel';
+import { CharacterPortraitWorkflow } from '@/components/sag/character-portrait-workflow';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
 import CharacterContextBar from '@/components/sag/character-context-bar.vue';
@@ -31,7 +31,8 @@ import PortraitGeneratorPanel from './components/portrait-generator-panel.vue';
 import VisualAssetRenameDialog from './components/visual-asset-rename-dialog.vue';
 
 type AssetKind = 'portrait' | 'sheet';
-type WorkspaceStage = 'portrait' | 'sheet';
+type CreationTarget = 'portrait' | 'sheet';
+type WorkspaceMode = 'cards' | 'canvas';
 
 const router = useRouter();
 const draft = ref<CharacterDraft>(createEmptyCharacterDraft());
@@ -41,18 +42,13 @@ const sheetRecords = ref<CharacterSheetRecord[]>([]);
 const officialAssets = ref<CharacterVisualAssetSelection[]>([]);
 const prompt = ref('');
 const imageName = ref('定妆照');
-const sheetPrompt = ref('');
-const sheetName = ref('角色表');
 const size = ref<CharacterPortraitSize>('2:3');
 const resolution = ref<CharacterPortraitResolution>('1k');
-const sheetResolution = ref<CharacterPortraitResolution>('1k');
 const count = ref(2);
 const errorMessage = ref('');
 const isInitializing = ref(true);
 const isSubmitting = ref(false);
-const isSubmittingSheet = ref(false);
 const isPolling = ref(false);
-const isPollingSheet = ref(false);
 const selectingFileName = ref('');
 const renamingFileName = ref('');
 const deletingFileName = ref('');
@@ -69,31 +65,19 @@ const renameTarget = ref<{
   kind: AssetKind;
   record: CharacterImageRecord;
 } | null>(null);
-const activeStage = ref<WorkspaceStage>('portrait');
 const generatorOpen = ref(true);
+const workspaceMode = ref<WorkspaceMode>('cards');
 const mobilePane = ref<'settings' | 'gallery'>('settings');
 
 let portraitPollTimer: ReturnType<typeof setTimeout> | null = null;
-let sheetPollTimer: ReturnType<typeof setTimeout> | null = null;
 let isDisposed = false;
 
 const activeStatuses = ['submitted', 'pending', 'processing'];
 const activeRecord = computed(() =>
   records.value.find(record => activeStatuses.includes(record.status)),
 );
-const activeSheetRecord = computed(() =>
-  sheetRecords.value.find(record => activeStatuses.includes(record.status)),
-);
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
 const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
-const isSheetBusy = computed(() => isSubmittingSheet.value || Boolean(activeSheetRecord.value));
-const selectedPortraitImage = computed(() => {
-  const asset = officialAssets.value[0];
-  if (!asset) {
-    return null;
-  }
-  return findSelectedImage(asset.kind === 'portrait' ? records.value : sheetRecords.value, asset);
-});
 const assetCount = computed(
   () =>
     records.value.reduce((total, record) => total + record.images.length, 0) +
@@ -108,23 +92,6 @@ const isGenerateDisabled = computed(
     imageName.value.length > 80 ||
     !prompt.value.trim() ||
     prompt.value.length > 20_000,
-);
-const isSheetGenerateDisabled = computed(
-  () =>
-    isInitializing.value ||
-    isSheetBusy.value ||
-    !keyConfigured.value ||
-    !selectedPortraitImage.value ||
-    !sheetName.value.trim() ||
-    sheetName.value.length > 80 ||
-    !sheetPrompt.value.trim() ||
-    sheetPrompt.value.length > 20_000,
-);
-const currentPollingRecord = computed(() =>
-  activeStage.value === 'portrait' ? activeRecord.value : activeSheetRecord.value,
-);
-const currentIsPolling = computed(() =>
-  activeStage.value === 'portrait' ? isPolling.value : isPollingSheet.value,
 );
 const uploadTitle = '上传角色视觉图片';
 const uploadDescription = '填写图片名称后上传。上传完成后可按需要设为正式资产。';
@@ -147,31 +114,6 @@ function buildPortraitPrompt(character: CharacterDraft): string {
   ].join('\n');
 }
 
-function buildSheetPrompt(): string {
-  return [
-    '参考图中的角色就是唯一要画的人，必须保持同一个角色，不要重新设计或美化。',
-    '严格保持参考图中的脸、五官、神态、发型、身材比例、服装、鞋履、配饰、颜色和绘画风格一致。',
-    '生成一张 16:9 横版多角度角色设定表，人物之间留出清晰间距并对齐。',
-    '从左到右依次展示：正面全身、完全侧面全身、背面全身、放大的四分之三侧面头肩像。',
-    '全身视图保持相同身高和自然中性站姿，完整展示头部到鞋底；头像清楚展示五官、表情、发型与标志性配饰。',
-    '背景干净统一，不要地面线、阴影、边框、文字、标注、色卡、额外人物或额外物品。',
-  ].join('\n');
-}
-
-function findSelectedImage(
-  recordList: CharacterImageRecord[],
-  selection: CharacterVisualAssetSelection | null,
-): CharacterPortraitImage | null {
-  if (!selection) {
-    return null;
-  }
-  return (
-    recordList
-      .find(record => record.id === selection.taskId)
-      ?.images.find(image => image.fileName === selection.fileName) ?? null
-  );
-}
-
 function replaceRecord<TRecord extends CharacterImageRecord>(
   recordList: TRecord[],
   updatedRecord: TRecord,
@@ -187,31 +129,18 @@ function applyWorkspace(workspace: CharacterPortraitWorkspaceState) {
   sheetRecords.value = workspace.sheetRecords;
 }
 
-function clearPollTimer(kind: AssetKind) {
-  if (kind === 'portrait' && portraitPollTimer) {
+function clearPollTimer() {
+  if (portraitPollTimer) {
     clearTimeout(portraitPollTimer);
     portraitPollTimer = null;
   }
-  if (kind === 'sheet' && sheetPollTimer) {
-    clearTimeout(sheetPollTimer);
-    sheetPollTimer = null;
-  }
 }
 
-function schedulePoll(kind: AssetKind, taskId: string) {
-  clearPollTimer(kind);
-  const timer = setTimeout(() => {
-    if (kind === 'portrait') {
-      void pollPortraitTask(taskId);
-    } else {
-      void pollSheetTask(taskId);
-    }
+function schedulePoll(taskId: string) {
+  clearPollTimer();
+  portraitPollTimer = setTimeout(() => {
+    void pollPortraitTask(taskId);
   }, 2500);
-  if (kind === 'portrait') {
-    portraitPollTimer = timer;
-  } else {
-    sheetPollTimer = timer;
-  }
 }
 
 async function pollPortraitTask(taskId: string) {
@@ -224,7 +153,7 @@ async function pollPortraitTask(taskId: string) {
     records.value = replaceRecord(records.value, record);
     errorMessage.value = '';
     if (activeStatuses.includes(record.status)) {
-      schedulePoll('portrait', taskId);
+      schedulePoll(taskId);
       return;
     }
     isPolling.value = false;
@@ -236,32 +165,6 @@ async function pollPortraitTask(taskId: string) {
     }
   } catch (pollError: unknown) {
     isPolling.value = false;
-    errorMessage.value = pollError instanceof Error ? pollError.message : String(pollError);
-  }
-}
-
-async function pollSheetTask(taskId: string) {
-  if (isDisposed) {
-    return;
-  }
-  isPollingSheet.value = true;
-  try {
-    const record = await window.desktop.getCharacterSheetTask(taskId);
-    sheetRecords.value = replaceRecord(sheetRecords.value, record);
-    errorMessage.value = '';
-    if (activeStatuses.includes(record.status)) {
-      schedulePoll('sheet', taskId);
-      return;
-    }
-    isPollingSheet.value = false;
-    if (record.status === 'completed') {
-      toast.success(`“${record.name}”已生成并保存到工作区`);
-      mobilePane.value = 'gallery';
-    } else {
-      errorMessage.value = record.errorMessage || '角色视觉生成任务未完成';
-    }
-  } catch (pollError: unknown) {
-    isPollingSheet.value = false;
     errorMessage.value = pollError instanceof Error ? pollError.message : String(pollError);
   }
 }
@@ -289,12 +192,6 @@ async function initialize() {
       count.value = latestGeneratedRecord.count;
     }
 
-    const latestGeneratedSheet = portraitWorkspace.sheetRecords.find(
-      record => record.source === 'generated',
-    );
-    sheetPrompt.value = latestGeneratedSheet?.prompt || buildSheetPrompt();
-    sheetResolution.value = latestGeneratedSheet?.resolution || '1k';
-
     const unfinishedRecord = portraitWorkspace.records.find(record =>
       activeStatuses.includes(record.status),
     );
@@ -302,11 +199,11 @@ async function initialize() {
       activeStatuses.includes(record.status),
     );
     if (unfinishedRecord) {
-      schedulePoll('portrait', unfinishedRecord.id);
+      schedulePoll(unfinishedRecord.id);
     }
     if (unfinishedSheet) {
-      activeStage.value = 'sheet';
-      schedulePoll('sheet', unfinishedSheet.id);
+      workspaceMode.value = 'canvas';
+      generatorOpen.value = false;
     }
     if (unfinishedRecord || unfinishedSheet) {
       mobilePane.value = 'gallery';
@@ -346,39 +243,12 @@ async function generatePortraits() {
   }
 }
 
-async function generateSheet() {
-  if (isSheetGenerateDisabled.value) {
-    return;
-  }
-  isSubmittingSheet.value = true;
-  errorMessage.value = '';
-  try {
-    const record = await window.desktop.generateCharacterSheet({
-      name: sheetName.value.trim(),
-      prompt: sheetPrompt.value.trim(),
-      resolution: sheetResolution.value,
-    });
-    sheetRecords.value = replaceRecord(sheetRecords.value, record);
-    mobilePane.value = 'gallery';
-    await pollSheetTask(record.id);
-  } catch (generationError: unknown) {
-    errorMessage.value =
-      generationError instanceof Error ? generationError.message : String(generationError);
-  } finally {
-    isSubmittingSheet.value = false;
-  }
-}
-
 function retryPolling() {
-  if (!currentPollingRecord.value || currentIsPolling.value) {
+  if (!activeRecord.value || isPolling.value) {
     return;
   }
   errorMessage.value = '';
-  if (activeStage.value === 'portrait') {
-    void pollPortraitTask(currentPollingRecord.value.id);
-  } else {
-    void pollSheetTask(currentPollingRecord.value.id);
-  }
+  void pollPortraitTask(activeRecord.value.id);
 }
 
 function closeGenerator(): void {
@@ -386,14 +256,25 @@ function closeGenerator(): void {
   mobilePane.value = 'gallery';
 }
 
-function openGenerator(stage: WorkspaceStage): void {
+function openGenerator(stage: CreationTarget): void {
   if (stage === 'sheet') {
-    void router.push({ name: 'character-portrait-workflow' });
+    workspaceMode.value = 'canvas';
+    generatorOpen.value = false;
     return;
   }
-  activeStage.value = stage;
+  workspaceMode.value = 'cards';
   generatorOpen.value = true;
   mobilePane.value = 'settings';
+  void refreshPortraitWorkspace();
+}
+
+async function refreshPortraitWorkspace(): Promise<void> {
+  try {
+    applyWorkspace(await window.desktop.getCharacterPortraitWorkspace());
+  } catch (refreshError: unknown) {
+    errorMessage.value =
+      refreshError instanceof Error ? refreshError.message : String(refreshError);
+  }
 }
 
 async function selectAsset(
@@ -518,8 +399,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   isDisposed = true;
-  clearPollTimer('portrait');
-  clearPollTimer('sheet');
+  clearPollTimer();
 });
 </script>
 
@@ -532,9 +412,9 @@ onBeforeUnmount(() => {
     <template #header>
       <PortraitPageHeader
         v-model:mobile-pane="mobilePane"
-        :active-stage="activeStage"
         :asset-count="assetCount"
-        :generator-open="generatorOpen"
+        :canvas-open="workspaceMode === 'canvas'"
+        :card-open="workspaceMode === 'cards' && generatorOpen"
         @ai-create="openGenerator"
         @upload="openUpload"
       />
@@ -549,23 +429,29 @@ onBeforeUnmount(() => {
       </AlertDescription>
     </Alert>
 
-    <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-3 shrink-0 sm:mx-5">
+    <Alert
+      v-if="workspaceMode === 'cards' && errorMessage"
+      variant="destructive"
+      class="mx-4 mt-3 shrink-0 sm:mx-5"
+    >
       <AlertCircle class="size-4" />
       <AlertTitle>角色图片流程暂时中断</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
         <span>{{ errorMessage }}</span>
-        <Button
-          v-if="currentPollingRecord && !currentIsPolling"
-          size="sm"
-          variant="outline"
-          @click="retryPolling"
-        >
+        <Button v-if="activeRecord && !isPolling" size="sm" variant="outline" @click="retryPolling">
           继续查询
         </Button>
       </AlertDescription>
     </Alert>
 
+    <CharacterPortraitWorkflow
+      v-if="workspaceMode === 'canvas'"
+      class="min-h-0 min-w-0 flex-1"
+      @workspace-updated="refreshPortraitWorkspace"
+    />
+
     <div
+      v-else
       :class="[
         'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
         generatorOpen && 'lg:grid-cols-[minmax(0,9fr)_minmax(340px,4fr)]',
@@ -598,7 +484,6 @@ onBeforeUnmount(() => {
         ]"
       >
         <PortraitGeneratorPanel
-          v-if="activeStage === 'portrait'"
           v-model="prompt"
           v-model:count="count"
           v-model:name="imageName"
@@ -610,18 +495,6 @@ onBeforeUnmount(() => {
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeGenerator"
           @generate="generatePortraits"
-        />
-        <CharacterSheetGeneratorPanel
-          v-else
-          v-model="sheetPrompt"
-          v-model:name="sheetName"
-          v-model:resolution="sheetResolution"
-          :busy="isSheetBusy"
-          :disabled="isSheetGenerateDisabled"
-          :reference-image="selectedPortraitImage"
-          class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
-          @close="closeGenerator"
-          @generate="generateSheet"
         />
       </div>
     </div>

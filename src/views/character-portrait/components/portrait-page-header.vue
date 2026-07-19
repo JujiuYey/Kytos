@@ -1,28 +1,14 @@
 <script setup lang="ts">
-import {
-  Camera,
-  Check,
-  ChevronDown,
-  Images,
-  SlidersHorizontal,
-  Upload,
-  WandSparkles,
-} from 'lucide-vue-next';
+import { Camera, Images, SlidersHorizontal, Upload, WandSparkles, Workflow } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 type WorkspaceStage = 'portrait' | 'sheet';
 
 defineProps<{
-  activeStage: WorkspaceStage;
   assetCount: number;
-  generatorOpen: boolean;
+  canvasOpen: boolean;
+  cardOpen: boolean;
   mobilePane: 'settings' | 'gallery';
 }>();
 
@@ -54,31 +40,26 @@ const emit = defineEmits<{
     上传图片
   </Button>
 
-  <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button size="sm" :variant="generatorOpen ? 'secondary' : 'default'">
-        <WandSparkles class="size-4" />
-        创建
-        <ChevronDown class="size-3.5" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" class="w-48">
-      <DropdownMenuItem @select="emit('ai-create', 'portrait')">
-        <Camera class="size-4" />
-        从描述创建
-        <Check v-if="activeStage === 'portrait' && generatorOpen" class="ml-auto size-4" />
-      </DropdownMenuItem>
-      <DropdownMenuItem @select="emit('ai-create', 'sheet')">
-        <Images class="size-4" />
-        基于正式资产创建
-        <Check v-if="activeStage === 'sheet' && generatorOpen" class="ml-auto size-4" />
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
+  <Button
+    size="sm"
+    :variant="cardOpen ? 'secondary' : 'outline'"
+    @click="emit('ai-create', 'portrait')"
+  >
+    <WandSparkles class="size-4" />
+    创建卡片
+  </Button>
+  <Button
+    size="sm"
+    :variant="canvasOpen ? 'secondary' : 'outline'"
+    @click="emit('ai-create', 'sheet')"
+  >
+    <Workflow class="size-4" />
+    创建画布
+  </Button>
 
-  <div class="flex items-center gap-1 lg:hidden">
+  <div v-if="!canvasOpen" class="flex items-center gap-1 lg:hidden">
     <Button
-      v-if="generatorOpen"
+      v-if="cardOpen"
       size="icon"
       :variant="mobilePane === 'settings' ? 'secondary' : 'ghost'"
       aria-label="显示设置"

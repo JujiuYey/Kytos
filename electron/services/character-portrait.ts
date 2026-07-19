@@ -25,6 +25,7 @@ import {
   CHARACTER_PORTRAIT_RESOLUTIONS,
   CHARACTER_PORTRAIT_SIZES,
   CHARACTER_SHEET_SIZE,
+  MAX_CHARACTER_SHEET_REFERENCE_IMAGES,
 } from '../../shared/character-portrait';
 import type { SaveFileRequest, SavedFileResult } from '../../shared/desktop';
 import { getActiveCharacterDirectory } from './character-library';
@@ -176,6 +177,15 @@ function parseSheetRecord(value: unknown): CharacterSheetRecord | null {
         .map(image => parseImage(image, SHEET_ASSET_DIRECTORY, '角色表'))
         .filter((image): image is CharacterPortraitImage => Boolean(image))
     : [];
+  const parsedReferenceAssets = Array.isArray(value.referenceAssets)
+    ? value.referenceAssets
+        .map(parseVisualAssetSelection)
+        .filter((asset): asset is CharacterVisualAssetSelection => Boolean(asset))
+    : [];
+  const referenceAssets = [
+    ...new Map(parsedReferenceAssets.map(asset => [selectionKey(asset), asset])).values(),
+  ].slice(0, MAX_CHARACTER_SHEET_REFERENCE_IMAGES);
+  const legacyReferenceImage = parseSelection(value.referenceImage);
 
   return {
     count: 1,
@@ -190,7 +200,12 @@ function parseSheetRecord(value: unknown): CharacterSheetRecord | null {
     originalName: typeof value.originalName === 'string' ? value.originalName : null,
     progress: typeof value.progress === 'number' ? Math.min(100, Math.max(0, value.progress)) : 0,
     prompt: value.prompt,
-    referenceImage: parseSelection(value.referenceImage),
+    referenceAssets,
+    referenceImage:
+      legacyReferenceImage ??
+      (referenceAssets[0]
+        ? { fileName: referenceAssets[0].fileName, taskId: referenceAssets[0].taskId }
+        : null),
     resolution: value.resolution,
     size: CHARACTER_SHEET_SIZE,
     source: value.source === 'uploaded' ? 'uploaded' : 'generated',
@@ -678,6 +693,7 @@ export async function uploadCharacterSheet(request: SaveFileRequest): Promise<Sa
     originalName: request.fileName,
     progress: 100,
     prompt: '',
+    referenceAssets: [],
     referenceImage: null,
     resolution: '1k',
     size: CHARACTER_SHEET_SIZE,
@@ -951,45 +967,48 @@ export async function generateCharacterSheet(
     typeof request.prompt !== 'string' ||
     !request.prompt.trim() ||
     request.prompt.length > MAX_PROMPT_LENGTH ||
+    !Array.isArray(request.referenceAssets) ||
+    request.referenceAssets.length < 1 ||
+    request.referenceAssets.length > MAX_CHARACTER_SHEET_REFERENCE_IMAGES ||
     !isPortraitResolution(request.resolution)
   ) {
     throw new Error('参考图生成参数无效');
   }
 
   const store = await loadPortraitStore();
-  const referenceAsset = request.referenceAsset
-    ? validateVisualAssetSelection(request.referenceAsset)
-    : store.officialAssets[0];
+  const parsedReferenceAssets = request.referenceAssets.map(validateVisualAssetSelection);
+  const referenceAssets = [
+    ...new Map(parsedReferenceAssets.map(asset => [selectionKey(asset), asset])).values(),
+  ];
   if (
-    referenceAsset &&
-    !store.officialAssets.some(asset => selectionKey(asset) === selectionKey(referenceAsset))
+    referenceAssets.some(
+      referenceAsset =>
+        !store.officialAssets.some(asset => selectionKey(asset) === selectionKey(referenceAsset)),
+    )
   ) {
-    throw new Error('画布连接的参考图不是正式资产');
+    throw new Error('画布连接的参考图包含非正式资产');
   }
-  const reference = referenceAsset ? findVisualAsset(store, referenceAsset) : null;
-  if (!referenceAsset || !reference) {
-    throw new Error('请先将一张角色视觉图片设为正式资产');
-  }
-  const referenceSelection: CharacterPortraitSelection = {
-    fileName: referenceAsset.fileName,
-    taskId: referenceAsset.taskId,
-  };
-  const referenceImage = reference.image;
-  const referenceDirectory =
-    referenceAsset.kind === 'portrait' ? PORTRAIT_ASSET_DIRECTORY : SHEET_ASSET_DIRECTORY;
 
   const workspacePath = await getWorkspaceDirectory();
-  const referenceData = await readFile(
-    path.join(workspacePath, 'assets', referenceDirectory, referenceImage.fileName),
+  const referenceImageUrls = await Promise.all(
+    referenceAssets.map(async referenceAsset => {
+      const { image } = findVisualAsset(store, referenceAsset);
+      const referenceDirectory =
+        referenceAsset.kind === 'portrait' ? PORTRAIT_ASSET_DIRECTORY : SHEET_ASSET_DIRECTORY;
+      const referenceData = await readFile(
+        path.join(workspacePath, 'assets', referenceDirectory, image.fileName),
+      );
+      if (referenceData.byteLength > MAX_REFERENCE_IMAGE_SIZE) {
+        throw new Error(`正式角色视觉图片“${image.name || image.fileName}”超过 20 MB`);
+      }
+      return `data:${image.mimeType};base64,${referenceData.toString('base64')}`;
+    }),
   );
-  if (referenceData.byteLength > MAX_REFERENCE_IMAGE_SIZE) {
-    throw new Error('正式角色视觉图片超过 20 MB，无法作为生成参考');
-  }
 
   const apiKey = await getCredentialValue('apimart');
   const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
     body: JSON.stringify({
-      image_urls: [`data:${referenceImage.mimeType};base64,${referenceData.toString('base64')}`],
+      image_urls: referenceImageUrls,
       model: 'gpt-image-2',
       n: 1,
       prompt: request.prompt.trim(),
@@ -1014,7 +1033,10 @@ export async function generateCharacterSheet(
     originalName: null,
     progress: 0,
     prompt: request.prompt.trim(),
-    referenceImage: { ...referenceSelection },
+    referenceAssets,
+    referenceImage: referenceAssets[0]
+      ? { fileName: referenceAssets[0].fileName, taskId: referenceAssets[0].taskId }
+      : null,
     resolution: request.resolution,
     size: CHARACTER_SHEET_SIZE,
     source: 'generated',

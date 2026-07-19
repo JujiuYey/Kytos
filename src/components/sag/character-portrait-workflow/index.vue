@@ -1,23 +1,22 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
-import { useRouter } from 'vue-router';
-import type {
-  Connection,
-  Edge,
-  GraphEdge,
-  GraphNode,
-  NodeMouseEvent,
-  ValidConnectionFunc,
-} from '@vue-flow/core';
-import { MarkerType } from '@vue-flow/core';
-import { AlertCircle, ArrowLeft, ImageOff, PanelRight, RotateCcw, Workflow } from 'lucide-vue-next';
+import type { Connection, Edge, NodeMouseEvent, ValidConnectionFunc } from '@vue-flow/core';
+import { MarkerType, useVueFlow } from '@vue-flow/core';
+import { AlertCircle, ImageOff, PanelRight, Plus, RotateCcw } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { Canvas } from '@/components/ai-elements/canvas';
 import { Controls } from '@/components/ai-elements/controls';
+import { Image as AiImage } from '@/components/ai-elements/image';
 import { Panel } from '@/components/ai-elements/panel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Sheet,
   SheetContent,
@@ -27,8 +26,6 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SagPage } from '@/components/sag/sag-page';
-import CharacterContextBar from '@/components/sag/character-context-bar.vue';
 import type {
   CharacterImageRecord,
   CharacterPortraitImage,
@@ -38,6 +35,7 @@ import type {
   CharacterVisualAssetSelection,
   CredentialStatus,
 } from '@/types';
+import { MAX_CHARACTER_SHEET_REFERENCE_IMAGES } from '@/types';
 import WorkflowInspector from './components/workflow-inspector.vue';
 import WorkflowNodeCard from './components/workflow-node.vue';
 import type {
@@ -46,12 +44,14 @@ import type {
   WorkflowGeneratorNodeData,
   WorkflowNode,
   WorkflowNodeKind,
-  WorkflowPromptNodeData,
   WorkflowResultNodeData,
   WorkflowRunStatus,
 } from './workflow-types';
 
-const router = useRouter();
+const emit = defineEmits<{
+  (event: 'workspace-updated'): void;
+}>();
+
 const nodes = shallowRef<WorkflowNode[]>([]);
 const edges = shallowRef<Edge[]>([]);
 const assetOptions = ref<WorkflowAssetOption[]>([]);
@@ -61,11 +61,17 @@ const isInitializing = ref(true);
 const isSubmitting = ref(false);
 const errorMessage = ref('');
 const inspectorOpen = ref(false);
+const canvasSection = ref<HTMLElement | null>(null);
+const { addEdges, addNodes, removeNodes, screenToFlowCoordinate } = useVueFlow(
+  'character-portrait-workflow',
+);
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let isDisposed = false;
+let nextAssetNodeIndex = 1;
 
 const ACTIVE_STATUSES: WorkflowRunStatus[] = ['submitted', 'pending', 'processing'];
+const FIXED_RESULT_EDGE_ID = 'generator-result';
 
 const selectedNode = computed(
   () => nodes.value.find(node => node.id === selectedNodeId.value) ?? null,
@@ -73,26 +79,34 @@ const selectedNode = computed(
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
 const hasOfficialAssets = computed(() => assetOptions.value.length > 0);
 const generatorNode = computed(() => nodes.value.find(node => node.type === 'generator') ?? null);
+const connectedAssetNodes = computed(() => {
+  const generator = generatorNode.value;
+  return generator ? findIncomingNodes(generator.id, 'asset') : [];
+});
+const connectedAssetCount = computed(() => connectedAssetNodes.value.length);
+const availableAssetOptions = computed(() => {
+  const assetKeys = new Set(
+    nodes.value.flatMap(node => (node.data.kind === 'asset' ? [node.data.assetKey] : [])),
+  );
+  return assetOptions.value.filter(option => !assetKeys.has(option.key));
+});
 
 const generateDisabled = computed(() => {
   const generator = generatorNode.value;
   if (!generator || generator.data.kind !== 'generator') {
     return true;
   }
-  const assetNode = findIncomingNode(generator.id, 'asset');
-  const promptNode = findIncomingNode(generator.id, 'prompt');
   const resultNode = findOutgoingNode(generator.id, 'result');
   return (
     isInitializing.value ||
     isSubmitting.value ||
     ACTIVE_STATUSES.includes(generator.data.status) ||
     !keyConfigured.value ||
-    !assetNode ||
-    !promptNode ||
+    connectedAssetCount.value < 1 ||
+    connectedAssetCount.value > MAX_CHARACTER_SHEET_REFERENCE_IMAGES ||
     !resultNode ||
-    promptNode.data.kind !== 'prompt' ||
-    !promptNode.data.prompt.trim() ||
-    promptNode.data.prompt.length > 20_000 ||
+    !generator.data.prompt.trim() ||
+    generator.data.prompt.length > 20_000 ||
     !generator.data.name.trim() ||
     generator.data.name.length > 80
   );
@@ -154,8 +168,8 @@ function initializeGraph(
   options: WorkflowAssetOption[],
 ): void {
   const latestSheet = workspace.sheetRecords.find(record => record.source === 'generated');
-  const assetNodes: WorkflowNode[] = options.map((option, index) => ({
-    ariaLabel: `正式资产：${option.label}`,
+  const assetNodes: WorkflowNode[] = options.slice(0, 1).map((option, index) => ({
+    ariaLabel: `参考图：${option.label}`,
     data: {
       assetKey: option.key,
       image: option.image,
@@ -163,28 +177,17 @@ function initializeGraph(
       label: option.label,
       selection: option.selection,
     },
-    deletable: false,
+    deletable: true,
     id: `asset-${index + 1}`,
-    position: { x: 0, y: index * 230 },
+    position: { x: 0, y: 120 + index * 230 },
     type: 'asset',
   }));
-  const promptNode: WorkflowNode = {
-    ariaLabel: '图片提示词',
-    data: {
-      kind: 'prompt',
-      label: '图片提示词',
-      prompt: latestSheet?.prompt || buildSheetPrompt(),
-    },
-    deletable: false,
-    id: 'prompt',
-    position: { x: 0, y: Math.max(options.length, 1) * 230 },
-    type: 'prompt',
-  };
   const generatorNodeData: WorkflowGeneratorNodeData = {
     errorMessage: latestSheet?.errorMessage || '',
     kind: 'generator',
     label: '图片生成',
     name: latestSheet?.name || '角色表',
+    prompt: latestSheet?.prompt || buildSheetPrompt(),
     progress: latestSheet?.progress || 0,
     resolution: latestSheet?.resolution || '1k',
     status: toRunStatus(latestSheet?.status),
@@ -194,6 +197,7 @@ function initializeGraph(
     ariaLabel: '图片生成',
     data: generatorNodeData,
     deletable: false,
+    draggable: false,
     id: 'generator',
     position: { x: 410, y: 120 },
     type: 'generator',
@@ -209,18 +213,17 @@ function initializeGraph(
       status: toRunStatus(latestSheet?.status),
     },
     deletable: false,
+    draggable: false,
     id: 'result',
     position: { x: 820, y: 120 },
     type: 'result',
   };
 
-  nodes.value = [...assetNodes, promptNode, generator, result];
+  nodes.value = [...assetNodes, generator, result];
+  nextAssetNodeIndex = assetNodes.length + 1;
   edges.value = [
-    ...(assetNodes[0]
-      ? [{ id: 'asset-generator', source: assetNodes[0].id, target: generator.id }]
-      : []),
-    { id: 'prompt-generator', source: promptNode.id, target: generator.id },
-    { id: 'generator-result', source: generator.id, target: result.id },
+    ...(assetNodes[0] ? [createReferenceEdge('asset-generator', assetNodes[0].id)] : []),
+    createFixedResultEdge(),
   ];
 
   if (latestSheet && ACTIVE_STATUSES.includes(latestSheet.status)) {
@@ -233,9 +236,9 @@ function findNode(id: string): WorkflowNode | null {
   return nodes.value.find(node => node.id === id) ?? null;
 }
 
-function findIncomingNode(targetId: string, kind: WorkflowNodeKind): WorkflowNode | null {
+function findIncomingNodes(targetId: string, kind: WorkflowNodeKind): WorkflowNode[] {
   const sourceIds = edges.value.filter(edge => edge.target === targetId).map(edge => edge.source);
-  return nodes.value.find(node => sourceIds.includes(node.id) && node.type === kind) ?? null;
+  return nodes.value.filter(node => sourceIds.includes(node.id) && node.type === kind);
 }
 
 function findOutgoingNode(sourceId: string, kind: WorkflowNodeKind): WorkflowNode | null {
@@ -243,50 +246,140 @@ function findOutgoingNode(sourceId: string, kind: WorkflowNodeKind): WorkflowNod
   return nodes.value.find(node => targetIds.includes(node.id) && node.type === kind) ?? null;
 }
 
-const isValidConnection: ValidConnectionFunc = (_connection, { sourceNode, targetNode }) =>
-  (sourceNode.type === 'asset' || sourceNode.type === 'prompt') && targetNode.type === 'generator'
-    ? true
-    : sourceNode.type === 'generator' && targetNode.type === 'result';
+const isValidConnection: ValidConnectionFunc = (
+  connection,
+  { edges: graphEdges, sourceNode, targetNode },
+) => {
+  if (connection.source === 'generator' && connection.target === 'result') {
+    return true;
+  }
+  if (sourceNode.type !== 'asset' || targetNode.type !== 'generator') {
+    return false;
+  }
+  const sourceAlreadyConnected = graphEdges.some(
+    edge => edge.source === connection.source && edge.target === connection.target,
+  );
+  const connectedReferenceCount = new Set(
+    graphEdges.filter(edge => edge.target === 'generator').map(edge => edge.source),
+  ).size;
+  return sourceAlreadyConnected || connectedReferenceCount < MAX_CHARACTER_SHEET_REFERENCE_IMAGES;
+};
+
+function createFixedResultEdge(): Edge {
+  return {
+    deletable: false,
+    id: FIXED_RESULT_EDGE_ID,
+    markerEnd: MarkerType.ArrowClosed,
+    selectable: false,
+    source: 'generator',
+    target: 'result',
+    type: 'smoothstep',
+    updatable: false,
+  };
+}
+
+function createReferenceEdge(id: string, source: string): Edge {
+  return {
+    deletable: true,
+    id,
+    markerEnd: MarkerType.ArrowClosed,
+    source,
+    target: 'generator',
+    type: 'smoothstep',
+  };
+}
 
 function handleConnect(connection: Connection): void {
   const sourceNode = findNode(connection.source);
-  if (!sourceNode) {
+  const targetNode = findNode(connection.target);
+  if (!sourceNode || !targetNode) {
     return;
   }
-  edges.value = [
-    ...edges.value.filter(edge => {
-      if (edge.target !== connection.target) {
-        return true;
-      }
-      const existingSource = findNode(edge.source);
-      return existingSource?.type !== sourceNode.type;
-    }),
-    {
-      id: `${connection.source}-${connection.target}-${Date.now()}`,
-      source: connection.source,
-      sourceHandle: connection.sourceHandle,
-      target: connection.target,
-      targetHandle: connection.targetHandle,
+  const alreadyConnected = edges.value.some(
+    edge => edge.source === connection.source && edge.target === connection.target,
+  );
+  if (alreadyConnected) {
+    return;
+  }
+  if (
+    sourceNode.type !== 'asset' ||
+    targetNode.type !== 'generator' ||
+    findIncomingNodes(targetNode.id, 'asset').length >= MAX_CHARACTER_SHEET_REFERENCE_IMAGES
+  ) {
+    return;
+  }
+  addEdges({
+    ...createReferenceEdge(
+      `${connection.source}-${connection.target}-${Date.now()}`,
+      connection.source,
+    ),
+    sourceHandle: connection.sourceHandle,
+    targetHandle: connection.targetHandle,
+  });
+}
+
+function addAssetNode(option: WorkflowAssetOption): void {
+  const bounds = canvasSection.value?.getBoundingClientRect();
+  const center = bounds
+    ? screenToFlowCoordinate({
+        x: bounds.left + bounds.width / 2,
+        y: bounds.top + bounds.height / 2,
+      })
+    : { x: 144, y: 170 };
+  let id = `asset-${nextAssetNodeIndex}`;
+  while (findNode(id)) {
+    nextAssetNodeIndex += 1;
+    id = `asset-${nextAssetNodeIndex}`;
+  }
+  nextAssetNodeIndex += 1;
+
+  const node: WorkflowNode = {
+    ariaLabel: `参考图：${option.label}`,
+    data: {
+      assetKey: option.key,
+      image: option.image,
+      kind: 'asset',
+      label: option.label,
+      selection: option.selection,
     },
-  ];
+    deletable: true,
+    id,
+    position: { x: center.x - 144, y: center.y - 170 },
+    type: 'asset',
+  };
+
+  addNodes(node);
+  selectedNodeId.value = node.id;
+}
+
+function deleteNode(nodeId: string): void {
+  const node = findNode(nodeId);
+  if (!node?.deletable) {
+    return;
+  }
+  removeNodes(nodeId, true);
+  if (selectedNodeId.value === nodeId) {
+    selectedNodeId.value = '';
+  }
 }
 
 function handleNodeClick(event: NodeMouseEvent): void {
   selectedNodeId.value = event.node.id;
 }
 
-function handleNodesUpdate(updatedNodes: GraphNode[]): void {
-  nodes.value = updatedNodes as WorkflowNode[];
-}
-
-function handleEdgesUpdate(updatedEdges: GraphEdge[]): void {
-  edges.value = updatedEdges;
-}
-
 function updateAsset(value: string): void {
   const node = selectedNode.value;
   const option = assetOptions.value.find(asset => asset.key === value);
   if (!node || node.data.kind !== 'asset' || !option) {
+    return;
+  }
+  if (
+    nodes.value.some(
+      item =>
+        item.id !== node.id && item.data.kind === 'asset' && item.data.assetKey === option.key,
+    )
+  ) {
+    toast.error('这张参考图已在画布中');
     return;
   }
   const data: WorkflowAssetNodeData = {
@@ -301,12 +394,11 @@ function updateAsset(value: string): void {
 }
 
 function updatePrompt(value: string): void {
-  const node = selectedNode.value;
-  if (!node || node.data.kind !== 'prompt') {
+  const node = findNode('generator');
+  if (!node || node.data.kind !== 'generator') {
     return;
   }
-  const data: WorkflowPromptNodeData = { ...node.data, prompt: value };
-  node.data = data;
+  node.data = { ...node.data, prompt: value };
   nodes.value = [...nodes.value];
 }
 
@@ -392,6 +484,7 @@ async function pollTask(taskId: string): Promise<void> {
     }
     isSubmitting.value = false;
     if (record.status === 'completed') {
+      emit('workspace-updated');
       toast.success(`“${record.name}”已生成并保存到资产库`);
     } else {
       errorMessage.value = record.errorMessage || '角色视觉生成任务未完成';
@@ -407,19 +500,26 @@ async function generateFromNode(generatorId = 'generator'): Promise<void> {
     return;
   }
   const generator = findNode(generatorId);
-  const assetNode = findIncomingNode(generatorId, 'asset');
-  const promptNode = findIncomingNode(generatorId, 'prompt');
+  const assetNodes = findIncomingNodes(generatorId, 'asset');
   const resultNode = findOutgoingNode(generatorId, 'result');
   if (
     !generator ||
     generator.data.kind !== 'generator' ||
-    !assetNode ||
-    assetNode.data.kind !== 'asset' ||
-    !promptNode ||
-    promptNode.data.kind !== 'prompt' ||
+    assetNodes.length < 1 ||
+    assetNodes.length > MAX_CHARACTER_SHEET_REFERENCE_IMAGES ||
     !resultNode ||
     resultNode.data.kind !== 'result'
   ) {
+    return;
+  }
+  const referenceAssets = assetNodes.flatMap<CharacterVisualAssetSelection>(node => {
+    if (node.data.kind !== 'asset') {
+      return [];
+    }
+    const { fileName, kind, taskId } = node.data.selection;
+    return [{ fileName, kind, taskId }];
+  });
+  if (referenceAssets.length !== assetNodes.length) {
     return;
   }
 
@@ -436,8 +536,8 @@ async function generateFromNode(generatorId = 'generator'): Promise<void> {
   try {
     const record = await window.desktop.generateCharacterSheet({
       name: generator.data.name.trim(),
-      prompt: promptNode.data.prompt.trim(),
-      referenceAsset: assetNode.data.selection,
+      prompt: generator.data.prompt.trim(),
+      referenceAssets,
       resolution: generator.data.resolution,
     });
     updateGeneratorStatus(generatorId, {
@@ -492,64 +592,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <SagPage>
-    <template #before-header>
-      <CharacterContextBar active-section="character-portrait" />
-    </template>
-
-    <template #header>
-      <Button
-        size="sm"
-        variant="ghost"
-        class="shrink-0"
-        @click="router.push('/character-portrait')"
-      >
-        <ArrowLeft class="size-4" />
-        角色视觉
-      </Button>
-      <div class="hidden h-5 w-px bg-border sm:block" />
-      <div class="flex min-w-0 flex-1 items-center gap-3">
-        <div
-          class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
-        >
-          <Workflow class="size-4" />
-        </div>
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <h1 class="truncate text-sm font-semibold">正式资产创作画布</h1>
-            <Badge variant="secondary">{{ assetOptions.length }} 个参考</Badge>
-          </div>
-          <p class="truncate text-xs text-muted-foreground">角色视觉工作流</p>
-        </div>
-      </div>
-      <Button size="icon" variant="ghost" aria-label="重置画布" @click="resetGraph">
-        <RotateCcw class="size-4" />
-      </Button>
-      <Sheet v-model:open="inspectorOpen">
-        <SheetTrigger as-child>
-          <Button size="icon" variant="outline" class="md:hidden" aria-label="节点属性">
-            <PanelRight class="size-4" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent class="w-[min(90vw,340px)] p-0" side="right">
-          <SheetHeader class="sr-only">
-            <SheetTitle>节点属性</SheetTitle>
-            <SheetDescription>当前工作流节点属性</SheetDescription>
-          </SheetHeader>
-          <WorkflowInspector
-            :asset-options="assetOptions"
-            :generate-disabled="generateDisabled"
-            :node="selectedNode"
-            @generate="generateFromNode()"
-            @update-asset="updateAsset"
-            @update-name="updateGeneratorName"
-            @update-prompt="updatePrompt"
-            @update-resolution="updateGeneratorResolution"
-          />
-        </SheetContent>
-      </Sheet>
-    </template>
-
+  <div class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background">
     <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
       <AlertTitle>工作流暂时中断</AlertTitle>
@@ -576,43 +619,48 @@ onBeforeUnmount(() => {
         <p class="mt-1 text-sm leading-6 text-muted-foreground">
           需要至少一张正式资产才能建立参考图生成流程。
         </p>
-        <Button class="mt-4" variant="outline" @click="router.push('/character-portrait')">
-          <ArrowLeft class="size-4" />
-          返回角色视觉
-        </Button>
       </div>
     </div>
 
-    <div v-else class="grid min-h-0 min-w-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px]">
-      <section class="relative min-h-0 min-w-0" aria-label="角色视觉节点画布">
+    <div
+      v-else
+      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]"
+    >
+      <section ref="canvasSection" class="relative min-h-0 min-w-0" aria-label="角色视觉节点画布">
         <Canvas
+          id="character-portrait-workflow"
           :default-edge-options="defaultEdgeOptions"
-          :edges="edges"
           :is-valid-connection="isValidConnection"
-          :nodes="nodes"
+          v-model:edges="edges"
+          v-model:nodes="nodes"
           class="h-full w-full"
           @connect="handleConnect"
           @node-click="handleNodeClick"
           @pane-click="selectedNodeId = ''"
-          @update:edges="handleEdgesUpdate"
-          @update:nodes="handleNodesUpdate"
         >
           <template #node-asset="nodeProps">
-            <WorkflowNodeCard :data="nodeProps.data" :selected="nodeProps.selected" />
-          </template>
-          <template #node-prompt="nodeProps">
-            <WorkflowNodeCard :data="nodeProps.data" :selected="nodeProps.selected" />
+            <WorkflowNodeCard
+              :data="nodeProps.data"
+              :deletable="nodeProps.deletable"
+              :selected="nodeProps.selected || selectedNodeId === nodeProps.id"
+              @delete="deleteNode(nodeProps.id)"
+            />
           </template>
           <template #node-generator="nodeProps">
             <WorkflowNodeCard
               :data="nodeProps.data"
               :generate-disabled="generateDisabled"
-              :selected="nodeProps.selected"
+              :reference-count="connectedAssetCount"
+              :selected="nodeProps.selected || selectedNodeId === nodeProps.id"
               @generate="generateFromNode(nodeProps.id)"
+              @update-prompt="updatePrompt"
             />
           </template>
           <template #node-result="nodeProps">
-            <WorkflowNodeCard :data="nodeProps.data" :selected="nodeProps.selected" />
+            <WorkflowNodeCard
+              :data="nodeProps.data"
+              :selected="nodeProps.selected || selectedNodeId === nodeProps.id"
+            />
           </template>
 
           <Controls position="bottom-left" />
@@ -623,14 +671,72 @@ onBeforeUnmount(() => {
             />
             <span class="text-xs">{{ keyConfigured ? 'APIMart 已连接' : 'APIMart 未配置' }}</span>
           </Panel>
+          <Panel position="top-right" class="flex items-center gap-1 bg-background p-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button size="sm" variant="ghost">
+                  <Plus class="size-4" />
+                  添加参考图
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" class="w-64">
+                <DropdownMenuLabel>选择正式资产</DropdownMenuLabel>
+                <DropdownMenuItem
+                  v-for="asset in availableAssetOptions"
+                  :key="asset.key"
+                  class="min-w-0"
+                  @select="addAssetNode(asset)"
+                >
+                  <AiImage
+                    :alt="asset.label"
+                    :src="asset.image.url"
+                    class="size-9 shrink-0 border bg-muted/30 object-contain"
+                  />
+                  <span class="min-w-0 truncate">{{ asset.label }}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem v-if="availableAssetOptions.length === 0" disabled>
+                  所有正式资产已在画布中
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="icon" variant="ghost" aria-label="重置画布" @click="resetGraph">
+              <RotateCcw class="size-4" />
+            </Button>
+            <Sheet v-model:open="inspectorOpen">
+              <SheetTrigger as-child>
+                <Button size="icon" variant="ghost" class="md:hidden" aria-label="节点属性">
+                  <PanelRight class="size-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent class="w-[min(90vw,340px)] p-0" side="right">
+                <SheetHeader class="sr-only">
+                  <SheetTitle>节点属性</SheetTitle>
+                  <SheetDescription>当前工作流节点属性</SheetDescription>
+                </SheetHeader>
+                <WorkflowInspector
+                  :asset-options="assetOptions"
+                  :generate-disabled="generateDisabled"
+                  :node="selectedNode"
+                  :reference-count="connectedAssetCount"
+                  @generate="generateFromNode()"
+                  @update-asset="updateAsset"
+                  @update-name="updateGeneratorName"
+                  @update-prompt="updatePrompt"
+                  @update-resolution="updateGeneratorResolution"
+                />
+              </SheetContent>
+            </Sheet>
+          </Panel>
         </Canvas>
       </section>
 
-      <div class="hidden min-h-0 border-l md:block">
+      <div class="hidden min-h-0 min-w-0 p-3 md:flex md:p-4">
         <WorkflowInspector
           :asset-options="assetOptions"
           :generate-disabled="generateDisabled"
           :node="selectedNode"
+          :reference-count="connectedAssetCount"
+          class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @generate="generateFromNode()"
           @update-asset="updateAsset"
           @update-name="updateGeneratorName"
@@ -639,5 +745,5 @@ onBeforeUnmount(() => {
         />
       </div>
     </div>
-  </SagPage>
+  </div>
 </template>

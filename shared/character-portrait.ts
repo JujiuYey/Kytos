@@ -1,6 +1,7 @@
 export const CHARACTER_PORTRAIT_SIZES = ['2:3', '3:4', '4:5', '1:1'] as const;
 export const CHARACTER_PORTRAIT_RESOLUTIONS = ['1k', '2k', '4k'] as const;
 export const CHARACTER_SHEET_SIZE = '16:9' as const;
+export const MAX_CHARACTER_SHEET_REFERENCE_IMAGES = 16;
 
 export type CharacterPortraitSize = (typeof CHARACTER_PORTRAIT_SIZES)[number];
 export type CharacterImageSize = CharacterPortraitSize | typeof CHARACTER_SHEET_SIZE;
@@ -53,6 +54,8 @@ export interface CharacterPortraitRecord
 export interface CharacterSheetRecord extends CharacterImageRecord<typeof CHARACTER_SHEET_SIZE> {
   count: 1;
   name: string;
+  referenceAssets: CharacterVisualAssetSelection[];
+  /** @deprecated Use referenceAssets. Kept for existing workspace data. */
   referenceImage: CharacterPortraitSelection | null;
   size: typeof CHARACTER_SHEET_SIZE;
 }
@@ -89,7 +92,7 @@ export interface DeleteCharacterPortraitRequest {
 export interface GenerateCharacterSheetRequest {
   name: string;
   prompt: string;
-  referenceAsset?: CharacterVisualAssetSelection;
+  referenceAssets: CharacterVisualAssetSelection[];
   resolution: CharacterPortraitResolution;
 }
 

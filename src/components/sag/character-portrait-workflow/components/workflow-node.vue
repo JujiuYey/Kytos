@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { FileText, Image as ImageIcon, Images, WandSparkles } from 'lucide-vue-next';
+import { Image as ImageIcon, Images, Trash2, WandSparkles } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import {
   Node as AiNode,
+  NodeAction,
   NodeContent,
   NodeDescription,
   NodeFooter,
@@ -13,24 +14,27 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
+import { MAX_CHARACTER_SHEET_REFERENCE_IMAGES } from '@/types';
 import type { WorkflowNodeData, WorkflowRunStatus } from '../workflow-types';
 
 const props = defineProps<{
   data: WorkflowNodeData;
+  deletable?: boolean;
   generateDisabled?: boolean;
+  referenceCount?: number;
   selected: boolean;
 }>();
 
 const emit = defineEmits<{
+  (event: 'delete'): void;
   (event: 'generate'): void;
+  (event: 'update-prompt', value: string): void;
 }>();
 
 const icon = computed(() => {
   if (props.data.kind === 'asset') {
     return Images;
-  }
-  if (props.data.kind === 'prompt') {
-    return FileText;
   }
   if (props.data.kind === 'generator') {
     return WandSparkles;
@@ -58,11 +62,15 @@ function statusLabel(status: WorkflowRunStatus): string {
 <template>
   <AiNode
     :handles="{
-      source: data.kind !== 'result',
+      source: data.kind === 'asset' || data.kind === 'generator',
+      sourceConnectableEnd: false,
+      sourceConnectableStart: data.kind === 'asset',
       target: data.kind === 'generator' || data.kind === 'result',
+      targetConnectableEnd: data.kind === 'generator',
+      targetConnectableStart: false,
     }"
     :class="[
-      'w-72 overflow-hidden shadow-sm transition-[border-color,box-shadow]',
+      'w-72 shadow-sm transition-[border-color,box-shadow] [&_.vue-flow__handle]:z-10 [&_.vue-flow__handle]:size-3 [&_.vue-flow__handle]:border-2 [&_.vue-flow__handle]:border-background [&_.vue-flow__handle]:bg-foreground',
       selected && 'border-primary ring-2 ring-primary/15',
     ]"
   >
@@ -78,16 +86,25 @@ function statusLabel(status: WorkflowRunStatus): string {
           <NodeDescription>
             {{
               data.kind === 'asset'
-                ? '正式资产'
-                : data.kind === 'prompt'
-                  ? '生成描述'
-                  : data.kind === 'generator'
-                    ? 'GPT-Image-2'
-                    : '生成结果'
+                ? '参考图 · 正式资产'
+                : data.kind === 'generator'
+                  ? 'GPT-Image-2'
+                  : '生成结果'
             }}
           </NodeDescription>
         </div>
       </div>
+      <NodeAction v-if="deletable">
+        <Button
+          size="icon"
+          variant="ghost"
+          class="nodrag nowheel size-7"
+          aria-label="删除参考图节点"
+          @click.stop="emit('delete')"
+        >
+          <Trash2 class="size-3.5" />
+        </Button>
+      </NodeAction>
     </NodeHeader>
 
     <NodeContent v-if="data.kind === 'asset'" class="p-3">
@@ -99,16 +116,28 @@ function statusLabel(status: WorkflowRunStatus): string {
       <p class="mt-2 truncate text-xs text-muted-foreground">{{ data.image.name || data.label }}</p>
     </NodeContent>
 
-    <NodeContent v-else-if="data.kind === 'prompt'" class="p-3">
-      <p class="line-clamp-5 text-xs leading-5 text-muted-foreground">
-        {{ data.prompt }}
-      </p>
-    </NodeContent>
-
     <NodeContent v-else-if="data.kind === 'generator'" class="space-y-3 p-3">
-      <div class="flex items-center justify-between gap-3 text-xs">
+      <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
         <span class="truncate font-medium">{{ data.name }}</span>
-        <Badge variant="outline">{{ data.resolution.toUpperCase() }} · 16:9</Badge>
+        <div class="flex items-center gap-1.5">
+          <Badge variant="secondary">
+            参考图 {{ referenceCount || 0 }} / {{ MAX_CHARACTER_SHEET_REFERENCE_IMAGES }}
+          </Badge>
+          <Badge variant="outline">{{ data.resolution.toUpperCase() }} · 16:9</Badge>
+        </div>
+      </div>
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between text-xs text-muted-foreground">
+          <span>图片提示词</span>
+          <span class="tabular-nums">{{ data.prompt.length }} / 20000</span>
+        </div>
+        <Textarea
+          :model-value="data.prompt"
+          class="nodrag nowheel min-h-24 resize-none text-xs leading-5"
+          maxlength="20000"
+          @click.stop
+          @update:model-value="emit('update-prompt', String($event))"
+        />
       </div>
       <div v-if="data.status !== 'idle'" class="space-y-1.5">
         <div class="flex items-center justify-between text-xs text-muted-foreground">

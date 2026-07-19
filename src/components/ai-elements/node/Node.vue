@@ -7,7 +7,11 @@ import { reactiveOmit } from '@vueuse/core';
 
 interface NodeHandles {
   target?: boolean;
+  targetConnectableEnd?: boolean;
+  targetConnectableStart?: boolean;
   source?: boolean;
+  sourceConnectableEnd?: boolean;
+  sourceConnectableStart?: boolean;
 }
 
 interface NodeProps {
@@ -24,8 +28,20 @@ const delegatedProps = reactiveOmit(props, 'class');
     v-bind="delegatedProps"
     :class="cn('node-container relative size-full h-auto w-sm gap-0 rounded-md p-0', props.class)"
   >
-    <Handle v-if="props.handles?.target" :position="Position.Left" type="target" />
-    <Handle v-if="props.handles?.source" :position="Position.Right" type="source" />
+    <Handle
+      v-if="props.handles?.target"
+      :connectable-end="props.handles.targetConnectableEnd"
+      :connectable-start="props.handles.targetConnectableStart"
+      :position="Position.Left"
+      type="target"
+    />
+    <Handle
+      v-if="props.handles?.source"
+      :connectable-end="props.handles.sourceConnectableEnd"
+      :connectable-start="props.handles.sourceConnectableStart"
+      :position="Position.Right"
+      type="source"
+    />
     <slot />
   </Card>
 </template>

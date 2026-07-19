@@ -72,6 +72,7 @@ export {
   CHARACTER_PORTRAIT_RESOLUTIONS,
   CHARACTER_PORTRAIT_SIZES,
   CHARACTER_SHEET_SIZE,
+  MAX_CHARACTER_SHEET_REFERENCE_IMAGES,
 } from '../../shared/character-portrait';
 export type {
   CreateIllustrationTopicRequest,

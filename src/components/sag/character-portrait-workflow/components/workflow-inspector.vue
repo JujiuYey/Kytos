@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FileText, Image as ImageIcon, Images, WandSparkles } from 'lucide-vue-next';
+import { Image as ImageIcon, Images, WandSparkles } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,12 +15,14 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { CharacterPortraitResolution } from '@/types';
+import { MAX_CHARACTER_SHEET_REFERENCE_IMAGES } from '@/types';
 import type { WorkflowAssetOption, WorkflowNode } from '../workflow-types';
 
 defineProps<{
   assetOptions: WorkflowAssetOption[];
   generateDisabled: boolean;
   node: WorkflowNode | null;
+  referenceCount: number;
 }>();
 
 const emit = defineEmits<{
@@ -36,7 +38,6 @@ const emit = defineEmits<{
   <aside class="flex h-full min-h-0 flex-col bg-background" aria-label="节点属性">
     <div class="flex h-12 shrink-0 items-center gap-2 border-b px-4">
       <Images v-if="node?.data.kind === 'asset'" class="size-4" />
-      <FileText v-else-if="node?.data.kind === 'prompt'" class="size-4" />
       <WandSparkles v-else-if="node?.data.kind === 'generator'" class="size-4" />
       <ImageIcon v-else class="size-4" />
       <h2 class="truncate text-sm font-medium">{{ node?.data.label || '未选择节点' }}</h2>
@@ -49,7 +50,7 @@ const emit = defineEmits<{
 
       <div v-else-if="node.data.kind === 'asset'" class="space-y-6 p-4">
         <div class="space-y-2">
-          <Label for="workflow-asset">正式资产</Label>
+          <Label for="workflow-asset">参考图资产</Label>
           <Select
             :model-value="node.data.assetKey"
             @update:model-value="emit('update-asset', String($event))"
@@ -81,23 +82,13 @@ const emit = defineEmits<{
         </dl>
       </div>
 
-      <div v-else-if="node.data.kind === 'prompt'" class="space-y-2 p-4">
-        <div class="flex items-center justify-between gap-3">
-          <Label for="workflow-prompt">图片提示词</Label>
-          <span class="text-xs tabular-nums text-muted-foreground">
-            {{ node.data.prompt.length }} / 20000
-          </span>
-        </div>
-        <Textarea
-          id="workflow-prompt"
-          :model-value="node.data.prompt"
-          class="min-h-80 resize-none text-sm leading-6"
-          maxlength="20000"
-          @update:model-value="emit('update-prompt', String($event))"
-        />
-      </div>
-
       <div v-else-if="node.data.kind === 'generator'" class="space-y-6 p-4">
+        <div class="flex items-center justify-between gap-3 text-sm">
+          <span class="text-muted-foreground">已连接参考图</span>
+          <Badge variant="secondary">
+            {{ referenceCount }} / {{ MAX_CHARACTER_SHEET_REFERENCE_IMAGES }}
+          </Badge>
+        </div>
         <div class="space-y-2">
           <Label for="workflow-name">图片名称</Label>
           <Input
@@ -105,6 +96,21 @@ const emit = defineEmits<{
             :model-value="node.data.name"
             maxlength="80"
             @update:model-value="emit('update-name', String($event))"
+          />
+        </div>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between gap-3">
+            <Label for="workflow-prompt">图片提示词</Label>
+            <span class="text-xs tabular-nums text-muted-foreground">
+              {{ node.data.prompt.length }} / 20000
+            </span>
+          </div>
+          <Textarea
+            id="workflow-prompt"
+            :model-value="node.data.prompt"
+            class="min-h-64 resize-none text-sm leading-6"
+            maxlength="20000"
+            @update:model-value="emit('update-prompt', String($event))"
           />
         </div>
         <div class="grid grid-cols-2 gap-3">

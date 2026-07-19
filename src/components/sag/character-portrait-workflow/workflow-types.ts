@@ -5,7 +5,7 @@ import type {
   CharacterVisualAssetSelection,
 } from '@/types';
 
-export type WorkflowNodeKind = 'asset' | 'prompt' | 'generator' | 'result';
+export type WorkflowNodeKind = 'asset' | 'generator' | 'result';
 export type WorkflowRunStatus =
   | 'idle'
   | 'submitted'
@@ -30,17 +30,12 @@ export interface WorkflowAssetNodeData {
   selection: CharacterVisualAssetSelection;
 }
 
-export interface WorkflowPromptNodeData {
-  kind: 'prompt';
-  label: string;
-  prompt: string;
-}
-
 export interface WorkflowGeneratorNodeData {
   errorMessage: string;
   kind: 'generator';
   label: string;
   name: string;
+  prompt: string;
   progress: number;
   resolution: CharacterPortraitResolution;
   status: WorkflowRunStatus;
@@ -58,7 +53,6 @@ export interface WorkflowResultNodeData {
 
 export type WorkflowNodeData =
   | WorkflowAssetNodeData
-  | WorkflowPromptNodeData
   | WorkflowGeneratorNodeData
   | WorkflowResultNodeData;
 
