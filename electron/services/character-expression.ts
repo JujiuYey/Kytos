@@ -1,11 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createDeepSeek } from '@ai-sdk/deepseek';
+import type { DeepSeekLanguageModelChatOptions } from '@ai-sdk/deepseek';
+import { generateText } from 'ai';
+import { DEFAULT_DEEPSEEK_MODEL } from '../../shared/character';
 import type {
   CharacterExpressionRecord,
+  CharacterExpressionReferenceSelection,
   CharacterExpressionSize,
   CharacterExpressionWorkspaceState,
   DeleteCharacterExpressionRequest,
+  GenerateCharacterExpressionPromptRequest,
   GenerateCharacterExpressionRequest,
   GetCharacterExpressionTaskRequest,
   GetCharacterExpressionWorkspaceRequest,
@@ -20,15 +26,12 @@ import type {
   CharacterPortraitImage,
   CharacterPortraitResolution,
   CharacterPortraitTaskStatus,
-  CharacterVisualAssetSelection,
+  CharacterPortraitWorkspaceState,
 } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
 import type { SavedFileResult } from '../../shared/desktop';
 import { getCharacterDirectory } from './character-library';
-import {
-  getCharacterPortraitWorkspace,
-  getOfficialCharacterVisualReferences,
-} from './character-portrait';
+import { getCharacterPortraitWorkspace } from './character-portrait';
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
@@ -36,6 +39,8 @@ import { getWorkspaceDirectory } from './workspace';
 const API_BASE_URL = 'https://api.apimart.ai';
 const EXPRESSION_STORE_FILE_NAME = 'character-expressions.json';
 const EXPRESSION_ASSET_DIRECTORY = 'character-expressions';
+const PORTRAIT_ASSET_DIRECTORY = 'character-portraits';
+const SHEET_ASSET_DIRECTORY = 'character-sheets';
 const MAX_NAME_LENGTH = 80;
 const MAX_PROMPT_LENGTH = 20_000;
 const MAX_REFERENCE_IMAGE_SIZE = 20 * 1024 * 1024;
@@ -58,6 +63,12 @@ interface ApiTaskData {
   status?: string;
 }
 
+interface ExpressionReferenceData {
+  directoryName: string;
+  image: CharacterPortraitImage;
+  selection: CharacterExpressionReferenceSelection;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
@@ -76,10 +87,10 @@ function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
   );
 }
 
-function parseVisualAssetSelection(value: unknown): CharacterVisualAssetSelection | null {
+function parseReferenceSelection(value: unknown): CharacterExpressionReferenceSelection | null {
   if (
     !isRecord(value) ||
-    (value.kind !== 'portrait' && value.kind !== 'sheet') ||
+    !['expression', 'portrait', 'sheet'].includes(String(value.kind)) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName ||
     typeof value.taskId !== 'string' ||
@@ -87,10 +98,14 @@ function parseVisualAssetSelection(value: unknown): CharacterVisualAssetSelectio
   ) {
     return null;
   }
-  return { fileName: value.fileName, kind: value.kind, taskId: value.taskId };
+  return {
+    fileName: value.fileName,
+    kind: value.kind as CharacterExpressionReferenceSelection['kind'],
+    taskId: value.taskId,
+  };
 }
 
-function selectionKey(selection: CharacterVisualAssetSelection): string {
+function selectionKey(selection: CharacterExpressionReferenceSelection): string {
   return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
 }
 
@@ -142,12 +157,12 @@ function parseExpressionRecord(value: unknown): CharacterExpressionRecord | null
         .map(parseImage)
         .filter((image): image is CharacterPortraitImage => Boolean(image))
     : [];
-  const parsedReferenceAssets = value.referenceAssets.map(parseVisualAssetSelection);
+  const parsedReferenceAssets = value.referenceAssets.map(parseReferenceSelection);
   if (parsedReferenceAssets.some(asset => !asset)) {
     return null;
   }
   const referenceAssets = parsedReferenceAssets.filter(
-    (asset): asset is CharacterVisualAssetSelection => Boolean(asset),
+    (asset): asset is CharacterExpressionReferenceSelection => Boolean(asset),
   );
   if (
     referenceAssets.length > MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES ||
@@ -221,7 +236,7 @@ function replaceRecord(
 
 function validateGenerateRequest(
   request: GenerateCharacterExpressionRequest,
-): CharacterVisualAssetSelection[] {
+): CharacterExpressionReferenceSelection[] {
   if (
     !request ||
     typeof request !== 'object' ||
@@ -243,12 +258,12 @@ function validateGenerateRequest(
   ) {
     throw new Error('表情生成参数无效');
   }
-  const referenceAssets = request.referenceAssets.map(parseVisualAssetSelection);
+  const referenceAssets = request.referenceAssets.map(parseReferenceSelection);
   if (referenceAssets.some(asset => !asset)) {
     throw new Error('选择的角色参考图无效');
   }
-  const selections = referenceAssets.filter((asset): asset is CharacterVisualAssetSelection =>
-    Boolean(asset),
+  const selections = referenceAssets.filter(
+    (asset): asset is CharacterExpressionReferenceSelection => Boolean(asset),
   );
   if (new Set(selections.map(selectionKey)).size !== selections.length) {
     throw new Error('角色参考图不能重复选择');
@@ -258,13 +273,65 @@ function validateGenerateRequest(
 
 function buildExpressionPrompt(request: GenerateCharacterExpressionRequest): string {
   return [
-    '参考图中的角色是唯一要画的人，综合所有正式角色视觉确认脸部、服装、完整造型和整体画风。',
+    '参考图中的角色是唯一要画的人，综合所有已选参考确认角色身份、造型、表情语言和整体画风。',
     `目标表情：${request.name.trim()}`,
     `表情描述：${request.description.trim()}`,
     '保持角色身份、脸型、五官、发型、服装、配饰、颜色和绘画风格与参考图一致，只改变面部表情和与情绪相符的轻微姿态。',
     '构图以清楚展示表情为主，使用头肩像或半身像，主体居中，轮廓完整，背景干净简单。',
     '不要添加文字、对话框、边框、Logo、水印、额外人物、重复五官或多格排版。',
   ].join('\n');
+}
+
+function resolveDeepSeekModel(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new Error('DeepSeek 模型无效');
+  }
+  const model = value.trim();
+  if (!model || model === 'deepseek-chat' || model === 'deepseek-reasoner') {
+    return DEFAULT_DEEPSEEK_MODEL;
+  }
+  if (model.length > 200 || !/^[a-zA-Z0-9._-]+$/.test(model)) {
+    throw new Error('DeepSeek 模型无效');
+  }
+  return model;
+}
+
+export async function generateCharacterExpressionPrompt(
+  request: GenerateCharacterExpressionPromptRequest,
+): Promise<string> {
+  if (
+    !request ||
+    typeof request !== 'object' ||
+    typeof request.name !== 'string' ||
+    !request.name.trim() ||
+    request.name.length > MAX_NAME_LENGTH
+  ) {
+    throw new Error('请先填写有效的表情名称');
+  }
+  const apiKey = await getCredentialValue('deepseek');
+  const deepSeek = createDeepSeek({ apiKey });
+  const { text } = await generateText({
+    maxOutputTokens: 600,
+    model: deepSeek(resolveDeepSeekModel(request.model)),
+    prompt: `表情名称：${request.name.trim()}`,
+    providerOptions: {
+      deepseek: {
+        thinking: { type: 'disabled' },
+      } satisfies DeepSeekLanguageModelChatOptions,
+    },
+    system: `你负责为角色表情图生图编写中文提示词。根据用户给出的表情名称，输出一段可直接编辑和用于生图的表情描述。
+
+要求：
+1. 具体描述眉毛、眼睛、视线、嘴部、面部肌肉、情绪强度以及自然的头部或上半身姿态。
+2. 不重新设计角色外形、服装和画风，这些由参考图决定。
+3. 不写尺寸、分辨率、模型名称、解释、标题、Markdown 或引号。
+4. 控制在 80 至 180 个中文字符，只输出提示词正文。`,
+  });
+  const prompt = text.trim();
+  if (!prompt) {
+    throw new Error('DeepSeek 未返回表情提示词');
+  }
+  return prompt.slice(0, MAX_PROMPT_LENGTH);
 }
 
 function validateUploadRequest(request: UploadCharacterExpressionRequest): void {
@@ -430,12 +497,12 @@ async function downloadTaskImages(
 }
 
 async function getReferenceData(
-  selection: CharacterVisualAssetSelection,
+  selection: CharacterExpressionReferenceSelection,
   directoryName: string,
   image: CharacterPortraitImage,
 ): Promise<string> {
   if (selection.fileName !== image.fileName) {
-    throw new Error('角色参考图选择已失效，请重新确认角色视觉资产');
+    throw new Error('选择的角色参考已失效，请重新选择');
   }
   const workspacePath = await getWorkspaceDirectory();
   const imageData = await readFile(
@@ -445,6 +512,52 @@ async function getReferenceData(
     throw new Error('角色参考图超过 20 MB，无法用于表情生成');
   }
   return `data:${image.mimeType};base64,${imageData.toString('base64')}`;
+}
+
+function getAvailableReferences(
+  portraitWorkspace: CharacterPortraitWorkspaceState,
+  expressionStore: StoredExpressionWorkspace,
+): ExpressionReferenceData[] {
+  const portraitReferences = portraitWorkspace.records.flatMap(record =>
+    record.status === 'completed'
+      ? record.images.map(image => ({
+          directoryName: PORTRAIT_ASSET_DIRECTORY,
+          image,
+          selection: {
+            fileName: image.fileName,
+            kind: 'portrait' as const,
+            taskId: record.id,
+          },
+        }))
+      : [],
+  );
+  const sheetReferences = portraitWorkspace.sheetRecords.flatMap(record =>
+    record.status === 'completed'
+      ? record.images.map(image => ({
+          directoryName: SHEET_ASSET_DIRECTORY,
+          image,
+          selection: {
+            fileName: image.fileName,
+            kind: 'sheet' as const,
+            taskId: record.id,
+          },
+        }))
+      : [],
+  );
+  const expressionReferences = expressionStore.records.flatMap(record =>
+    record.status === 'completed'
+      ? record.images.map(image => ({
+          directoryName: EXPRESSION_ASSET_DIRECTORY,
+          image,
+          selection: {
+            fileName: image.fileName,
+            kind: 'expression' as const,
+            taskId: record.id,
+          },
+        }))
+      : [],
+  );
+  return [...portraitReferences, ...sheetReferences, ...expressionReferences];
 }
 
 export async function getCharacterExpressionWorkspace(
@@ -461,10 +574,13 @@ export async function generateCharacterExpression(
   request: GenerateCharacterExpressionRequest,
 ): Promise<CharacterExpressionRecord> {
   const requestedAssets = validateGenerateRequest(request);
-  const portraitWorkspace = await getCharacterPortraitWorkspace(request.characterId);
-  const officialReferences = getOfficialCharacterVisualReferences(portraitWorkspace);
+  const [portraitWorkspace, expressionStore] = await Promise.all([
+    getCharacterPortraitWorkspace(request.characterId),
+    loadExpressionStore(request.characterId),
+  ]);
+  const availableReferences = getAvailableReferences(portraitWorkspace, expressionStore);
   const referencesByKey = new Map(
-    officialReferences.map(reference => [selectionKey(reference.selection), reference]),
+    availableReferences.map(reference => [selectionKey(reference.selection), reference]),
   );
   const references = requestedAssets.map(selection => {
     const reference = referencesByKey.get(selectionKey(selection));

@@ -7,33 +7,38 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
+import { useAppStore } from '@/stores/app';
 import type {
   CharacterExpressionRecord,
+  CharacterExpressionReferenceSelection,
   CharacterExpressionSize,
   CharacterExpressionWorkspaceState,
   CharacterLibraryState,
   CharacterPortraitImage,
   CharacterPortraitResolution,
   CharacterPortraitWorkspaceState,
-  CharacterVisualAssetSelection,
   CredentialStatus,
   SaveFileRequest,
   SavedFileResult,
 } from '@/types';
-import { MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
+import { DEFAULT_DEEPSEEK_MODEL, MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
 import ExpressionGallery from './components/expression-gallery.vue';
 import ExpressionGeneratorPanel from './components/expression-generator-panel.vue';
 import ExpressionPageHeader from './components/expression-page-header.vue';
+import ExpressionReferenceDialog from './components/expression-reference-dialog.vue';
 import ExpressionRenameDialog from './components/expression-rename-dialog.vue';
 import ExpressionUploadDialog from './components/expression-upload-dialog.vue';
+import type { ExpressionReferenceOption } from './expression-reference';
 
 const router = useRouter();
+const appStore = useAppStore();
 const library = ref<CharacterLibraryState | null>(null);
 const selectedCharacterId = ref('');
 const records = ref<CharacterExpressionRecord[]>([]);
 const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
-const selectedReferenceAssets = ref<CharacterVisualAssetSelection[]>([]);
+const selectedReferenceAssets = ref<CharacterExpressionReferenceSelection[]>([]);
 const credentialStatus = ref<CredentialStatus | null>(null);
+const deepseekStatus = ref<CredentialStatus | null>(null);
 const name = ref('开心');
 const description = ref('眼睛明亮，嘴角自然上扬，带有真诚而有感染力的笑意。');
 const size = ref<CharacterExpressionSize>('1:1');
@@ -53,7 +58,9 @@ const deleteTarget = ref<{
 const renameDialogOpen = ref(false);
 const renameTarget = ref<CharacterExpressionRecord | null>(null);
 const uploadDialogOpen = ref(false);
+const referenceDialogOpen = ref(false);
 const generatorOpen = ref(false);
+const isGeneratingPrompt = ref(false);
 const mobilePane = ref<'settings' | 'gallery'>('gallery');
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -68,70 +75,111 @@ const activeRecord = computed(() =>
   records.value.find(record => activeStatuses.includes(record.status)),
 );
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
+const promptGenerationAvailable = computed(() => Boolean(deepseekStatus.value?.configured));
 const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
 const characterSelectionDisabled = computed(
   () =>
     isInitializing.value ||
     isSubmitting.value ||
+    isGeneratingPrompt.value ||
     Boolean(deletingFileName.value) ||
     Boolean(renamingTaskId.value),
 );
-const officialReferenceAssets = computed(() =>
-  (portraitWorkspace.value?.officialAssets ?? []).flatMap(selection => {
-    const image = findOfficialImage(selection);
-    return image ? [{ image, key: referenceAssetKey(selection), selection: { ...selection } }] : [];
-  }),
-);
+const referenceOptions = computed<ExpressionReferenceOption[]>(() => {
+  const workspace = portraitWorkspace.value;
+  if (!workspace) {
+    return [];
+  }
+  const portraitOptions = workspace.records.flatMap(record =>
+    record.status === 'completed'
+      ? record.images.map(image => {
+          const selection = {
+            fileName: image.fileName,
+            kind: 'portrait' as const,
+            taskId: record.id,
+          };
+          return {
+            detail: `角色图片 · ${record.size}`,
+            image,
+            key: referenceAssetKey(selection),
+            label: image.name || record.name || '角色图片',
+            selection,
+            source: 'visual' as const,
+          };
+        })
+      : [],
+  );
+  const sheetOptions = workspace.sheetRecords.flatMap(record =>
+    record.status === 'completed'
+      ? record.images.map(image => {
+          const selection = {
+            fileName: image.fileName,
+            kind: 'sheet' as const,
+            taskId: record.id,
+          };
+          return {
+            detail: '角色表 · 16:9',
+            image,
+            key: referenceAssetKey(selection),
+            label: image.name || record.name || '角色表',
+            selection,
+            source: 'visual' as const,
+          };
+        })
+      : [],
+  );
+  const expressionOptions = records.value.flatMap(record =>
+    record.status === 'completed'
+      ? record.images.map((image, index) => {
+          const selection = {
+            fileName: image.fileName,
+            kind: 'expression' as const,
+            taskId: record.id,
+          };
+          return {
+            detail: record.source === 'uploaded' ? '已有表情 · 上传' : '已有表情 · 生成',
+            image,
+            key: referenceAssetKey(selection),
+            label: record.images.length > 1 ? `${record.name} ${index + 1}` : record.name,
+            selection,
+            source: 'expression' as const,
+          };
+        })
+      : [],
+  );
+  return [...portraitOptions, ...sheetOptions, ...expressionOptions];
+});
 const selectedReferenceKeys = computed(() => selectedReferenceAssets.value.map(referenceAssetKey));
-const hasReferences = computed(() => Boolean(portraitWorkspace.value?.officialAssets.length));
+const selectedReferenceOptions = computed(() => {
+  const selectedKeySet = new Set(selectedReferenceKeys.value);
+  return referenceOptions.value.filter(option => selectedKeySet.has(option.key));
+});
+const hasReferences = computed(() => referenceOptions.value.length > 0);
 const isGenerateDisabled = computed(
   () =>
     isInitializing.value ||
     isBusy.value ||
+    isGeneratingPrompt.value ||
     !keyConfigured.value ||
     !hasReferences.value ||
-    selectedReferenceAssets.value.length < 1 ||
-    selectedReferenceAssets.value.length > MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES ||
+    selectedReferenceOptions.value.length < 1 ||
+    selectedReferenceOptions.value.length > MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES ||
     !name.value.trim() ||
     name.value.length > 80 ||
     !description.value.trim() ||
     description.value.length > 20_000,
 );
 
-function referenceAssetKey(selection: CharacterVisualAssetSelection): string {
+function referenceAssetKey(selection: CharacterExpressionReferenceSelection): string {
   return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
 }
 
-function findOfficialImage(
-  selection: CharacterVisualAssetSelection,
-): CharacterPortraitImage | null {
-  const workspace = portraitWorkspace.value;
-  if (!workspace || !selection) {
-    return null;
-  }
-  const records = selection.kind === 'portrait' ? workspace.records : workspace.sheetRecords;
-  return (
-    records
-      .find(record => record.id === selection.taskId)
-      ?.images.find(image => image.fileName === selection.fileName) ?? null
-  );
-}
-
-function toggleReferenceAsset(selection: CharacterVisualAssetSelection): void {
-  const key = referenceAssetKey(selection);
-  if (selectedReferenceAssets.value.some(asset => referenceAssetKey(asset) === key)) {
-    selectedReferenceAssets.value = selectedReferenceAssets.value.filter(
-      asset => referenceAssetKey(asset) !== key,
-    );
-    return;
-  }
-  if (selectedReferenceAssets.value.length >= MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES) {
-    return;
-  }
-  selectedReferenceAssets.value = [
-    ...selectedReferenceAssets.value,
-    { fileName: selection.fileName, kind: selection.kind, taskId: selection.taskId },
-  ];
+function selectReferenceAssets(options: ExpressionReferenceOption[]): void {
+  selectedReferenceAssets.value = options.map(option => ({
+    fileName: option.selection.fileName,
+    kind: option.selection.kind,
+    taskId: option.selection.taskId,
+  }));
 }
 
 function replaceRecord(updatedRecord: CharacterExpressionRecord): void {
@@ -255,12 +303,14 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   try {
-    const [characterLibrary, status] = await Promise.all([
+    const [characterLibrary, status, deepseek] = await Promise.all([
       window.desktop.getCharacterLibrary(),
       window.desktop.getCredentialStatus('apimart'),
+      window.desktop.getCredentialStatus('deepseek'),
     ]);
     library.value = characterLibrary;
     credentialStatus.value = status;
+    deepseekStatus.value = deepseek;
     selectedCharacterId.value = characterLibrary.activeCharacterId;
     await loadCharacterWorkspace(characterLibrary.activeCharacterId);
   } catch (initializationError: unknown) {
@@ -328,6 +378,24 @@ function retryPolling(): void {
 function closeGenerator(): void {
   generatorOpen.value = false;
   mobilePane.value = 'gallery';
+}
+
+async function generateExpressionPrompt(): Promise<void> {
+  if (isGeneratingPrompt.value || !promptGenerationAvailable.value || !name.value.trim()) {
+    return;
+  }
+  isGeneratingPrompt.value = true;
+  try {
+    description.value = await window.desktop.generateCharacterExpressionPrompt({
+      model: appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL,
+      name: name.value.trim(),
+    });
+    toast.success('表情提示词已生成');
+  } catch (promptError: unknown) {
+    toast.error(promptError instanceof Error ? promptError.message : String(promptError));
+  } finally {
+    isGeneratingPrompt.value = false;
+  }
 }
 
 function uploadExpression(
@@ -448,9 +516,9 @@ onBeforeUnmount(() => {
 
     <Alert v-if="!isInitializing && !hasReferences" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
-      <AlertTitle>生成表情需要正式角色视觉</AlertTitle>
+      <AlertTitle>生成表情需要角色参考</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>上传已有表情不受影响。</span>
+        <span>可以先准备角色视觉，或上传一张已有表情。</span>
         <Button size="sm" variant="outline" @click="router.push('/character-portrait')">
           前往角色视觉
         </Button>
@@ -518,12 +586,14 @@ onBeforeUnmount(() => {
           v-model:size="size"
           :busy="isBusy"
           :disabled="isGenerateDisabled"
-          :reference-assets="officialReferenceAssets"
-          :selected-reference-keys="selectedReferenceKeys"
+          :prompt-generation-available="promptGenerationAvailable"
+          :prompt-generating="isGeneratingPrompt"
+          :reference-assets="selectedReferenceOptions"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeGenerator"
           @generate="generateExpression"
-          @toggle-reference="toggleReferenceAsset"
+          @generate-prompt="generateExpressionPrompt"
+          @open-reference-picker="referenceDialogOpen = true"
         />
       </div>
     </div>
@@ -532,6 +602,14 @@ onBeforeUnmount(() => {
       v-model:open="uploadDialogOpen"
       :upload-handler="uploadExpression"
       @uploaded="handleUploaded"
+    />
+
+    <ExpressionReferenceDialog
+      v-model:open="referenceDialogOpen"
+      :busy="isSubmitting"
+      :options="referenceOptions"
+      :selected-keys="selectedReferenceKeys"
+      @confirm="selectReferenceAssets"
     />
 
     <ExpressionRenameDialog

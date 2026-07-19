@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Check, WandSparkles, X } from 'lucide-vue-next';
+import { Images, Sparkles, WandSparkles, X } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
+import { Loader } from '@/components/ai-elements/loader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,46 +14,33 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type {
-  CharacterExpressionSize,
-  CharacterPortraitImage,
-  CharacterPortraitResolution,
-  CharacterVisualAssetSelection,
-} from '@/types';
-import { MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
+import type { CharacterExpressionSize, CharacterPortraitResolution } from '@/types';
+import type { ExpressionReferenceOption } from '../expression-reference';
 
-interface ExpressionReferenceAsset {
-  image: CharacterPortraitImage;
-  key: string;
-  selection: CharacterVisualAssetSelection;
-}
-
-const props = defineProps<{
+defineProps<{
   busy: boolean;
   count: number;
   description: string;
   disabled: boolean;
   name: string;
-  referenceAssets: ExpressionReferenceAsset[];
+  promptGenerationAvailable: boolean;
+  promptGenerating: boolean;
+  referenceAssets: ExpressionReferenceOption[];
   resolution: CharacterPortraitResolution;
-  selectedReferenceKeys: string[];
   size: CharacterExpressionSize;
 }>();
 
 const emit = defineEmits<{
   (event: 'close'): void;
   (event: 'generate'): void;
-  (event: 'toggle-reference', selection: CharacterVisualAssetSelection): void;
+  (event: 'generate-prompt'): void;
+  (event: 'open-reference-picker'): void;
   (event: 'update:count', value: number): void;
   (event: 'update:description', value: string): void;
   (event: 'update:name', value: string): void;
   (event: 'update:resolution', value: CharacterPortraitResolution): void;
   (event: 'update:size', value: CharacterExpressionSize): void;
 }>();
-
-function isReferenceSelected(key: string): boolean {
-  return props.selectedReferenceKeys.includes(key);
-}
 </script>
 
 <template>
@@ -67,63 +55,48 @@ function isReferenceSelected(key: string): boolean {
     <ScrollArea class="min-h-0 flex-1">
       <div class="space-y-7 px-5 py-5">
         <section aria-labelledby="expression-reference-heading">
-          <div class="mb-3">
-            <h2 id="expression-reference-heading" class="text-sm font-medium">角色参考</h2>
-            <p class="mt-1 text-xs leading-5 text-muted-foreground">
-              从当前角色的正式视觉资产中选择生成参考，不会默认全部使用。
-            </p>
-            <p class="mt-1 text-xs tabular-nums text-muted-foreground">
-              已选择 {{ selectedReferenceKeys.length }} /
-              {{ Math.min(referenceAssets.length, MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES) }}
-            </p>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div v-for="(asset, index) in referenceAssets" :key="asset.key" class="min-w-0">
-              <Button
-                variant="outline"
-                :aria-label="`${isReferenceSelected(asset.key) ? '取消选择' : '选择'}${asset.image.name || `正式资产 ${index + 1}`}`"
-                :aria-pressed="isReferenceSelected(asset.key)"
-                :disabled="
-                  busy ||
-                  (!isReferenceSelected(asset.key) &&
-                    selectedReferenceKeys.length >= MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES)
-                "
-                :class="[
-                  'relative block h-auto w-full overflow-hidden rounded-md p-0 focus-visible:ring-inset',
-                  isReferenceSelected(asset.key) && 'border-primary ring-2 ring-primary/20',
-                ]"
-                @click="emit('toggle-reference', asset.selection)"
-              >
-                <AiImage
-                  :alt="asset.image.name || `正式资产 ${index + 1}`"
-                  :src="asset.image.url"
-                  class="aspect-square w-full rounded-md bg-muted/30 object-contain"
-                />
-                <span
-                  v-if="isReferenceSelected(asset.key)"
-                  class="absolute right-2 top-2 flex size-5 items-center justify-center rounded-sm bg-primary text-primary-foreground shadow-sm"
-                >
-                  <Check class="size-3.5" />
-                </span>
-              </Button>
-              <p
-                :class="[
-                  'mt-2 truncate text-center text-xs',
-                  isReferenceSelected(asset.key)
-                    ? 'font-medium text-foreground'
-                    : 'text-muted-foreground',
-                ]"
-              >
-                {{ asset.image.name || `正式资产 ${index + 1}` }}
+          <div class="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h2 id="expression-reference-heading" class="text-sm font-medium">角色参考</h2>
+              <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                可选择当前角色的视觉资产或已有表情。
               </p>
             </div>
-            <div
-              v-if="!referenceAssets.length"
-              class="col-span-2 flex min-h-32 items-center justify-center rounded-md border border-dashed px-3 text-center text-xs leading-5 text-muted-foreground"
+            <Button
+              size="sm"
+              variant="outline"
+              :disabled="busy"
+              @click="emit('open-reference-picker')"
             >
-              缺少正式角色视觉
+              <Images class="size-4" />
+              {{ referenceAssets.length ? '更换参考' : '选择参考' }}
+            </Button>
+          </div>
+
+          <div
+            v-if="referenceAssets.length"
+            class="grid grid-cols-4 gap-2 rounded-md border bg-muted/15 p-2"
+          >
+            <div v-for="asset in referenceAssets.slice(0, 4)" :key="asset.key" class="min-w-0">
+              <AiImage
+                :alt="asset.label"
+                :src="asset.image.url"
+                class="aspect-square w-full rounded-sm bg-background object-contain"
+              />
+              <p class="mt-1 truncate text-center text-xs text-muted-foreground">
+                {{ asset.label }}
+              </p>
             </div>
           </div>
+          <div
+            v-else
+            class="flex min-h-24 items-center justify-center rounded-md border border-dashed px-3 text-center text-xs leading-5 text-muted-foreground"
+          >
+            尚未选择参考图片
+          </div>
+          <p v-if="referenceAssets.length > 4" class="mt-2 text-xs text-muted-foreground">
+            另有 {{ referenceAssets.length - 4 }} 张已选参考
+          </p>
         </section>
 
         <section class="space-y-4" aria-labelledby="expression-content-heading">
@@ -144,19 +117,34 @@ function isReferenceSelected(key: string): boolean {
 
           <div class="space-y-2">
             <div class="flex items-center justify-between gap-3">
-              <Label for="expression-description">表情描述</Label>
-              <span class="text-xs tabular-nums text-muted-foreground">
-                {{ description.length }} / 20000
-              </span>
+              <Label for="expression-description">表情提示词</Label>
+              <div class="flex items-center gap-2">
+                <span class="text-xs tabular-nums text-muted-foreground">
+                  {{ description.length }} / 20000
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  :disabled="busy || promptGenerating || !promptGenerationAvailable || !name.trim()"
+                  @click="emit('generate-prompt')"
+                >
+                  <Loader v-if="promptGenerating" class="size-4" />
+                  <Sparkles v-else class="size-4" />
+                  {{ promptGenerating ? '生成中' : '生成提示词' }}
+                </Button>
+              </div>
             </div>
             <Textarea
               id="expression-description"
               :model-value="description"
               class="min-h-36 resize-y text-sm leading-6"
               maxlength="20000"
-              placeholder="描述眼神、嘴角、眉毛、情绪强度和轻微姿态"
+              placeholder="描述眉眼、嘴部、情绪强度和轻微姿态"
               @update:model-value="emit('update:description', String($event))"
             />
+            <p v-if="!promptGenerationAvailable" class="text-xs text-muted-foreground">
+              配置 DeepSeek API Key 后可根据表情名称生成提示词。
+            </p>
           </div>
         </section>
 
@@ -228,9 +216,9 @@ function isReferenceSelected(key: string): boolean {
       </Button>
       <p class="mt-2 text-center text-xs text-muted-foreground">
         {{
-          selectedReferenceKeys.length
-            ? `使用 ${selectedReferenceKeys.length} 张已选参考图进行 GPT-Image-2 图生图，点击后将产生实际费用`
-            : '请先选择至少一张正式角色参考图'
+          referenceAssets.length
+            ? `使用 ${referenceAssets.length} 张已选参考图进行 GPT-Image-2 图生图，点击后将产生实际费用`
+            : '请先选择至少一张角色参考图'
         }}
       </p>
     </footer>

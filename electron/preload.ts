@@ -19,6 +19,8 @@ const desktopApi: DesktopApi = {
   deleteStoryShotVersion: request => ipcRenderer.invoke('story:delete-shot-version', request),
   generateCharacterExpression: request =>
     ipcRenderer.invoke('character-expression:generate', request),
+  generateCharacterExpressionPrompt: request =>
+    ipcRenderer.invoke('character-expression:generate-prompt', request),
   generateCharacterPortrait: request => ipcRenderer.invoke('character-portrait:generate', request),
   generateCharacterSheet: request => ipcRenderer.invoke('character-sheet:generate', request),
   generateIllustration: request => ipcRenderer.invoke('illustration:generate', request),

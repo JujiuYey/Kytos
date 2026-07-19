@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import type {
   DeleteCharacterExpressionRequest,
   GenerateCharacterExpressionRequest,
+  GenerateCharacterExpressionPromptRequest,
   GetCharacterExpressionTaskRequest,
   GetCharacterExpressionWorkspaceRequest,
   RenameCharacterExpressionRequest,
@@ -10,6 +11,7 @@ import type {
 import {
   deleteCharacterExpression,
   generateCharacterExpression,
+  generateCharacterExpressionPrompt,
   getCharacterExpressionTask,
   getCharacterExpressionWorkspace,
   renameCharacterExpression,
@@ -31,6 +33,14 @@ export function registerCharacterExpressionIpc(assertTrustedSender: TrustedSende
     async (event, request: GenerateCharacterExpressionRequest) => {
       assertTrustedSender(event);
       return generateCharacterExpression(request);
+    },
+  );
+
+  ipcMain.handle(
+    'character-expression:generate-prompt',
+    async (event, request: GenerateCharacterExpressionPromptRequest) => {
+      assertTrustedSender(event);
+      return generateCharacterExpressionPrompt(request);
     },
   );
 

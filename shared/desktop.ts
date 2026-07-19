@@ -1,5 +1,11 @@
 import type { CharacterWorkspaceState, SaveCharacterProfileRequest } from './character';
 import type {
+  ArtStyleWorkspaceState,
+  DeleteArtStyleRequest,
+  SaveArtStyleRequest,
+  SelectArtStyleRequest,
+} from './art-style';
+import type {
   CharacterLibraryState,
   CharacterScopeRequest,
   CreateCharacterRequest,
@@ -12,6 +18,7 @@ import type {
   CharacterExpressionWorkspaceState,
   DeleteCharacterExpressionRequest,
   GenerateCharacterExpressionRequest,
+  GenerateCharacterExpressionPromptRequest,
   GetCharacterExpressionTaskRequest,
   GetCharacterExpressionWorkspaceRequest,
   RenameCharacterExpressionRequest,
@@ -97,6 +104,7 @@ export interface SavedFileResult {
 }
 
 export interface DesktopApi {
+  deleteArtStyle: (request: DeleteArtStyleRequest) => Promise<ArtStyleWorkspaceState>;
   createCharacter: (request: CreateCharacterRequest) => Promise<CharacterLibraryState>;
   createStory: (request: CreateStoryRequest) => Promise<StoryProject>;
   createStoryShot: (request: CreateStoryShotRequest) => Promise<StoryProject>;
@@ -127,6 +135,9 @@ export interface DesktopApi {
   generateCharacterExpression: (
     request: GenerateCharacterExpressionRequest,
   ) => Promise<CharacterExpressionRecord>;
+  generateCharacterExpressionPrompt: (
+    request: GenerateCharacterExpressionPromptRequest,
+  ) => Promise<string>;
   generateCharacterPortrait: (
     request: GenerateCharacterPortraitRequest,
   ) => Promise<CharacterPortraitRecord>;
@@ -136,6 +147,7 @@ export interface DesktopApi {
   getCharacterExpressionTask: (
     request: GetCharacterExpressionTaskRequest,
   ) => Promise<CharacterExpressionRecord>;
+  getArtStyleWorkspace: () => Promise<ArtStyleWorkspaceState>;
   getCharacterExpressionWorkspace: (
     request: GetCharacterExpressionWorkspaceRequest,
   ) => Promise<CharacterExpressionWorkspaceState>;
@@ -162,6 +174,7 @@ export interface DesktopApi {
   ) => Promise<CharacterPortraitWorkspaceState>;
   selectDirectory: () => Promise<string | null>;
   saveFile: (request: SaveFileRequest) => Promise<SavedFileResult>;
+  saveArtStyle: (request: SaveArtStyleRequest) => Promise<ArtStyleWorkspaceState>;
   saveCharacterProfile: (request: SaveCharacterProfileRequest) => Promise<void>;
   saveIllustrationConversation: (
     request: SaveIllustrationConversationRequest,
@@ -177,6 +190,7 @@ export interface DesktopApi {
   selectIllustrationStyleReference: (
     request: SelectIllustrationStyleReferenceRequest,
   ) => Promise<IllustrationWorkspaceState>;
+  selectArtStyle: (request: SelectArtStyleRequest) => Promise<ArtStyleWorkspaceState>;
   selectStoryShotVersion: (request: SelectStoryShotVersionRequest) => Promise<StoryProject>;
   setCredential: (request: SetCredentialRequest) => Promise<CredentialStatus>;
   setCharacterVisualAssetOfficial: (

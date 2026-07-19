@@ -276,7 +276,7 @@ function formatDate(value: string): string {
             {{
               searchQuery.trim()
                 ? '可以调整搜索内容后重试。'
-                : '可以上传已有表情，或使用正式角色参考图发起生成。'
+                : '可以上传已有表情，或选择角色参考发起生成。'
             }}
           </p>
           <Button

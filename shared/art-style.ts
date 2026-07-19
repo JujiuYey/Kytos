@@ -1,0 +1,41 @@
+import type { CharacterPortraitImage } from './character-portrait';
+
+export const DEFAULT_ART_STYLE_ID = 'preset-minimal-line-art';
+
+export type ArtStyleSource = 'custom' | 'preset';
+
+export interface ArtStyleReferenceImage extends CharacterPortraitImage {
+  directory: 'art-styles';
+}
+
+export interface ArtStyle {
+  createdAt: string;
+  description: string;
+  id: string;
+  name: string;
+  palette: string[];
+  prompt: string;
+  referenceImage: ArtStyleReferenceImage | null;
+  source: ArtStyleSource;
+  updatedAt: string;
+}
+
+export interface ArtStyleWorkspaceState {
+  activeStyleId: string;
+  styles: ArtStyle[];
+}
+
+export interface SaveArtStyleRequest {
+  description: string;
+  id?: string;
+  name: string;
+  prompt: string;
+}
+
+export interface DeleteArtStyleRequest {
+  id: string;
+}
+
+export interface SelectArtStyleRequest {
+  id: string;
+}

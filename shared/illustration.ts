@@ -5,6 +5,7 @@ import type {
   CharacterPortraitSelection,
   CharacterPortraitTaskStatus,
 } from './character-portrait';
+import type { ArtStyle } from './art-style';
 
 export const ILLUSTRATION_AGENT_ENDPOINT = 'app://bundle/api/illustration-agent';
 export const ILLUSTRATION_SIZES = ['1:1', '3:4', '4:5', '16:9', '9:16'] as const;
@@ -62,6 +63,8 @@ export type IllustrationStyleReference =
     };
 
 export interface IllustrationVersion {
+  artStyleId: string | null;
+  artStyleName: string | null;
   baseVersion: IllustrationVersionReference | null;
   createdAt: string;
   errorMessage: string | null;
@@ -103,6 +106,7 @@ export interface UploadedIllustration {
 }
 
 export interface IllustrationWorkspaceState {
+  activeArtStyle: ArtStyle;
   selectedStyleReference: IllustrationStyleReference | null;
   topics: IllustrationTopic[];
   uploads: UploadedIllustration[];

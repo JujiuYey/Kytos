@@ -40,6 +40,8 @@ export interface StoryVersionReference {
 }
 
 export interface StoryShotVersion {
+  artStyleId: string | null;
+  artStyleName: string | null;
   baseVersion: StoryVersionReference | null;
   continuityVersion: StoryVersionReference | null;
   createdAt: string;

@@ -1,7 +1,8 @@
 import type {
   CharacterImageRecord,
   CharacterPortraitResolution,
-  CharacterVisualAssetSelection,
+  CharacterPortraitSelection,
+  CharacterVisualAssetKind,
 } from './character-portrait';
 import type { CharacterScopeRequest } from './character-library';
 
@@ -9,12 +10,17 @@ export const CHARACTER_EXPRESSION_SIZES = ['1:1', '3:4', '4:5'] as const;
 export const MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES = 16;
 
 export type CharacterExpressionSize = (typeof CHARACTER_EXPRESSION_SIZES)[number];
+export type CharacterExpressionReferenceKind = CharacterVisualAssetKind | 'expression';
+
+export interface CharacterExpressionReferenceSelection extends CharacterPortraitSelection {
+  kind: CharacterExpressionReferenceKind;
+}
 
 export interface GenerateCharacterExpressionRequest extends CharacterScopeRequest {
   count: number;
   description: string;
   name: string;
-  referenceAssets: CharacterVisualAssetSelection[];
+  referenceAssets: CharacterExpressionReferenceSelection[];
   resolution: CharacterPortraitResolution;
   size: CharacterExpressionSize;
 }
@@ -50,3 +56,8 @@ export interface GetCharacterExpressionTaskRequest extends CharacterScopeRequest
 }
 
 export type GetCharacterExpressionWorkspaceRequest = CharacterScopeRequest;
+
+export interface GenerateCharacterExpressionPromptRequest {
+  model: string;
+  name: string;
+}

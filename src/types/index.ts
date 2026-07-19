@@ -1,4 +1,14 @@
 export type {
+  ArtStyle,
+  ArtStyleReferenceImage,
+  ArtStyleSource,
+  ArtStyleWorkspaceState,
+  DeleteArtStyleRequest,
+  SaveArtStyleRequest,
+  SelectArtStyleRequest,
+} from '../../shared/art-style';
+export { DEFAULT_ART_STYLE_ID } from '../../shared/art-style';
+export type {
   CredentialService,
   CredentialStatus,
   DesktopApi,
@@ -30,10 +40,13 @@ export type {
 } from '../../shared/character-library';
 export type {
   CharacterExpressionRecord,
+  CharacterExpressionReferenceKind,
+  CharacterExpressionReferenceSelection,
   CharacterExpressionSize,
   CharacterExpressionWorkspaceState,
   DeleteCharacterExpressionRequest,
   GenerateCharacterExpressionRequest,
+  GenerateCharacterExpressionPromptRequest,
   GetCharacterExpressionTaskRequest,
   GetCharacterExpressionWorkspaceRequest,
   RenameCharacterExpressionRequest,
