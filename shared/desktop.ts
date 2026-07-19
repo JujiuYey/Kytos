@@ -22,8 +22,11 @@ import type {
   DeleteCharacterSheetRequest,
   GenerateCharacterPortraitRequest,
   GenerateCharacterSheetRequest,
+  RenameCharacterVisualAssetRequest,
   SelectCharacterPortraitRequest,
   SelectCharacterSheetRequest,
+  SetCharacterVisualAssetOfficialRequest,
+  UploadCharacterVisualAssetRequest,
 } from './character-portrait';
 import type {
   CreateIllustrationTopicRequest,
@@ -145,6 +148,9 @@ export interface DesktopApi {
   renameCharacterExpression: (
     request: RenameCharacterExpressionRequest,
   ) => Promise<CharacterExpressionWorkspaceState>;
+  renameCharacterVisualAsset: (
+    request: RenameCharacterVisualAssetRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
   selectDirectory: () => Promise<string | null>;
   saveFile: (request: SaveFileRequest) => Promise<SavedFileResult>;
   saveCharacterProfile: (request: SaveCharacterProfileRequest) => Promise<void>;
@@ -164,9 +170,15 @@ export interface DesktopApi {
   ) => Promise<IllustrationWorkspaceState>;
   selectStoryShotVersion: (request: SelectStoryShotVersionRequest) => Promise<StoryProject>;
   setCredential: (request: SetCredentialRequest) => Promise<CredentialStatus>;
+  setCharacterVisualAssetOfficial: (
+    request: SetCharacterVisualAssetOfficialRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
   setWorkspaceDirectory: (workspacePath: string) => Promise<DesktopSettings>;
   useSuggestedWorkspace: () => Promise<DesktopSettings>;
   uploadCharacterPortrait: (request: SaveFileRequest) => Promise<SavedFileResult>;
+  uploadCharacterVisualAsset: (
+    request: UploadCharacterVisualAssetRequest,
+  ) => Promise<SavedFileResult>;
   uploadCharacterExpression: (
     request: UploadCharacterExpressionRequest,
   ) => Promise<SavedFileResult>;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Check, Clock3, Image as ImageIcon, Trash2 } from 'lucide-vue-next';
+import { Check, Clock3, Image as ImageIcon, Pencil, Trash2 } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { Badge } from '@/components/ui/badge';
@@ -14,9 +14,9 @@ import type {
   CharacterImageRecord,
   CharacterPortraitImage,
   CharacterPortraitRecord,
-  CharacterPortraitSelection,
   CharacterPortraitTaskStatus,
   CharacterSheetRecord,
+  CharacterVisualAssetSelection,
 } from '@/types';
 
 type AssetKind = 'portrait' | 'sheet';
@@ -32,10 +32,10 @@ interface GalleryEntry {
 
 const props = defineProps<{
   deletingFileName: string;
+  officialAssets: CharacterVisualAssetSelection[];
   portraitRecords: CharacterPortraitRecord[];
-  selectedImage: CharacterPortraitSelection | null;
-  selectedSheet: CharacterPortraitSelection | null;
   selectingFileName: string;
+  renamingFileName: string;
   sheetRecords: CharacterSheetRecord[];
 }>();
 
@@ -47,7 +47,14 @@ const emit = defineEmits<{
     image: CharacterPortraitImage,
   ): void;
   (
-    event: 'select',
+    event: 'official',
+    kind: AssetKind,
+    record: CharacterImageRecord,
+    image: CharacterPortraitImage,
+    official: boolean,
+  ): void;
+  (
+    event: 'rename',
     kind: AssetKind,
     record: CharacterImageRecord,
     image: CharacterPortraitImage,
@@ -97,8 +104,12 @@ function isSelected(entry: GalleryEntry): boolean {
   if (!entry.image) {
     return false;
   }
-  const selection = entry.kind === 'portrait' ? props.selectedImage : props.selectedSheet;
-  return selection?.taskId === entry.record.id && selection.fileName === entry.image.fileName;
+  return props.officialAssets.some(
+    asset =>
+      asset.kind === entry.kind &&
+      asset.taskId === entry.record.id &&
+      asset.fileName === entry.image?.fileName,
+  );
 }
 
 function getStatusLabel(record: CharacterImageRecord): string {
@@ -116,8 +127,8 @@ function getStatusLabel(record: CharacterImageRecord): string {
   return labels[record.status];
 }
 
-function getAssetLabel(kind: AssetKind): string {
-  return kind === 'portrait' ? '定妆照' : '角色表';
+function getImageName(entry: GalleryEntry): string {
+  return entry.image?.name || entry.record.name;
 }
 
 function getAspectClass(size: CharacterImageRecord['size']): string {
@@ -163,9 +174,7 @@ function formatDate(value: string): string {
           <template v-if="entry.type === 'task'">
             <div class="p-4">
               <div class="flex min-w-0 items-center justify-between gap-3">
-                <h2 class="truncate text-sm font-medium">
-                  {{ getAssetLabel(entry.kind) }}生成任务
-                </h2>
+                <h2 class="truncate text-sm font-medium">{{ entry.record.name }}生成任务</h2>
                 <SagStatusBadge
                   :tone="
                     entry.record.status === 'failed' || entry.record.status === 'cancelled'
@@ -180,7 +189,7 @@ function formatDate(value: string): string {
               </div>
 
               <template v-if="isActive(entry.record)">
-                <p class="mt-4 text-sm">GPT-Image-2 正在绘制{{ getAssetLabel(entry.kind) }}</p>
+                <p class="mt-4 text-sm">GPT-Image-2 正在绘制“{{ entry.record.name }}”</p>
                 <div
                   class="mt-3 flex items-center justify-between gap-4 text-xs text-muted-foreground"
                 >
@@ -191,25 +200,25 @@ function formatDate(value: string): string {
               </template>
 
               <p v-else class="mt-4 text-sm text-destructive">
-                {{ entry.record.errorMessage || `${getAssetLabel(entry.kind)}生成任务未完成` }}
+                {{ entry.record.errorMessage || `${entry.record.name}生成任务未完成` }}
               </p>
             </div>
           </template>
 
           <template v-else-if="entry.image">
             <ImageViewer
-              :alt="`${getAssetLabel(entry.kind)}候选 ${entry.imageIndex + 1} 预览`"
+              :alt="`${getImageName(entry)}预览`"
               :src="entry.image.url"
-              :title="`${getAssetLabel(entry.kind)}预览`"
-              :description="`查看${getAssetLabel(entry.kind)}大图，可缩放和拖拽`"
+              :title="getImageName(entry)"
+              description="查看角色视觉大图，可缩放和拖拽"
             >
               <Button
                 variant="ghost"
                 class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
-                :aria-label="`查看${getAssetLabel(entry.kind)}候选 ${entry.imageIndex + 1}`"
+                :aria-label="`查看${getImageName(entry)}`"
               >
                 <AiImage
-                  :alt="`${getAssetLabel(entry.kind)}候选 ${entry.imageIndex + 1}`"
+                  :alt="getImageName(entry)"
                   :src="entry.image.url"
                   :class="[
                     getAspectClass(entry.record.size),
@@ -222,7 +231,7 @@ function formatDate(value: string): string {
             <div class="space-y-3 border-t px-3 py-3">
               <div class="flex min-w-0 items-start justify-between gap-2">
                 <div class="min-w-0">
-                  <h2 class="truncate text-sm font-medium">{{ getAssetLabel(entry.kind) }}</h2>
+                  <h2 class="truncate text-sm font-medium">{{ getImageName(entry) }}</h2>
                   <p class="mt-1 truncate text-xs text-muted-foreground">
                     {{
                       entry.record.source === 'uploaded'
@@ -245,16 +254,24 @@ function formatDate(value: string): string {
                   <Clock3 class="size-3.5 shrink-0" />
                   <span class="truncate">{{ formatDate(entry.record.createdAt) }}</span>
                 </span>
-                <div v-if="!isSelected(entry)" class="flex shrink-0 items-center gap-1.5">
+                <div class="flex shrink-0 items-center gap-1.5">
                   <Button
                     size="sm"
-                    variant="outline"
+                    :variant="isSelected(entry) ? 'ghost' : 'outline'"
                     :disabled="
                       selectingFileName === entry.image.fileName || Boolean(deletingFileName)
                     "
-                    @click="emit('select', entry.kind, entry.record, entry.image)"
+                    @click="
+                      emit('official', entry.kind, entry.record, entry.image, !isSelected(entry))
+                    "
                   >
-                    {{ selectingFileName === entry.image.fileName ? '保存中' : '设为正式资产' }}
+                    {{
+                      selectingFileName === entry.image.fileName
+                        ? '保存中'
+                        : isSelected(entry)
+                          ? '移出正式资产'
+                          : '设为正式资产'
+                    }}
                   </Button>
                   <TooltipProvider :delay-duration="300">
                     <Tooltip>
@@ -262,15 +279,38 @@ function formatDate(value: string): string {
                         <Button
                           size="icon"
                           variant="ghost"
+                          class="size-8 text-muted-foreground"
+                          :disabled="Boolean(renamingFileName) || Boolean(selectingFileName)"
+                          :aria-label="`重命名${getImageName(entry)}`"
+                          @click="emit('rename', entry.kind, entry.record, entry.image)"
+                        >
+                          <Pencil class="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>重命名图片</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider :delay-duration="300">
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button
+                          size="icon"
+                          variant="ghost"
                           class="size-8 text-muted-foreground hover:text-destructive"
-                          :disabled="Boolean(deletingFileName) || Boolean(selectingFileName)"
-                          :aria-label="`删除这张${getAssetLabel(entry.kind)}`"
+                          :disabled="
+                            isSelected(entry) ||
+                            Boolean(deletingFileName) ||
+                            Boolean(selectingFileName)
+                          "
+                          :aria-label="`删除${getImageName(entry)}`"
                           @click="emit('delete', entry.kind, entry.record, entry.image)"
                         >
                           <Trash2 class="size-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>删除{{ getAssetLabel(entry.kind) }}</TooltipContent>
+                      <TooltipContent>
+                        {{ isSelected(entry) ? '正式资产需先移出后才能删除' : '删除图片' }}
+                      </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </div>

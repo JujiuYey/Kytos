@@ -49,12 +49,17 @@ export type {
   CharacterPortraitTaskStatus,
   CharacterPortraitWorkspaceState,
   CharacterSheetRecord,
+  CharacterVisualAssetKind,
+  CharacterVisualAssetSelection,
   DeleteCharacterPortraitRequest,
   DeleteCharacterSheetRequest,
   GenerateCharacterPortraitRequest,
   GenerateCharacterSheetRequest,
+  RenameCharacterVisualAssetRequest,
   SelectCharacterPortraitRequest,
   SelectCharacterSheetRequest,
+  SetCharacterVisualAssetOfficialRequest,
+  UploadCharacterVisualAssetRequest,
 } from '../../shared/character-portrait';
 export {
   CHARACTER_AGENT_ENDPOINT,

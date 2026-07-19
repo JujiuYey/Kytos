@@ -26,8 +26,7 @@ defineProps<{
   description: string;
   disabled: boolean;
   name: string;
-  referencePortrait: CharacterPortraitImage | null;
-  referenceSheet: CharacterPortraitImage | null;
+  referenceAssets: CharacterPortraitImage[];
   resolution: CharacterPortraitResolution;
   size: CharacterExpressionSize;
 }>();
@@ -58,66 +57,38 @@ const emit = defineEmits<{
           <div class="mb-3">
             <h2 id="expression-reference-heading" class="text-sm font-medium">角色参考</h2>
             <p class="mt-1 text-xs leading-5 text-muted-foreground">
-              同时参考正式定妆照和角色表，锁定角色身份、造型与画风。
+              使用当前角色的正式视觉资产，锁定角色身份、造型与画风。
             </p>
           </div>
           <div class="grid grid-cols-2 gap-3">
-            <div class="min-w-0">
+            <div v-for="(asset, index) in referenceAssets" :key="asset.fileName" class="min-w-0">
               <ImageViewer
-                v-if="referencePortrait"
-                alt="正式定妆照预览"
-                :src="referencePortrait.url"
-                title="正式定妆照"
+                :alt="`${asset.name || `正式资产 ${index + 1}`}预览`"
+                :src="asset.url"
+                :title="asset.name || `正式资产 ${index + 1}`"
                 description="表情生成使用的身份与画风参考"
               >
                 <Button
                   variant="ghost"
                   class="block h-auto w-full rounded-md border p-0 focus-visible:ring-inset"
-                  aria-label="查看正式定妆照"
+                  :aria-label="`查看${asset.name || `正式资产 ${index + 1}`}`"
                 >
                   <AiImage
-                    alt="正式定妆照"
-                    :src="referencePortrait.url"
+                    :alt="asset.name || `正式资产 ${index + 1}`"
+                    :src="asset.url"
                     class="aspect-square w-full rounded-md bg-muted/30 object-contain"
                   />
                 </Button>
               </ImageViewer>
-              <div
-                v-else
-                class="flex aspect-square items-center justify-center rounded-md border border-dashed px-3 text-center text-xs leading-5 text-muted-foreground"
-              >
-                缺少正式定妆照
-              </div>
-              <p class="mt-2 truncate text-center text-xs text-muted-foreground">定妆照</p>
+              <p class="mt-2 truncate text-center text-xs text-muted-foreground">
+                {{ asset.name || `正式资产 ${index + 1}` }}
+              </p>
             </div>
-
-            <div class="min-w-0">
-              <ImageViewer
-                v-if="referenceSheet"
-                alt="正式角色表预览"
-                :src="referenceSheet.url"
-                title="正式角色表"
-                description="表情生成使用的完整造型与结构参考"
-              >
-                <Button
-                  variant="ghost"
-                  class="block h-auto w-full rounded-md border p-0 focus-visible:ring-inset"
-                  aria-label="查看正式角色表"
-                >
-                  <AiImage
-                    alt="正式角色表"
-                    :src="referenceSheet.url"
-                    class="aspect-square w-full rounded-md bg-muted/30 object-contain"
-                  />
-                </Button>
-              </ImageViewer>
-              <div
-                v-else
-                class="flex aspect-square items-center justify-center rounded-md border border-dashed px-3 text-center text-xs leading-5 text-muted-foreground"
-              >
-                缺少正式角色表
-              </div>
-              <p class="mt-2 truncate text-center text-xs text-muted-foreground">角色表</p>
+            <div
+              v-if="!referenceAssets.length"
+              class="col-span-2 flex min-h-32 items-center justify-center rounded-md border border-dashed px-3 text-center text-xs leading-5 text-muted-foreground"
+            >
+              缺少正式角色视觉
             </div>
           </div>
         </section>

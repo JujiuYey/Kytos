@@ -39,7 +39,10 @@ import {
   createEmptyStoryDraft,
   createEmptyStoryShotContent,
 } from '../../shared/story';
-import { getCharacterPortraitWorkspace } from './character-portrait';
+import {
+  getCharacterPortraitWorkspace,
+  getOfficialCharacterVisualReferences,
+} from './character-portrait';
 import { getCredentialValue } from './credentials';
 import { getIllustrationWorkspace } from './illustration';
 import { readJsonFile, writeJsonFile } from './json-store';
@@ -49,8 +52,6 @@ const API_BASE_URL = 'https://api.apimart.ai';
 const STORE_FILE_NAME = 'stories.json';
 const ASSET_DIRECTORY = 'story-frames';
 const ILLUSTRATION_ASSET_DIRECTORY = 'illustrations';
-const PORTRAIT_ASSET_DIRECTORY = 'character-portraits';
-const SHEET_ASSET_DIRECTORY = 'character-sheets';
 const MAX_TITLE_LENGTH = 100;
 const MAX_TEXT_LENGTH = 20_000;
 const MAX_STORED_PROMPT_LENGTH = 50_000;
@@ -1044,20 +1045,12 @@ export async function generateStoryShot(
   }
 
   const portraitWorkspace = await getCharacterPortraitWorkspace();
-  const referencePortrait = portraitWorkspace.selectedImage;
-  const referenceSheet = portraitWorkspace.selectedSheet;
-  const portraitImage = portraitWorkspace.records
-    .find(record => record.id === referencePortrait?.taskId)
-    ?.images.find(image => image.fileName === referencePortrait?.fileName);
-  const sheetImage = portraitWorkspace.sheetRecords
-    .find(record => record.id === referenceSheet?.taskId)
-    ?.images.find(image => image.fileName === referenceSheet?.fileName);
-  if (!referencePortrait || !portraitImage) {
-    throw new Error('请先选定或上传正式定妆照');
+  const characterReferences = getOfficialCharacterVisualReferences(portraitWorkspace);
+  if (!characterReferences.length) {
+    throw new Error('请先将至少一张角色视觉图片设为正式资产');
   }
-  if (!referenceSheet || !sheetImage) {
-    throw new Error('请先选定或上传正式角色表');
-  }
+  const referencePortrait = characterReferences[0]!.selection;
+  const referenceSheet = characterReferences[1]?.selection ?? null;
 
   const illustrationWorkspace = await getIllustrationWorkspace();
   const referenceStyle = illustrationWorkspace.selectedStyleReference;
@@ -1070,8 +1063,11 @@ export async function generateStoryShot(
   }
 
   const referenceImages = [
-    await readReferenceImage(PORTRAIT_ASSET_DIRECTORY, portraitImage),
-    await readReferenceImage(SHEET_ASSET_DIRECTORY, sheetImage),
+    ...(await Promise.all(
+      characterReferences.map(reference =>
+        readReferenceImage(reference.directoryName, reference.image),
+      ),
+    )),
     await readReferenceImage(ILLUSTRATION_ASSET_DIRECTORY, styleImage),
   ];
 
@@ -1126,7 +1122,7 @@ export async function generateStoryShot(
     progress: 0,
     prompt,
     referencePortrait: { ...referencePortrait },
-    referenceSheet: { ...referenceSheet },
+    referenceSheet: referenceSheet ? { ...referenceSheet } : null,
     referenceStyle: { ...referenceStyle },
     resolution: story.resolution,
     size: story.size,

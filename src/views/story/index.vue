@@ -67,10 +67,8 @@ const activeStory = computed(
 );
 const deepseekConfigured = computed(() => Boolean(deepseekStatus.value?.configured));
 const apimartConfigured = computed(() => Boolean(apimartStatus.value?.configured));
-const characterAssetsReady = computed(
-  () =>
-    Boolean(portraitWorkspace.value?.selectedImage) &&
-    Boolean(portraitWorkspace.value?.selectedSheet),
+const characterAssetsReady = computed(() =>
+  Boolean(portraitWorkspace.value?.officialAssets.length),
 );
 const styleReady = computed(() => Boolean(illustrationWorkspace.value?.selectedStyleReference));
 const assetsReady = computed(() => characterAssetsReady.value && styleReady.value);

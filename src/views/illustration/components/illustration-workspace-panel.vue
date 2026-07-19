@@ -46,12 +46,11 @@ const props = defineProps<{
   apimartConfigured: boolean;
   baseReference: IllustrationVersionReference | null;
   busy: boolean;
+  characterReferences: CharacterPortraitImage[];
   prompt: string;
-  portraitReference: CharacterPortraitImage | null;
   referencesReady: boolean;
   resolution: CharacterPortraitResolution;
   size: IllustrationSize;
-  sheetReference: CharacterPortraitImage | null;
   styleReference: CharacterPortraitImage | null;
   topic: IllustrationTopic;
 }>();
@@ -71,8 +70,10 @@ const emit = defineEmits<{
 
 const promptOpen = ref(false);
 const referenceAssets = computed(() => [
-  { image: props.portraitReference, label: '定妆照' },
-  { image: props.sheetReference, label: '角色表' },
+  ...props.characterReferences.map((image, index) => ({
+    image,
+    label: image.name || `正式资产 ${index + 1}`,
+  })),
   { image: props.styleReference, label: '画风' },
 ]);
 const activeStatuses = ['submitted', 'pending', 'processing'];
@@ -152,7 +153,7 @@ function handleTitleChange(event: Event): void {
             <div>
               <Label for="illustration-mobile-use-character">使用当前角色</Label>
               <p class="mt-1 text-xs text-muted-foreground">
-                {{ referencesReady ? '正式定妆照与角色表已就绪' : '需要先准备正式角色参考图' }}
+                {{ referencesReady ? '正式角色视觉已就绪' : '需要先准备正式角色视觉' }}
               </p>
             </div>
             <Switch
@@ -171,7 +172,7 @@ function handleTitleChange(event: Event): void {
               {{ styleReference ? '画风已锁定' : '未选画风' }}
             </SagStatusBadge>
           </div>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <div
               v-for="asset in referenceAssets"
               :key="asset.label"
@@ -210,7 +211,7 @@ function handleTitleChange(event: Event): void {
             {{ styleReference ? '更换正式画风' : '选择正式画风' }}
           </Button>
           <p class="mt-2 text-xs leading-5 text-muted-foreground">
-            生成时默认使用定妆照、角色表和正式画风；旧插画仅在点击“以此继续”后加入。
+            生成时默认使用全部正式角色视觉和正式画风；旧插画仅在点击“以此继续”后加入。
           </p>
         </section>
 

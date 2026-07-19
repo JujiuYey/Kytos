@@ -70,10 +70,6 @@ function getSkeletonAspectClass(index: number): string {
   return skeletonAspectClasses[(index - 1) % skeletonAspectClasses.length] ?? 'aspect-[3/4]';
 }
 
-function getVisualAssetLabel(kind: 'portrait' | 'sheet'): string {
-  return kind === 'portrait' ? '定妆照' : '角色表';
-}
-
 async function loadLibrary(): Promise<void> {
   loading.value = true;
   errorMessage.value = '';
@@ -225,7 +221,7 @@ onMounted(() => {
           >
             <AiImage
               v-if="character.visualAsset"
-              :alt="`${character.name}的${getVisualAssetLabel(character.visualAsset.kind)}`"
+              :alt="`${character.name}的${character.visualAsset.name}`"
               :src="character.visualAsset.url"
               :class="[
                 getVisualAssetAspectClass(character.visualAsset.size),
@@ -237,7 +233,7 @@ onMounted(() => {
               class="flex aspect-[3/4] w-full flex-col items-center justify-center gap-3 bg-muted/30 px-4 text-muted-foreground"
             >
               <UserRound class="size-10" />
-              <span class="text-xs">尚无定妆照或角色表</span>
+              <span class="text-xs">尚无正式角色视觉</span>
             </div>
           </Button>
 
@@ -248,8 +244,8 @@ onMounted(() => {
                 <p class="mt-1 truncate text-xs text-muted-foreground">
                   {{
                     character.visualAsset
-                      ? `首张${getVisualAssetLabel(character.visualAsset.kind)}`
-                      : '等待创建定妆照或角色表'
+                      ? `正式资产 · ${character.visualAsset.name}`
+                      : '等待添加正式角色视觉'
                   }}
                 </p>
               </div>

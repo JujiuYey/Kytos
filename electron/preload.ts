@@ -39,6 +39,7 @@ const desktopApi: DesktopApi = {
   openWorkspaceDirectory: () => ipcRenderer.invoke('workspace:open'),
   moveStoryShot: request => ipcRenderer.invoke('story:move-shot', request),
   renameCharacterExpression: request => ipcRenderer.invoke('character-expression:rename', request),
+  renameCharacterVisualAsset: request => ipcRenderer.invoke('character-visual:rename', request),
   selectDirectory: () => ipcRenderer.invoke('dialog:select-directory'),
   saveFile: request => ipcRenderer.invoke('file:save', request),
   saveCharacterProfile: request => ipcRenderer.invoke('character:save-profile', request),
@@ -52,11 +53,14 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke('illustration:select-style-reference', request),
   selectStoryShotVersion: request => ipcRenderer.invoke('story:select-shot-version', request),
   setCredential: request => ipcRenderer.invoke('credential:set', request),
+  setCharacterVisualAssetOfficial: request =>
+    ipcRenderer.invoke('character-visual:set-official', request),
   setWorkspaceDirectory: workspacePath =>
     ipcRenderer.invoke('workspace:set-directory', workspacePath),
   useSuggestedWorkspace: () => ipcRenderer.invoke('workspace:use-suggested'),
   uploadCharacterExpression: request => ipcRenderer.invoke('character-expression:upload', request),
   uploadCharacterPortrait: request => ipcRenderer.invoke('character-portrait:upload', request),
+  uploadCharacterVisualAsset: request => ipcRenderer.invoke('character-visual:upload', request),
   uploadCharacterSheet: request => ipcRenderer.invoke('character-sheet:upload', request),
   uploadIllustration: request => ipcRenderer.invoke('illustration:upload', request),
   updateIllustrationTopic: request => ipcRenderer.invoke('illustration:update-topic', request),

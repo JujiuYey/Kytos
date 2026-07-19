@@ -61,27 +61,13 @@ const activeTopic = computed(
 );
 const deepseekConfigured = computed(() => Boolean(deepseekStatus.value?.configured));
 const apimartConfigured = computed(() => Boolean(apimartStatus.value?.configured));
-const referencesReady = computed(
-  () =>
-    Boolean(portraitWorkspace.value?.selectedImage) &&
-    Boolean(portraitWorkspace.value?.selectedSheet),
+const referencesReady = computed(() => Boolean(portraitWorkspace.value?.officialAssets.length));
+const characterReferenceImages = computed<CharacterPortraitImage[]>(() =>
+  (portraitWorkspace.value?.officialAssets ?? []).flatMap((_, index) => {
+    const image = findOfficialVisualImage(index);
+    return image ? [image] : [];
+  }),
 );
-const portraitReferenceImage = computed<CharacterPortraitImage | null>(() => {
-  const selection = portraitWorkspace.value?.selectedImage;
-  return (
-    portraitWorkspace.value?.records
-      .find(record => record.id === selection?.taskId)
-      ?.images.find(image => image.fileName === selection?.fileName) ?? null
-  );
-});
-const sheetReferenceImage = computed<CharacterPortraitImage | null>(() => {
-  const selection = portraitWorkspace.value?.selectedSheet;
-  return (
-    portraitWorkspace.value?.sheetRecords
-      .find(record => record.id === selection?.taskId)
-      ?.images.find(image => image.fileName === selection?.fileName) ?? null
-  );
-});
 const styleReferenceImage = computed<CharacterPortraitImage | null>(() => {
   const reference = selectedStyleReference.value;
   if (!reference) {
@@ -100,6 +86,20 @@ const styleReferenceImage = computed<CharacterPortraitImage | null>(() => {
       ?.images.find(image => image.fileName === reference.fileName) ?? null
   );
 });
+
+function findOfficialVisualImage(index: number): CharacterPortraitImage | null {
+  const workspace = portraitWorkspace.value;
+  const selection = workspace?.officialAssets[index];
+  if (!workspace || !selection) {
+    return null;
+  }
+  const records = selection.kind === 'sheet' ? workspace.sheetRecords : workspace.records;
+  return (
+    records
+      .find(record => record.id === selection.taskId)
+      ?.images.find(image => image.fileName === selection.fileName) ?? null
+  );
+}
 
 const transport = new DefaultChatTransport<IllustrationAgentMessage>({
   api: ILLUSTRATION_AGENT_ENDPOINT,
@@ -521,11 +521,10 @@ onBeforeUnmount(() => {
           :base-reference="baseReference"
           :busy="generationBusy"
           :prompt="prompt"
-          :portrait-reference="portraitReferenceImage"
+          :character-references="characterReferenceImages"
           :references-ready="referencesReady"
           :resolution="resolution"
           :size="size"
-          :sheet-reference="sheetReferenceImage"
           :style-reference="styleReferenceImage"
           :topic="activeTopic"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"

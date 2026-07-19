@@ -16,18 +16,19 @@ import type {
   CharacterPortraitImage,
   CharacterPortraitRecord,
   CharacterPortraitResolution,
-  CharacterPortraitSelection,
   CharacterPortraitSize,
   CharacterPortraitWorkspaceState,
   CharacterSheetRecord,
+  CharacterVisualAssetSelection,
   CredentialStatus,
-  SaveFileRequest,
   SavedFileResult,
+  UploadCharacterVisualAssetRequest,
 } from '@/types';
 import { createEmptyCharacterDraft } from '@/types';
 import PortraitGallery from './components/portrait-gallery.vue';
 import PortraitPageHeader from './components/portrait-page-header.vue';
 import PortraitGeneratorPanel from './components/portrait-generator-panel.vue';
+import VisualAssetRenameDialog from './components/visual-asset-rename-dialog.vue';
 
 type AssetKind = 'portrait' | 'sheet';
 type WorkspaceStage = 'portrait' | 'sheet';
@@ -37,10 +38,11 @@ const draft = ref<CharacterDraft>(createEmptyCharacterDraft());
 const credentialStatus = ref<CredentialStatus | null>(null);
 const records = ref<CharacterPortraitRecord[]>([]);
 const sheetRecords = ref<CharacterSheetRecord[]>([]);
-const selectedImage = ref<CharacterPortraitSelection | null>(null);
-const selectedSheet = ref<CharacterPortraitSelection | null>(null);
+const officialAssets = ref<CharacterVisualAssetSelection[]>([]);
 const prompt = ref('');
+const imageName = ref('定妆照');
 const sheetPrompt = ref('');
+const sheetName = ref('角色表');
 const size = ref<CharacterPortraitSize>('2:3');
 const resolution = ref<CharacterPortraitResolution>('1k');
 const sheetResolution = ref<CharacterPortraitResolution>('1k');
@@ -52,6 +54,7 @@ const isSubmittingSheet = ref(false);
 const isPolling = ref(false);
 const isPollingSheet = ref(false);
 const selectingFileName = ref('');
+const renamingFileName = ref('');
 const deletingFileName = ref('');
 const deleteDialogOpen = ref(false);
 const deleteTarget = ref<{
@@ -60,7 +63,12 @@ const deleteTarget = ref<{
   record: CharacterImageRecord;
 } | null>(null);
 const uploadDialogOpen = ref(false);
-const uploadKind = ref<AssetKind>('portrait');
+const renameDialogOpen = ref(false);
+const renameTarget = ref<{
+  image: CharacterPortraitImage;
+  kind: AssetKind;
+  record: CharacterImageRecord;
+} | null>(null);
 const activeStage = ref<WorkspaceStage>('portrait');
 const generatorOpen = ref(true);
 const mobilePane = ref<'settings' | 'gallery'>('settings');
@@ -79,7 +87,13 @@ const activeSheetRecord = computed(() =>
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
 const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
 const isSheetBusy = computed(() => isSubmittingSheet.value || Boolean(activeSheetRecord.value));
-const selectedPortraitImage = computed(() => findSelectedImage(records.value, selectedImage.value));
+const selectedPortraitImage = computed(() => {
+  const asset = officialAssets.value[0];
+  if (!asset) {
+    return null;
+  }
+  return findSelectedImage(asset.kind === 'portrait' ? records.value : sheetRecords.value, asset);
+});
 const assetCount = computed(
   () =>
     records.value.reduce((total, record) => total + record.images.length, 0) +
@@ -90,6 +104,8 @@ const isGenerateDisabled = computed(
     isInitializing.value ||
     isBusy.value ||
     !keyConfigured.value ||
+    !imageName.value.trim() ||
+    imageName.value.length > 80 ||
     !prompt.value.trim() ||
     prompt.value.length > 20_000,
 );
@@ -99,6 +115,8 @@ const isSheetGenerateDisabled = computed(
     isSheetBusy.value ||
     !keyConfigured.value ||
     !selectedPortraitImage.value ||
+    !sheetName.value.trim() ||
+    sheetName.value.length > 80 ||
     !sheetPrompt.value.trim() ||
     sheetPrompt.value.length > 20_000,
 );
@@ -108,17 +126,8 @@ const currentPollingRecord = computed(() =>
 const currentIsPolling = computed(() =>
   activeStage.value === 'portrait' ? isPolling.value : isPollingSheet.value,
 );
-const uploadTitle = computed(() =>
-  uploadKind.value === 'portrait' ? '上传已有定妆照' : '上传已有角色表',
-);
-const uploadDescription = computed(() =>
-  uploadKind.value === 'portrait'
-    ? '上传后将直接设为正式定妆照，并可继续生成多角度角色表。'
-    : '上传后将直接设为正式角色表，不再调用图片生成服务。',
-);
-const uploadHandler = computed(() =>
-  uploadKind.value === 'portrait' ? uploadPortrait : uploadSheet,
-);
+const uploadTitle = '上传角色视觉图片';
+const uploadDescription = '填写图片名称后上传。上传完成后可按需要设为正式资产。';
 
 function buildPortraitPrompt(character: CharacterDraft): string {
   const characterDetails = [
@@ -149,9 +158,9 @@ function buildSheetPrompt(): string {
   ].join('\n');
 }
 
-function findSelectedImage<TRecord extends CharacterImageRecord>(
-  recordList: TRecord[],
-  selection: CharacterPortraitSelection | null,
+function findSelectedImage(
+  recordList: CharacterImageRecord[],
+  selection: CharacterVisualAssetSelection | null,
 ): CharacterPortraitImage | null {
   if (!selection) {
     return null;
@@ -173,10 +182,9 @@ function replaceRecord<TRecord extends CharacterImageRecord>(
 }
 
 function applyWorkspace(workspace: CharacterPortraitWorkspaceState) {
+  officialAssets.value = workspace.officialAssets;
   records.value = workspace.records;
   sheetRecords.value = workspace.sheetRecords;
-  selectedImage.value = workspace.selectedImage;
-  selectedSheet.value = workspace.selectedSheet;
 }
 
 function clearPollTimer(kind: AssetKind) {
@@ -221,10 +229,10 @@ async function pollPortraitTask(taskId: string) {
     }
     isPolling.value = false;
     if (record.status === 'completed') {
-      toast.success('定妆照已生成并保存到工作区');
+      toast.success(`“${record.name}”已生成并保存到工作区`);
       mobilePane.value = 'gallery';
     } else {
-      errorMessage.value = record.errorMessage || '定妆照生成任务未完成';
+      errorMessage.value = record.errorMessage || '角色视觉生成任务未完成';
     }
   } catch (pollError: unknown) {
     isPolling.value = false;
@@ -247,10 +255,10 @@ async function pollSheetTask(taskId: string) {
     }
     isPollingSheet.value = false;
     if (record.status === 'completed') {
-      toast.success('多角度角色表已生成并保存到工作区');
+      toast.success(`“${record.name}”已生成并保存到工作区`);
       mobilePane.value = 'gallery';
     } else {
-      errorMessage.value = record.errorMessage || '角色表生成任务未完成';
+      errorMessage.value = record.errorMessage || '角色视觉生成任务未完成';
     }
   } catch (pollError: unknown) {
     isPollingSheet.value = false;
@@ -322,6 +330,7 @@ async function generatePortraits() {
   try {
     const record = await window.desktop.generateCharacterPortrait({
       count: count.value,
+      name: imageName.value.trim(),
       prompt: prompt.value.trim(),
       resolution: resolution.value,
       size: size.value,
@@ -345,6 +354,7 @@ async function generateSheet() {
   errorMessage.value = '';
   try {
     const record = await window.desktop.generateCharacterSheet({
+      name: sheetName.value.trim(),
       prompt: sheetPrompt.value.trim(),
       resolution: sheetResolution.value,
     });
@@ -386,47 +396,21 @@ async function selectAsset(
   kind: AssetKind,
   record: CharacterImageRecord,
   image: CharacterPortraitImage,
+  official: boolean,
 ) {
-  if (kind === 'portrait') {
-    await selectPortrait(record, image);
-  } else {
-    await selectSheet(record, image);
-  }
-}
-
-async function selectPortrait(record: CharacterImageRecord, image: CharacterPortraitImage) {
   if (selectingFileName.value || deletingFileName.value) {
     return;
   }
   selectingFileName.value = image.fileName;
   try {
-    const workspace = await window.desktop.selectCharacterPortrait({
+    const workspace = await window.desktop.setCharacterVisualAssetOfficial({
       fileName: image.fileName,
+      kind,
+      official,
       taskId: record.id,
     });
     applyWorkspace(workspace);
-    activeStage.value = 'sheet';
-    mobilePane.value = 'settings';
-    toast.success('已设为正式定妆照');
-  } catch (selectionError: unknown) {
-    toast.error(selectionError instanceof Error ? selectionError.message : String(selectionError));
-  } finally {
-    selectingFileName.value = '';
-  }
-}
-
-async function selectSheet(record: CharacterImageRecord, image: CharacterPortraitImage) {
-  if (selectingFileName.value || deletingFileName.value) {
-    return;
-  }
-  selectingFileName.value = image.fileName;
-  try {
-    const workspace = await window.desktop.selectCharacterSheet({
-      fileName: image.fileName,
-      taskId: record.id,
-    });
-    applyWorkspace(workspace);
-    toast.success('已设为正式角色表');
+    toast.success(official ? '已设为正式资产' : '已移出正式资产');
   } catch (selectionError: unknown) {
     toast.error(selectionError instanceof Error ? selectionError.message : String(selectionError));
   } finally {
@@ -461,7 +445,7 @@ async function deleteAsset() {
     applyWorkspace(workspace);
     deleteDialogOpen.value = false;
     deleteTarget.value = null;
-    toast.success(kind === 'portrait' ? '定妆照已删除' : '角色表已删除');
+    toast.success('角色视觉图片已删除');
   } catch (deletionError: unknown) {
     toast.error(deletionError instanceof Error ? deletionError.message : String(deletionError));
   } finally {
@@ -469,33 +453,58 @@ async function deleteAsset() {
   }
 }
 
-function openUpload(kind: AssetKind) {
-  uploadKind.value = kind;
+function openUpload() {
   uploadDialogOpen.value = true;
 }
 
-function uploadPortrait(request: SaveFileRequest): Promise<SavedFileResult> {
-  return window.desktop.uploadCharacterPortrait(request);
-}
-
-function uploadSheet(request: SaveFileRequest): Promise<SavedFileResult> {
-  return window.desktop.uploadCharacterSheet(request);
+function uploadVisualAsset(request: UploadCharacterVisualAssetRequest): Promise<SavedFileResult> {
+  return window.desktop.uploadCharacterVisualAsset(request);
 }
 
 async function handleUploaded() {
   try {
     applyWorkspace(await window.desktop.getCharacterPortraitWorkspace());
-    if (uploadKind.value === 'portrait') {
-      activeStage.value = 'sheet';
-      mobilePane.value = 'settings';
-      toast.success('定妆照已上传并设为正式定妆照');
-    } else {
-      activeStage.value = 'sheet';
-      mobilePane.value = 'gallery';
-      toast.success('角色表已上传并设为正式角色表');
-    }
+    mobilePane.value = 'gallery';
+    toast.success('角色视觉图片已上传');
   } catch (uploadError: unknown) {
     toast.error(uploadError instanceof Error ? uploadError.message : String(uploadError));
+  }
+}
+
+function requestRename(
+  kind: AssetKind,
+  record: CharacterImageRecord,
+  image: CharacterPortraitImage,
+): void {
+  if (renamingFileName.value || selectingFileName.value || deletingFileName.value) {
+    return;
+  }
+  renameTarget.value = { image, kind, record };
+  renameDialogOpen.value = true;
+}
+
+async function renameAsset(name: string): Promise<void> {
+  const target = renameTarget.value;
+  if (!target || renamingFileName.value) {
+    return;
+  }
+  renamingFileName.value = target.image.fileName;
+  try {
+    applyWorkspace(
+      await window.desktop.renameCharacterVisualAsset({
+        fileName: target.image.fileName,
+        kind: target.kind,
+        name,
+        taskId: target.record.id,
+      }),
+    );
+    renameDialogOpen.value = false;
+    renameTarget.value = null;
+    toast.success('图片名称已更新');
+  } catch (renameError: unknown) {
+    toast.error(renameError instanceof Error ? renameError.message : String(renameError));
+  } finally {
+    renamingFileName.value = '';
   }
 }
 
@@ -512,6 +521,10 @@ onBeforeUnmount(() => {
 
 <template>
   <SagPage>
+    <template #before-header>
+      <CharacterContextBar active-section="character-portrait" />
+    </template>
+
     <template #header>
       <PortraitPageHeader
         v-model:mobile-pane="mobilePane"
@@ -523,13 +536,11 @@ onBeforeUnmount(() => {
       />
     </template>
 
-    <CharacterContextBar active-section="character-portrait" />
-
     <Alert v-if="!isInitializing && !keyConfigured" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
       <AlertTitle>生成图片需要 APIMart API Key</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>上传已有定妆照或角色表不受影响。</span>
+        <span>上传已有角色视觉图片不受影响。</span>
         <Button size="sm" variant="outline" @click="router.push('/settings')">前往设置</Button>
       </AlertDescription>
     </Alert>
@@ -564,14 +575,15 @@ onBeforeUnmount(() => {
       >
         <PortraitGallery
           :deleting-file-name="deletingFileName"
+          :official-assets="officialAssets"
           :portrait-records="records"
-          :selected-image="selectedImage"
-          :selected-sheet="selectedSheet"
+          :renaming-file-name="renamingFileName"
           :selecting-file-name="selectingFileName"
           :sheet-records="sheetRecords"
           class="min-h-0 min-w-0 flex-1"
           @delete="requestDelete"
-          @select="selectAsset"
+          @official="selectAsset"
+          @rename="requestRename"
         />
       </div>
       <div
@@ -585,6 +597,7 @@ onBeforeUnmount(() => {
           v-if="activeStage === 'portrait'"
           v-model="prompt"
           v-model:count="count"
+          v-model:name="imageName"
           v-model:resolution="resolution"
           v-model:size="size"
           :busy="isBusy"
@@ -597,6 +610,7 @@ onBeforeUnmount(() => {
         <CharacterSheetGeneratorPanel
           v-else
           v-model="sheetPrompt"
+          v-model:name="sheetName"
           v-model:resolution="sheetResolution"
           :busy="isSheetBusy"
           :disabled="isSheetGenerateDisabled"
@@ -612,13 +626,20 @@ onBeforeUnmount(() => {
       v-model:open="uploadDialogOpen"
       :description="uploadDescription"
       :title="uploadTitle"
-      :upload-handler="uploadHandler"
+      :upload-handler="uploadVisualAsset"
       @uploaded="handleUploaded"
+    />
+
+    <VisualAssetRenameDialog
+      v-model:open="renameDialogOpen"
+      :current-name="renameTarget?.image.name || renameTarget?.record.name || ''"
+      :loading="Boolean(renamingFileName)"
+      @rename="renameAsset"
     />
 
     <SagConfirmDialog
       v-model:open="deleteDialogOpen"
-      :title="deleteTarget?.kind === 'sheet' ? '删除这张角色表？' : '删除这张定妆照？'"
+      :title="`删除“${deleteTarget?.image.name || deleteTarget?.record.name || '这张图片'}”？`"
       description="图片将从作品工作区永久删除，此操作不可恢复。"
       :confirm-text="deletingFileName ? '删除中' : '确定删除'"
       :loading="Boolean(deletingFileName)"

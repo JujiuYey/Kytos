@@ -4,8 +4,11 @@ import type {
   DeleteCharacterSheetRequest,
   GenerateCharacterPortraitRequest,
   GenerateCharacterSheetRequest,
+  RenameCharacterVisualAssetRequest,
   SelectCharacterPortraitRequest,
   SelectCharacterSheetRequest,
+  SetCharacterVisualAssetOfficialRequest,
+  UploadCharacterVisualAssetRequest,
 } from '../../shared/character-portrait';
 import type { SaveFileRequest } from '../../shared/desktop';
 import {
@@ -16,10 +19,13 @@ import {
   getCharacterPortraitTask,
   getCharacterPortraitWorkspace,
   getCharacterSheetTask,
+  renameCharacterVisualAsset,
   selectCharacterPortrait,
   selectCharacterSheet,
+  setCharacterVisualAssetOfficial,
   uploadCharacterPortrait,
   uploadCharacterSheet,
+  uploadCharacterVisualAsset,
 } from '../services/character-portrait';
 import type { TrustedSenderGuard } from './trusted-sender';
 
@@ -67,6 +73,30 @@ export function registerCharacterPortraitIpc(assertTrustedSender: TrustedSenderG
     assertTrustedSender(event);
     return getCharacterPortraitWorkspace();
   });
+
+  ipcMain.handle(
+    'character-visual:rename',
+    async (event, request: RenameCharacterVisualAssetRequest) => {
+      assertTrustedSender(event);
+      return renameCharacterVisualAsset(request);
+    },
+  );
+
+  ipcMain.handle(
+    'character-visual:set-official',
+    async (event, request: SetCharacterVisualAssetOfficialRequest) => {
+      assertTrustedSender(event);
+      return setCharacterVisualAssetOfficial(request);
+    },
+  );
+
+  ipcMain.handle(
+    'character-visual:upload',
+    async (event, request: UploadCharacterVisualAssetRequest) => {
+      assertTrustedSender(event);
+      return uploadCharacterVisualAsset(request);
+    },
+  );
 
   ipcMain.handle(
     'character-portrait:select',

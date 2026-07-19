@@ -9,6 +9,7 @@ export interface CharacterSummary {
 
 export interface CharacterLibraryVisualAsset {
   kind: 'portrait' | 'sheet';
+  name: string;
   size: CharacterImageSize;
   url: string;
 }

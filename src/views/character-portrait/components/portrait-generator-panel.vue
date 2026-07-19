@@ -2,6 +2,7 @@
 import { WandSparkles, X } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
@@ -19,6 +20,7 @@ defineProps<{
   disabled: boolean;
   draft: CharacterDraft;
   modelValue: string;
+  name: string;
   resolution: CharacterPortraitResolution;
   size: CharacterPortraitSize;
 }>();
@@ -28,15 +30,16 @@ const emit = defineEmits<{
   (event: 'generate'): void;
   (event: 'update:count', value: number): void;
   (event: 'update:modelValue', value: string): void;
+  (event: 'update:name', value: string): void;
   (event: 'update:resolution', value: CharacterPortraitResolution): void;
   (event: 'update:size', value: CharacterPortraitSize): void;
 }>();
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-col" aria-label="定妆照生成设置">
+  <section class="flex min-h-0 flex-col" aria-label="角色视觉生成设置">
     <div class="flex h-12 shrink-0 items-center justify-between border-b px-4">
-      <h2 class="text-sm font-medium">创建定妆照</h2>
+      <h2 class="text-sm font-medium">从描述创建</h2>
       <Button variant="ghost" size="icon" aria-label="关闭创建面板" @click="emit('close')">
         <X class="size-4" />
       </Button>
@@ -44,6 +47,16 @@ const emit = defineEmits<{
 
     <ScrollArea class="min-h-0 flex-1">
       <div class="space-y-7 px-5 py-5">
+        <div class="space-y-2">
+          <Label for="portrait-name">图片名称</Label>
+          <Input
+            id="portrait-name"
+            :model-value="name"
+            maxlength="80"
+            placeholder="例如：定妆照、日常造型、战斗形态"
+            @update:model-value="emit('update:name', String($event))"
+          />
+        </div>
         <section aria-labelledby="portrait-source-heading">
           <div class="mb-3">
             <h2 id="portrait-source-heading" class="text-sm font-medium">角色依据</h2>
@@ -73,7 +86,7 @@ const emit = defineEmits<{
 
         <section aria-labelledby="portrait-prompt-heading">
           <div class="mb-2 flex items-center justify-between gap-3">
-            <Label id="portrait-prompt-heading" for="portrait-prompt">定妆照提示词</Label>
+            <Label id="portrait-prompt-heading" for="portrait-prompt">图片提示词</Label>
             <span class="text-xs tabular-nums text-muted-foreground">
               {{ modelValue.length }} / 20000
             </span>
@@ -153,7 +166,7 @@ const emit = defineEmits<{
     <footer class="shrink-0 border-t bg-background px-5 py-4">
       <Button class="w-full" :disabled="disabled" @click="emit('generate')">
         <WandSparkles class="size-4" />
-        {{ busy ? '正在生成定妆照' : `生成 ${count} 张定妆照` }}
+        {{ busy ? '正在生成图片' : `生成 ${count} 张图片` }}
       </Button>
       <p class="mt-2 text-center text-xs text-muted-foreground">
         使用 GPT-Image-2，点击后将产生实际费用

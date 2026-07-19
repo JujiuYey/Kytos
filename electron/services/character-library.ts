@@ -124,6 +124,7 @@ interface VisualAssetCandidate {
 function parseVisualAssetRecords(
   value: unknown,
   kind: CharacterLibraryVisualAsset['kind'],
+  officialAssets: Set<string>,
 ): VisualAssetCandidate[] {
   if (!Array.isArray(value)) {
     return [];
@@ -145,12 +146,19 @@ function parseVisualAssetRecords(
       item =>
         isRecord(item) &&
         typeof item.fileName === 'string' &&
-        path.basename(item.fileName) === item.fileName,
+        path.basename(item.fileName) === item.fileName &&
+        officialAssets.has(`${kind}:${record.id}:${item.fileName}`),
     );
     if (isRecord(image) && typeof image.fileName === 'string') {
       candidates.push({
         asset: {
           kind,
+          name:
+            typeof image.name === 'string' && image.name.trim()
+              ? image.name.trim()
+              : kind === 'portrait'
+                ? '定妆照'
+                : '角色表',
           size: record.size,
           url: `app://bundle/workspace-assets/${directory}/${encodeURIComponent(image.fileName)}`,
         },
@@ -165,9 +173,32 @@ function parseCharacterVisualAsset(value: unknown): CharacterLibraryVisualAsset 
   if (!isRecord(value)) {
     return null;
   }
+  const officialAssets = new Set(
+    Array.isArray(value.officialAssets)
+      ? value.officialAssets.flatMap(asset =>
+          isRecord(asset) &&
+          (asset.kind === 'portrait' || asset.kind === 'sheet') &&
+          typeof asset.taskId === 'string' &&
+          typeof asset.fileName === 'string'
+            ? [`${asset.kind}:${asset.taskId}:${asset.fileName}`]
+            : [],
+        )
+      : [
+          isRecord(value.selectedImage) &&
+          typeof value.selectedImage.taskId === 'string' &&
+          typeof value.selectedImage.fileName === 'string'
+            ? `portrait:${value.selectedImage.taskId}:${value.selectedImage.fileName}`
+            : '',
+          isRecord(value.selectedSheet) &&
+          typeof value.selectedSheet.taskId === 'string' &&
+          typeof value.selectedSheet.fileName === 'string'
+            ? `sheet:${value.selectedSheet.taskId}:${value.selectedSheet.fileName}`
+            : '',
+        ].filter(Boolean),
+  );
   const candidates = [
-    ...parseVisualAssetRecords(value.records, 'portrait'),
-    ...parseVisualAssetRecords(value.sheetRecords, 'sheet'),
+    ...parseVisualAssetRecords(value.records, 'portrait', officialAssets),
+    ...parseVisualAssetRecords(value.sheetRecords, 'sheet', officialAssets),
   ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   return candidates[0]?.asset ?? null;
 }

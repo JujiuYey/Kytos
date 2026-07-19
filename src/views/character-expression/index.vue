@@ -14,7 +14,6 @@ import type {
   CharacterExpressionWorkspaceState,
   CharacterPortraitImage,
   CharacterPortraitResolution,
-  CharacterPortraitSelection,
   CharacterPortraitWorkspaceState,
   CredentialStatus,
   SaveFileRequest,
@@ -61,21 +60,13 @@ const activeRecord = computed(() =>
 );
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
 const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
-const selectedPortraitImage = computed(() =>
-  findSelectedImage(
-    portraitWorkspace.value?.records ?? [],
-    portraitWorkspace.value?.selectedImage ?? null,
-  ),
+const officialReferenceImages = computed(() =>
+  (portraitWorkspace.value?.officialAssets ?? []).flatMap((_, index) => {
+    const image = findOfficialImage(index);
+    return image ? [image] : [];
+  }),
 );
-const selectedSheetImage = computed(() =>
-  findSelectedImage(
-    portraitWorkspace.value?.sheetRecords ?? [],
-    portraitWorkspace.value?.selectedSheet ?? null,
-  ),
-);
-const hasReferences = computed(
-  () => Boolean(selectedPortraitImage.value) && Boolean(selectedSheetImage.value),
-);
+const hasReferences = computed(() => Boolean(portraitWorkspace.value?.officialAssets.length));
 const isGenerateDisabled = computed(
   () =>
     isInitializing.value ||
@@ -88,25 +79,15 @@ const isGenerateDisabled = computed(
     description.value.length > 20_000,
 );
 
-function findSelectedImage(
-  recordList: CharacterPortraitWorkspaceState['records'],
-  selection: CharacterPortraitSelection | null,
-): CharacterPortraitImage | null;
-function findSelectedImage(
-  recordList: CharacterPortraitWorkspaceState['sheetRecords'],
-  selection: CharacterPortraitSelection | null,
-): CharacterPortraitImage | null;
-function findSelectedImage(
-  recordList:
-    | CharacterPortraitWorkspaceState['records']
-    | CharacterPortraitWorkspaceState['sheetRecords'],
-  selection: CharacterPortraitSelection | null,
-): CharacterPortraitImage | null {
-  if (!selection) {
+function findOfficialImage(index: number): CharacterPortraitImage | null {
+  const workspace = portraitWorkspace.value;
+  const selection = workspace?.officialAssets[index];
+  if (!workspace || !selection) {
     return null;
   }
+  const records = selection.kind === 'portrait' ? workspace.records : workspace.sheetRecords;
   return (
-    recordList
+    records
       .find(record => record.id === selection.taskId)
       ?.images.find(image => image.fileName === selection.fileName) ?? null
   );
@@ -353,7 +334,7 @@ onBeforeUnmount(() => {
 
     <Alert v-if="!isInitializing && !hasReferences" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
-      <AlertTitle>生成表情需要正式定妆照和正式角色表</AlertTitle>
+      <AlertTitle>生成表情需要正式角色视觉</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
         <span>上传已有表情不受影响。</span>
         <Button size="sm" variant="outline" @click="router.push('/character-portrait')">
@@ -419,8 +400,7 @@ onBeforeUnmount(() => {
           v-model:size="size"
           :busy="isBusy"
           :disabled="isGenerateDisabled"
-          :reference-portrait="selectedPortraitImage"
-          :reference-sheet="selectedSheetImage"
+          :reference-assets="officialReferenceImages"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeGenerator"
           @generate="generateExpression"

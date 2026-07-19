@@ -6,6 +6,7 @@ export type CharacterPortraitSize = (typeof CHARACTER_PORTRAIT_SIZES)[number];
 export type CharacterImageSize = CharacterPortraitSize | typeof CHARACTER_SHEET_SIZE;
 export type CharacterPortraitResolution = (typeof CHARACTER_PORTRAIT_RESOLUTIONS)[number];
 export type CharacterImageSource = 'generated' | 'uploaded';
+export type CharacterVisualAssetKind = 'portrait' | 'sheet';
 export type CharacterPortraitTaskStatus =
   | 'submitted'
   | 'pending'
@@ -16,6 +17,7 @@ export type CharacterPortraitTaskStatus =
 
 export interface GenerateCharacterPortraitRequest {
   count: number;
+  name: string;
   prompt: string;
   resolution: CharacterPortraitResolution;
   size: CharacterPortraitSize;
@@ -24,6 +26,7 @@ export interface GenerateCharacterPortraitRequest {
 export interface CharacterPortraitImage {
   fileName: string;
   mimeType: string;
+  name?: string;
   url: string;
 }
 
@@ -33,6 +36,7 @@ export interface CharacterImageRecord<TSize extends CharacterImageSize = Charact
   errorMessage: string | null;
   id: string;
   images: CharacterPortraitImage[];
+  name: string;
   originalName: string | null;
   progress: number;
   prompt: string;
@@ -48,6 +52,7 @@ export interface CharacterPortraitRecord
 
 export interface CharacterSheetRecord extends CharacterImageRecord<typeof CHARACTER_SHEET_SIZE> {
   count: 1;
+  name: string;
   referenceImage: CharacterPortraitSelection | null;
   size: typeof CHARACTER_SHEET_SIZE;
 }
@@ -58,10 +63,17 @@ export interface CharacterPortraitSelection {
 }
 
 export interface CharacterPortraitWorkspaceState {
+  officialAssets: CharacterVisualAssetSelection[];
   records: CharacterPortraitRecord[];
+  /** @deprecated Use officialAssets. Kept while older generation flows are migrated. */
   selectedImage: CharacterPortraitSelection | null;
+  /** @deprecated Use officialAssets. Kept while older generation flows are migrated. */
   selectedSheet: CharacterPortraitSelection | null;
   sheetRecords: CharacterSheetRecord[];
+}
+
+export interface CharacterVisualAssetSelection extends CharacterPortraitSelection {
+  kind: CharacterVisualAssetKind;
 }
 
 export interface SelectCharacterPortraitRequest {
@@ -75,8 +87,24 @@ export interface DeleteCharacterPortraitRequest {
 }
 
 export interface GenerateCharacterSheetRequest {
+  name: string;
   prompt: string;
   resolution: CharacterPortraitResolution;
+}
+
+export interface RenameCharacterVisualAssetRequest extends CharacterVisualAssetSelection {
+  name: string;
+}
+
+export interface SetCharacterVisualAssetOfficialRequest extends CharacterVisualAssetSelection {
+  official: boolean;
+}
+
+export interface UploadCharacterVisualAssetRequest {
+  fileData: Uint8Array;
+  fileName: string;
+  mimeType: string;
+  name: string;
 }
 
 export type DeleteCharacterSheetRequest = DeleteCharacterPortraitRequest;

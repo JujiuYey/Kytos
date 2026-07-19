@@ -28,7 +28,7 @@ defineProps<{
 
 const emit = defineEmits<{
   (event: 'ai-create', value: WorkspaceStage): void;
-  (event: 'upload', value: WorkspaceStage): void;
+  (event: 'upload'): void;
   (event: 'update:mobilePane', value: 'settings' | 'gallery'): void;
 }>();
 </script>
@@ -49,25 +49,10 @@ const emit = defineEmits<{
     </div>
   </div>
 
-  <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button size="sm" variant="outline">
-        <Upload class="size-4" />
-        上传
-        <ChevronDown class="size-3.5" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" class="w-48">
-      <DropdownMenuItem @select="emit('upload', 'portrait')">
-        <Camera class="size-4" />
-        上传定妆照
-      </DropdownMenuItem>
-      <DropdownMenuItem @select="emit('upload', 'sheet')">
-        <Images class="size-4" />
-        上传角色表
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
+  <Button size="sm" variant="outline" @click="emit('upload')">
+    <Upload class="size-4" />
+    上传图片
+  </Button>
 
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
@@ -80,12 +65,12 @@ const emit = defineEmits<{
     <DropdownMenuContent align="end" class="w-48">
       <DropdownMenuItem @select="emit('ai-create', 'portrait')">
         <Camera class="size-4" />
-        创建定妆照
+        从描述创建
         <Check v-if="activeStage === 'portrait' && generatorOpen" class="ml-auto size-4" />
       </DropdownMenuItem>
       <DropdownMenuItem @select="emit('ai-create', 'sheet')">
         <Images class="size-4" />
-        创建角色表
+        基于正式资产创建
         <Check v-if="activeStage === 'sheet' && generatorOpen" class="ml-auto size-4" />
       </DropdownMenuItem>
     </DropdownMenuContent>

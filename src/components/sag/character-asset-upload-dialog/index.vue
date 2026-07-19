@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import {
   Dialog,
   DialogContent,
@@ -8,13 +8,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { FileUpload } from '@/components/sag/file-upload';
-import type { SaveFileRequest, SavedFileResult } from '@/types';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import type { SaveFileRequest, SavedFileResult, UploadCharacterVisualAssetRequest } from '@/types';
 
 const props = defineProps<{
   description: string;
   open: boolean;
   title: string;
-  uploadHandler: (request: SaveFileRequest) => Promise<SavedFileResult>;
+  uploadHandler: (request: UploadCharacterVisualAssetRequest) => Promise<SavedFileResult>;
 }>();
 
 const emit = defineEmits<{
@@ -23,12 +25,15 @@ const emit = defineEmits<{
 }>();
 
 const uploadKey = ref(0);
+const name = ref('角色视觉');
+const normalizedName = computed(() => name.value.trim());
 
 watch(
   () => props.open,
   open => {
     if (open) {
       uploadKey.value += 1;
+      name.value = '角色视觉';
     }
   },
 );
@@ -36,6 +41,13 @@ watch(
 function handleUploaded(result: SavedFileResult) {
   emit('uploaded', result);
   emit('update:open', false);
+}
+
+function upload(request: SaveFileRequest): Promise<SavedFileResult> {
+  if (!normalizedName.value) {
+    return Promise.reject(new Error('请先填写图片名称'));
+  }
+  return props.uploadHandler({ ...request, name: normalizedName.value });
 }
 </script>
 
@@ -46,6 +58,18 @@ function handleUploaded(result: SavedFileResult) {
         <DialogTitle>{{ title }}</DialogTitle>
         <DialogDescription>{{ description }}</DialogDescription>
       </DialogHeader>
+      <div class="space-y-2">
+        <div class="flex items-center justify-between gap-3">
+          <Label for="character-visual-name">图片名称</Label>
+          <span class="text-xs tabular-nums text-muted-foreground">{{ name.length }} / 80</span>
+        </div>
+        <Input
+          id="character-visual-name"
+          v-model="name"
+          maxlength="80"
+          placeholder="例如：角色表、定妆照、冬季造型"
+        />
+      </div>
       <FileUpload
         :key="uploadKey"
         accept="image/png,image/jpeg,image/webp,image/avif"
@@ -53,7 +77,7 @@ function handleUploaded(result: SavedFileResult) {
         :max-files="1"
         :multiple="false"
         :show-file-list="true"
-        :upload-handler="uploadHandler"
+        :upload-handler="upload"
         @upload-success="handleUploaded"
       />
     </DialogContent>

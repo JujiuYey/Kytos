@@ -20,7 +20,10 @@ import type {
 import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
 import type { SavedFileResult } from '../../shared/desktop';
 import { getActiveCharacterDirectory } from './character-library';
-import { getCharacterPortraitWorkspace } from './character-portrait';
+import {
+  getCharacterPortraitWorkspace,
+  getOfficialCharacterVisualReferences,
+} from './character-portrait';
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
@@ -28,8 +31,6 @@ import { getWorkspaceDirectory } from './workspace';
 const API_BASE_URL = 'https://api.apimart.ai';
 const EXPRESSION_STORE_FILE_NAME = 'character-expressions.json';
 const EXPRESSION_ASSET_DIRECTORY = 'character-expressions';
-const PORTRAIT_ASSET_DIRECTORY = 'character-portraits';
-const SHEET_ASSET_DIRECTORY = 'character-sheets';
 const MAX_NAME_LENGTH = 80;
 const MAX_PROMPT_LENGTH = 20_000;
 const MAX_REFERENCE_IMAGE_SIZE = 20 * 1024 * 1024;
@@ -210,7 +211,7 @@ function validateGenerateRequest(request: GenerateCharacterExpressionRequest): v
 
 function buildExpressionPrompt(request: GenerateCharacterExpressionRequest): string {
   return [
-    '参考图中的角色是唯一要画的人，使用定妆照确认脸部、服装和整体画风，使用角色表确认完整造型和各角度结构。',
+    '参考图中的角色是唯一要画的人，综合所有正式角色视觉确认脸部、服装、完整造型和整体画风。',
     `目标表情：${request.name.trim()}`,
     `表情描述：${request.description.trim()}`,
     '保持角色身份、脸型、五官、发型、服装、配饰、颜色和绘画风格与参考图一致，只改变面部表情和与情绪相符的轻微姿态。',
@@ -408,29 +409,18 @@ export async function generateCharacterExpression(
 ): Promise<CharacterExpressionRecord> {
   validateGenerateRequest(request);
   const portraitWorkspace = await getCharacterPortraitWorkspace();
-  const portraitSelection = portraitWorkspace.selectedImage;
-  const sheetSelection = portraitWorkspace.selectedSheet;
-  const portraitRecord = portraitSelection
-    ? portraitWorkspace.records.find(record => record.id === portraitSelection.taskId)
-    : null;
-  const sheetRecord = sheetSelection
-    ? portraitWorkspace.sheetRecords.find(record => record.id === sheetSelection.taskId)
-    : null;
-  const portraitImage = portraitRecord?.images.find(
-    image => image.fileName === portraitSelection?.fileName,
-  );
-  const sheetImage = sheetRecord?.images.find(image => image.fileName === sheetSelection?.fileName);
-  if (!portraitSelection || !portraitImage) {
-    throw new Error('请先选定或上传正式定妆照');
-  }
-  if (!sheetSelection || !sheetImage) {
-    throw new Error('请先选定或上传正式角色表');
+  const references = getOfficialCharacterVisualReferences(portraitWorkspace);
+  if (!references.length) {
+    throw new Error('请先将至少一张角色视觉图片设为正式资产');
   }
 
-  const imageUrls = await Promise.all([
-    getReferenceData(portraitSelection, PORTRAIT_ASSET_DIRECTORY, portraitImage),
-    getReferenceData(sheetSelection, SHEET_ASSET_DIRECTORY, sheetImage),
-  ]);
+  const imageUrls = await Promise.all(
+    references.map(reference =>
+      getReferenceData(reference.selection, reference.directoryName, reference.image),
+    ),
+  );
+  const portraitSelection = references[0]?.selection ?? null;
+  const sheetSelection = references[1]?.selection ?? null;
   const apiKey = await getCredentialValue('apimart');
   const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
     body: JSON.stringify({

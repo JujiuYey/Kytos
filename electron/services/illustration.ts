@@ -34,7 +34,10 @@ import type {
   CharacterPortraitTaskStatus,
 } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
-import { getCharacterPortraitWorkspace } from './character-portrait';
+import {
+  getCharacterPortraitWorkspace,
+  getOfficialCharacterVisualReferences,
+} from './character-portrait';
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
@@ -42,8 +45,6 @@ import { getWorkspaceDirectory } from './workspace';
 const API_BASE_URL = 'https://api.apimart.ai';
 const STORE_FILE_NAME = 'illustrations.json';
 const ASSET_DIRECTORY = 'illustrations';
-const PORTRAIT_ASSET_DIRECTORY = 'character-portraits';
-const SHEET_ASSET_DIRECTORY = 'character-sheets';
 const MAX_TITLE_LENGTH = 100;
 const MAX_TEXT_LENGTH = 20_000;
 const MAX_REFERENCE_IMAGE_SIZE = 20 * 1024 * 1024;
@@ -685,7 +686,7 @@ function buildPrompt(prompt: string, useCharacter: boolean, useStyleReference: b
   const lines: string[] = [];
   if (useCharacter) {
     lines.push(
-      '参考图中的角色是本次插画中的同一个角色。使用正式定妆照确认脸部和服装，使用角色表确认完整造型和各角度结构。',
+      '参考图中的角色是本次插画中的同一个角色。综合所有正式角色视觉确认脸部、服装、完整造型和结构。',
       '必须保持角色身份、脸型、五官、发型、身材比例、服装、鞋履、配饰和颜色一致，不要重新设计或美化角色。',
     );
   }
@@ -735,29 +736,16 @@ export async function generateIllustration(
   const referenceStyle = store.selectedStyleReference;
   if (topic.useCharacter) {
     const portraitWorkspace = await getCharacterPortraitWorkspace();
-    referencePortrait = portraitWorkspace.selectedImage;
-    referenceSheet = portraitWorkspace.selectedSheet;
-    const portraitRecord = referencePortrait
-      ? portraitWorkspace.records.find(record => record.id === referencePortrait?.taskId)
-      : null;
-    const sheetRecord = referenceSheet
-      ? portraitWorkspace.sheetRecords.find(record => record.id === referenceSheet?.taskId)
-      : null;
-    const portraitImage = portraitRecord?.images.find(
-      image => image.fileName === referencePortrait?.fileName,
-    );
-    const sheetImage = sheetRecord?.images.find(
-      image => image.fileName === referenceSheet?.fileName,
-    );
-    if (!referencePortrait || !portraitImage) {
-      throw new Error('请先选定或上传正式定妆照');
+    const references = getOfficialCharacterVisualReferences(portraitWorkspace);
+    if (!references.length) {
+      throw new Error('请先将至少一张角色视觉图片设为正式资产');
     }
-    if (!referenceSheet || !sheetImage) {
-      throw new Error('请先选定或上传正式角色表');
-    }
+    referencePortrait = references[0]?.selection ?? null;
+    referenceSheet = references[1]?.selection ?? null;
     referenceImages.push(
-      await readReferenceImage(PORTRAIT_ASSET_DIRECTORY, portraitImage),
-      await readReferenceImage(SHEET_ASSET_DIRECTORY, sheetImage),
+      ...(await Promise.all(
+        references.map(reference => readReferenceImage(reference.directoryName, reference.image)),
+      )),
     );
   }
 
