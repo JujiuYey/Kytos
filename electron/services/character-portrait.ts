@@ -957,7 +957,15 @@ export async function generateCharacterSheet(
   }
 
   const store = await loadPortraitStore();
-  const referenceAsset = store.officialAssets[0];
+  const referenceAsset = request.referenceAsset
+    ? validateVisualAssetSelection(request.referenceAsset)
+    : store.officialAssets[0];
+  if (
+    referenceAsset &&
+    !store.officialAssets.some(asset => selectionKey(asset) === selectionKey(referenceAsset))
+  ) {
+    throw new Error('画布连接的参考图不是正式资产');
+  }
   const reference = referenceAsset ? findVisualAsset(store, referenceAsset) : null;
   if (!referenceAsset || !reference) {
     throw new Error('请先将一张角色视觉图片设为正式资产');

@@ -387,6 +387,10 @@ function closeGenerator(): void {
 }
 
 function openGenerator(stage: WorkspaceStage): void {
+  if (stage === 'sheet') {
+    void router.push({ name: 'character-portrait-workflow' });
+    return;
+  }
   activeStage.value = stage;
   generatorOpen.value = true;
   mobilePane.value = 'settings';

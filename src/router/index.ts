@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '角色视觉' },
       },
       {
+        path: '/character-portrait/workflow',
+        name: 'character-portrait-workflow',
+        component: () => import('@/views/character-portrait-workflow/index.vue'),
+        meta: { title: '角色视觉工作流' },
+      },
+      {
         path: '/character-expression',
         name: 'character-expression',
         component: () => import('@/views/character-expression/index.vue'),

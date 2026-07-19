@@ -89,6 +89,7 @@ export interface DeleteCharacterPortraitRequest {
 export interface GenerateCharacterSheetRequest {
   name: string;
   prompt: string;
+  referenceAsset?: CharacterVisualAssetSelection;
   resolution: CharacterPortraitResolution;
 }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { FlowEmits, FlowProps, FlowSlots } from '@vue-flow/core';
+import { computed, useSlots } from 'vue';
+import type { FlowEmits, FlowProps } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { VueFlow } from '@vue-flow/core';
 import { useForwardPropsEmits } from 'reka-ui';
@@ -16,8 +17,13 @@ const props = withDefaults(defineProps<FlowProps>(), {
 });
 
 const emits = defineEmits<FlowEmits>();
-const slots = defineSlots<FlowSlots>();
+const slots = useSlots();
 const forwarded = useForwardPropsEmits(props, emits);
+const forwardedSlotNames = computed(() =>
+  Object.keys(slots).filter(
+    name => name !== 'default' && name !== 'connection-line' && name !== 'zoom-pane',
+  ),
+);
 </script>
 
 <template>
@@ -30,6 +36,10 @@ const forwarded = useForwardPropsEmits(props, emits);
 
     <template v-if="slots['zoom-pane']" #zoom-pane>
       <slot name="zoom-pane" />
+    </template>
+
+    <template v-for="name in forwardedSlotNames" :key="name" #[name]="slotProps">
+      <slot :name="name" v-bind="slotProps" />
     </template>
 
     <slot />

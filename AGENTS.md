@@ -99,11 +99,13 @@
 
 ```bash
 # Vue / TypeScript 构建
-pnpm build
+pnpm build:web
 
 # 只检查改动过的文件；不要为了一个局部改动格式化全仓库
 pnpm exec oxlint <changed-files>
 pnpm exec oxfmt --check <changed-files>
 ```
+
+常规代码验证只要求 `pnpm build:web` 通过。不要为验证改动运行 `pnpm build`、`pnpm package`、`pnpm make` 或其他 Electron Forge 打包命令；完整 Electron 打包由用户按需执行。
 
 交付前同时运行 `git diff --check`，并确认生成文件、缓存和无关格式化没有混入 diff。
