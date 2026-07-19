@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import type { CharacterScopeRequest } from '../../shared/character-library';
 import type {
   DeleteCharacterPortraitRequest,
   DeleteCharacterSheetRequest,
@@ -69,10 +70,13 @@ export function registerCharacterPortraitIpc(assertTrustedSender: TrustedSenderG
     return getCharacterSheetTask(taskId);
   });
 
-  ipcMain.handle('character-portrait:get-workspace', async event => {
-    assertTrustedSender(event);
-    return getCharacterPortraitWorkspace();
-  });
+  ipcMain.handle(
+    'character-portrait:get-workspace',
+    async (event, request?: CharacterScopeRequest) => {
+      assertTrustedSender(event);
+      return getCharacterPortraitWorkspace(request?.characterId);
+    },
+  );
 
   ipcMain.handle(
     'character-visual:rename',

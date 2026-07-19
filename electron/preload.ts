@@ -23,11 +23,14 @@ const desktopApi: DesktopApi = {
   generateCharacterSheet: request => ipcRenderer.invoke('character-sheet:generate', request),
   generateIllustration: request => ipcRenderer.invoke('illustration:generate', request),
   generateStoryShot: request => ipcRenderer.invoke('story:generate-shot', request),
-  getCharacterExpressionTask: taskId => ipcRenderer.invoke('character-expression:get-task', taskId),
-  getCharacterExpressionWorkspace: () => ipcRenderer.invoke('character-expression:get-workspace'),
+  getCharacterExpressionTask: request =>
+    ipcRenderer.invoke('character-expression:get-task', request),
+  getCharacterExpressionWorkspace: request =>
+    ipcRenderer.invoke('character-expression:get-workspace', request),
   getCharacterLibrary: () => ipcRenderer.invoke('character-library:get'),
   getCharacterPortraitTask: taskId => ipcRenderer.invoke('character-portrait:get-task', taskId),
-  getCharacterPortraitWorkspace: () => ipcRenderer.invoke('character-portrait:get-workspace'),
+  getCharacterPortraitWorkspace: request =>
+    ipcRenderer.invoke('character-portrait:get-workspace', request),
   getCharacterSheetTask: taskId => ipcRenderer.invoke('character-sheet:get-task', taskId),
   getCharacterWorkspace: () => ipcRenderer.invoke('character:get-workspace'),
   getIllustrationTask: taskId => ipcRenderer.invoke('illustration:get-task', taskId),

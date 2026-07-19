@@ -7,18 +7,20 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
-import CharacterContextBar from '@/components/sag/character-context-bar.vue';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionSize,
   CharacterExpressionWorkspaceState,
+  CharacterLibraryState,
   CharacterPortraitImage,
   CharacterPortraitResolution,
   CharacterPortraitWorkspaceState,
+  CharacterVisualAssetSelection,
   CredentialStatus,
   SaveFileRequest,
   SavedFileResult,
 } from '@/types';
+import { MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
 import ExpressionGallery from './components/expression-gallery.vue';
 import ExpressionGeneratorPanel from './components/expression-generator-panel.vue';
 import ExpressionPageHeader from './components/expression-page-header.vue';
@@ -26,8 +28,11 @@ import ExpressionRenameDialog from './components/expression-rename-dialog.vue';
 import ExpressionUploadDialog from './components/expression-upload-dialog.vue';
 
 const router = useRouter();
+const library = ref<CharacterLibraryState | null>(null);
+const selectedCharacterId = ref('');
 const records = ref<CharacterExpressionRecord[]>([]);
 const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
+const selectedReferenceAssets = ref<CharacterVisualAssetSelection[]>([]);
 const credentialStatus = ref<CredentialStatus | null>(null);
 const name = ref('开心');
 const description = ref('眼睛明亮，嘴角自然上扬，带有真诚而有感染力的笑意。');
@@ -53,19 +58,31 @@ const mobilePane = ref<'settings' | 'gallery'>('gallery');
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let isDisposed = false;
+let loadRequestId = 0;
 
 const activeStatuses = ['submitted', 'pending', 'processing'];
+const defaultExpressionName = '开心';
+const defaultExpressionDescription = '眼睛明亮，嘴角自然上扬，带有真诚而有感染力的笑意。';
+const characters = computed(() => library.value?.characters ?? []);
 const activeRecord = computed(() =>
   records.value.find(record => activeStatuses.includes(record.status)),
 );
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
 const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
-const officialReferenceImages = computed(() =>
-  (portraitWorkspace.value?.officialAssets ?? []).flatMap((_, index) => {
-    const image = findOfficialImage(index);
-    return image ? [image] : [];
+const characterSelectionDisabled = computed(
+  () =>
+    isInitializing.value ||
+    isSubmitting.value ||
+    Boolean(deletingFileName.value) ||
+    Boolean(renamingTaskId.value),
+);
+const officialReferenceAssets = computed(() =>
+  (portraitWorkspace.value?.officialAssets ?? []).flatMap(selection => {
+    const image = findOfficialImage(selection);
+    return image ? [{ image, key: referenceAssetKey(selection), selection: { ...selection } }] : [];
   }),
 );
+const selectedReferenceKeys = computed(() => selectedReferenceAssets.value.map(referenceAssetKey));
 const hasReferences = computed(() => Boolean(portraitWorkspace.value?.officialAssets.length));
 const isGenerateDisabled = computed(
   () =>
@@ -73,15 +90,22 @@ const isGenerateDisabled = computed(
     isBusy.value ||
     !keyConfigured.value ||
     !hasReferences.value ||
+    selectedReferenceAssets.value.length < 1 ||
+    selectedReferenceAssets.value.length > MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES ||
     !name.value.trim() ||
     name.value.length > 80 ||
     !description.value.trim() ||
     description.value.length > 20_000,
 );
 
-function findOfficialImage(index: number): CharacterPortraitImage | null {
+function referenceAssetKey(selection: CharacterVisualAssetSelection): string {
+  return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
+}
+
+function findOfficialImage(
+  selection: CharacterVisualAssetSelection,
+): CharacterPortraitImage | null {
   const workspace = portraitWorkspace.value;
-  const selection = workspace?.officialAssets[index];
   if (!workspace || !selection) {
     return null;
   }
@@ -91,6 +115,23 @@ function findOfficialImage(index: number): CharacterPortraitImage | null {
       .find(record => record.id === selection.taskId)
       ?.images.find(image => image.fileName === selection.fileName) ?? null
   );
+}
+
+function toggleReferenceAsset(selection: CharacterVisualAssetSelection): void {
+  const key = referenceAssetKey(selection);
+  if (selectedReferenceAssets.value.some(asset => referenceAssetKey(asset) === key)) {
+    selectedReferenceAssets.value = selectedReferenceAssets.value.filter(
+      asset => referenceAssetKey(asset) !== key,
+    );
+    return;
+  }
+  if (selectedReferenceAssets.value.length >= MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES) {
+    return;
+  }
+  selectedReferenceAssets.value = [
+    ...selectedReferenceAssets.value,
+    { fileName: selection.fileName, kind: selection.kind, taskId: selection.taskId },
+  ];
 }
 
 function replaceRecord(updatedRecord: CharacterExpressionRecord): void {
@@ -111,24 +152,27 @@ function clearPollTimer(): void {
   }
 }
 
-function schedulePoll(taskId: string): void {
+function schedulePoll(taskId: string, characterId: string): void {
   clearPollTimer();
   pollTimer = setTimeout(() => {
-    void pollExpressionTask(taskId);
+    void pollExpressionTask(taskId, characterId);
   }, 2500);
 }
 
-async function pollExpressionTask(taskId: string): Promise<void> {
-  if (isDisposed) {
+async function pollExpressionTask(taskId: string, characterId: string): Promise<void> {
+  if (isDisposed || selectedCharacterId.value !== characterId) {
     return;
   }
   isPolling.value = true;
   try {
-    const record = await window.desktop.getCharacterExpressionTask(taskId);
+    const record = await window.desktop.getCharacterExpressionTask({ characterId, taskId });
+    if (selectedCharacterId.value !== characterId) {
+      return;
+    }
     replaceRecord(record);
     errorMessage.value = '';
     if (activeStatuses.includes(record.status)) {
-      schedulePoll(taskId);
+      schedulePoll(taskId, characterId);
       return;
     }
     isPolling.value = false;
@@ -139,8 +183,71 @@ async function pollExpressionTask(taskId: string): Promise<void> {
       errorMessage.value = record.errorMessage || '表情生成任务未完成';
     }
   } catch (pollError: unknown) {
+    if (selectedCharacterId.value !== characterId) {
+      return;
+    }
     isPolling.value = false;
     errorMessage.value = pollError instanceof Error ? pollError.message : String(pollError);
+  }
+}
+
+function applyCharacterWorkspace(
+  expressionWorkspace: CharacterExpressionWorkspaceState,
+  currentPortraitWorkspace: CharacterPortraitWorkspaceState,
+): void {
+  applyWorkspace(expressionWorkspace);
+  portraitWorkspace.value = currentPortraitWorkspace;
+  selectedReferenceAssets.value = [];
+
+  const latestGeneratedRecord = expressionWorkspace.records.find(
+    record => record.source === 'generated',
+  );
+  name.value = latestGeneratedRecord?.name ?? defaultExpressionName;
+  description.value = latestGeneratedRecord?.description ?? defaultExpressionDescription;
+  size.value = latestGeneratedRecord?.size ?? '1:1';
+  resolution.value = latestGeneratedRecord?.resolution ?? '1k';
+  count.value = latestGeneratedRecord?.count ?? 2;
+
+  const unfinishedRecord = expressionWorkspace.records.find(record =>
+    activeStatuses.includes(record.status),
+  );
+  if (unfinishedRecord) {
+    generatorOpen.value = true;
+    mobilePane.value = 'gallery';
+    schedulePoll(unfinishedRecord.id, selectedCharacterId.value);
+  }
+}
+
+async function loadCharacterWorkspace(characterId: string): Promise<void> {
+  const requestId = ++loadRequestId;
+  clearPollTimer();
+  isPolling.value = false;
+  isInitializing.value = true;
+  errorMessage.value = '';
+  records.value = [];
+  portraitWorkspace.value = null;
+  selectedReferenceAssets.value = [];
+  try {
+    const [expressionWorkspace, currentPortraitWorkspace] = await Promise.all([
+      window.desktop.getCharacterExpressionWorkspace({ characterId }),
+      window.desktop.getCharacterPortraitWorkspace({ characterId }),
+    ]);
+    if (requestId !== loadRequestId || selectedCharacterId.value !== characterId) {
+      return;
+    }
+    applyCharacterWorkspace(expressionWorkspace, currentPortraitWorkspace);
+  } catch (initializationError: unknown) {
+    if (requestId !== loadRequestId) {
+      return;
+    }
+    errorMessage.value =
+      initializationError instanceof Error
+        ? initializationError.message
+        : String(initializationError);
+  } finally {
+    if (requestId === loadRequestId) {
+      isInitializing.value = false;
+    }
   }
 }
 
@@ -148,61 +255,60 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   try {
-    const [expressionWorkspace, currentPortraitWorkspace, status] = await Promise.all([
-      window.desktop.getCharacterExpressionWorkspace(),
-      window.desktop.getCharacterPortraitWorkspace(),
+    const [characterLibrary, status] = await Promise.all([
+      window.desktop.getCharacterLibrary(),
       window.desktop.getCredentialStatus('apimart'),
     ]);
-    applyWorkspace(expressionWorkspace);
-    portraitWorkspace.value = currentPortraitWorkspace;
+    library.value = characterLibrary;
     credentialStatus.value = status;
-
-    const latestGeneratedRecord = expressionWorkspace.records.find(
-      record => record.source === 'generated',
-    );
-    if (latestGeneratedRecord) {
-      name.value = latestGeneratedRecord.name;
-      description.value = latestGeneratedRecord.description;
-      size.value = latestGeneratedRecord.size;
-      resolution.value = latestGeneratedRecord.resolution;
-      count.value = latestGeneratedRecord.count;
-    }
-
-    const unfinishedRecord = expressionWorkspace.records.find(record =>
-      activeStatuses.includes(record.status),
-    );
-    if (unfinishedRecord) {
-      generatorOpen.value = true;
-      mobilePane.value = 'gallery';
-      schedulePoll(unfinishedRecord.id);
-    }
+    selectedCharacterId.value = characterLibrary.activeCharacterId;
+    await loadCharacterWorkspace(characterLibrary.activeCharacterId);
   } catch (initializationError: unknown) {
     errorMessage.value =
       initializationError instanceof Error
         ? initializationError.message
         : String(initializationError);
-  } finally {
     isInitializing.value = false;
   }
 }
 
+function selectCharacter(characterId: string): void {
+  if (
+    characterSelectionDisabled.value ||
+    characterId === selectedCharacterId.value ||
+    !characters.value.some(character => character.id === characterId)
+  ) {
+    return;
+  }
+  selectedCharacterId.value = characterId;
+  selectedReferenceAssets.value = [];
+  void loadCharacterWorkspace(characterId);
+}
+
 async function generateExpression(): Promise<void> {
-  if (isGenerateDisabled.value) {
+  const characterId = selectedCharacterId.value;
+  if (isGenerateDisabled.value || !characterId) {
     return;
   }
   isSubmitting.value = true;
   errorMessage.value = '';
   try {
     const record = await window.desktop.generateCharacterExpression({
+      characterId,
       count: count.value,
       description: description.value.trim(),
       name: name.value.trim(),
+      referenceAssets: selectedReferenceAssets.value.map(asset => ({
+        fileName: asset.fileName,
+        kind: asset.kind,
+        taskId: asset.taskId,
+      })),
       resolution: resolution.value,
       size: size.value,
     });
     replaceRecord(record);
     mobilePane.value = 'gallery';
-    await pollExpressionTask(record.id);
+    await pollExpressionTask(record.id, characterId);
   } catch (generationError: unknown) {
     errorMessage.value =
       generationError instanceof Error ? generationError.message : String(generationError);
@@ -216,7 +322,7 @@ function retryPolling(): void {
     return;
   }
   errorMessage.value = '';
-  void pollExpressionTask(activeRecord.value.id);
+  void pollExpressionTask(activeRecord.value.id, selectedCharacterId.value);
 }
 
 function closeGenerator(): void {
@@ -228,12 +334,20 @@ function uploadExpression(
   expressionName: string,
   request: SaveFileRequest,
 ): Promise<SavedFileResult> {
-  return window.desktop.uploadCharacterExpression({ ...request, name: expressionName });
+  return window.desktop.uploadCharacterExpression({
+    ...request,
+    characterId: selectedCharacterId.value,
+    name: expressionName,
+  });
 }
 
 async function handleUploaded(): Promise<void> {
   try {
-    applyWorkspace(await window.desktop.getCharacterExpressionWorkspace());
+    applyWorkspace(
+      await window.desktop.getCharacterExpressionWorkspace({
+        characterId: selectedCharacterId.value,
+      }),
+    );
     mobilePane.value = 'gallery';
     toast.success('表情已上传并保存到工作区');
   } catch (uploadError: unknown) {
@@ -265,6 +379,7 @@ async function renameExpression(nextName: string): Promise<void> {
   try {
     applyWorkspace(
       await window.desktop.renameCharacterExpression({
+        characterId: selectedCharacterId.value,
         name: nextName,
         taskId: renameTarget.value.id,
       }),
@@ -288,6 +403,7 @@ async function deleteExpression(): Promise<void> {
   try {
     applyWorkspace(
       await window.desktop.deleteCharacterExpression({
+        characterId: selectedCharacterId.value,
         fileName: image.fileName,
         taskId: record.id,
       }),
@@ -329,8 +445,6 @@ onBeforeUnmount(() => {
         "
       />
     </template>
-
-    <CharacterContextBar active-section="character-expression" />
 
     <Alert v-if="!isInitializing && !hasReferences" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
@@ -376,12 +490,16 @@ onBeforeUnmount(() => {
         ]"
       >
         <ExpressionGallery
+          :characters="characters"
+          :character-selection-disabled="characterSelectionDisabled"
           :deleting-file-name="deletingFileName"
           :records="records"
           :renaming-task-id="renamingTaskId"
+          :selected-character-id="selectedCharacterId"
           class="min-h-0 min-w-0 flex-1"
           @delete="requestDelete"
           @rename="requestRename"
+          @update:selected-character-id="selectCharacter"
         />
       </div>
 
@@ -400,10 +518,12 @@ onBeforeUnmount(() => {
           v-model:size="size"
           :busy="isBusy"
           :disabled="isGenerateDisabled"
-          :reference-assets="officialReferenceImages"
+          :reference-assets="officialReferenceAssets"
+          :selected-reference-keys="selectedReferenceKeys"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeGenerator"
           @generate="generateExpression"
+          @toggle-reference="toggleReferenceAsset"
         />
       </div>
     </div>

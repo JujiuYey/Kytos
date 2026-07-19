@@ -1,5 +1,5 @@
 import type { Component } from 'vue';
-import { BookMarked, BookOpen, ImagePlus, Images, UsersRound } from 'lucide-vue-next';
+import { BookMarked, BookOpen, ImagePlus, Images, Laugh, UsersRound } from 'lucide-vue-next';
 
 export interface MenuItem {
   title: string;
@@ -22,6 +22,12 @@ export const menuGroups: MenuGroup[] = [
         key: 'characters',
         icon: UsersRound,
         path: '/characters',
+      },
+      {
+        title: '表情管理',
+        key: 'character-expression',
+        icon: Laugh,
+        path: '/character-expression',
       },
     ],
   },

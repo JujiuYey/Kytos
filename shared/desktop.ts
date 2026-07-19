@@ -1,6 +1,7 @@
 import type { CharacterWorkspaceState, SaveCharacterProfileRequest } from './character';
 import type {
   CharacterLibraryState,
+  CharacterScopeRequest,
   CreateCharacterRequest,
   DeleteCharacterRequest,
   SelectCharacterRequest,
@@ -11,6 +12,8 @@ import type {
   CharacterExpressionWorkspaceState,
   DeleteCharacterExpressionRequest,
   GenerateCharacterExpressionRequest,
+  GetCharacterExpressionTaskRequest,
+  GetCharacterExpressionWorkspaceRequest,
   RenameCharacterExpressionRequest,
   UploadCharacterExpressionRequest,
 } from './character-expression';
@@ -130,11 +133,17 @@ export interface DesktopApi {
   generateCharacterSheet: (request: GenerateCharacterSheetRequest) => Promise<CharacterSheetRecord>;
   generateIllustration: (request: GenerateIllustrationRequest) => Promise<IllustrationVersion>;
   generateStoryShot: (request: GenerateStoryShotRequest) => Promise<StoryShotVersion>;
-  getCharacterExpressionTask: (taskId: string) => Promise<CharacterExpressionRecord>;
-  getCharacterExpressionWorkspace: () => Promise<CharacterExpressionWorkspaceState>;
+  getCharacterExpressionTask: (
+    request: GetCharacterExpressionTaskRequest,
+  ) => Promise<CharacterExpressionRecord>;
+  getCharacterExpressionWorkspace: (
+    request: GetCharacterExpressionWorkspaceRequest,
+  ) => Promise<CharacterExpressionWorkspaceState>;
   getCharacterLibrary: () => Promise<CharacterLibraryState>;
   getCharacterPortraitTask: (taskId: string) => Promise<CharacterPortraitRecord>;
-  getCharacterPortraitWorkspace: () => Promise<CharacterPortraitWorkspaceState>;
+  getCharacterPortraitWorkspace: (
+    request?: CharacterScopeRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
   getCharacterSheetTask: (taskId: string) => Promise<CharacterSheetRecord>;
   getCharacterWorkspace: () => Promise<CharacterWorkspaceState>;
   getIllustrationTask: (taskId: string) => Promise<IllustrationVersion>;

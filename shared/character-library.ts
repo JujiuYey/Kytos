@@ -39,3 +39,7 @@ export interface DeleteCharacterRequest {
 export interface SelectCharacterRequest {
   characterId: string;
 }
+
+export interface CharacterScopeRequest {
+  characterId: string;
+}

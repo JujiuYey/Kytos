@@ -28,7 +28,7 @@ import {
   MAX_CHARACTER_SHEET_REFERENCE_IMAGES,
 } from '../../shared/character-portrait';
 import type { SaveFileRequest, SavedFileResult } from '../../shared/desktop';
-import { getActiveCharacterDirectory } from './character-library';
+import { getActiveCharacterDirectory, getCharacterDirectory } from './character-library';
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
@@ -298,12 +298,15 @@ export function getOfficialCharacterVisualReferences(
   });
 }
 
-async function getPortraitStorePath(): Promise<string> {
-  return path.join(await getActiveCharacterDirectory(), PORTRAIT_STORE_FILE_NAME);
+async function getPortraitStorePath(characterId?: string): Promise<string> {
+  const characterDirectory = characterId
+    ? await getCharacterDirectory(characterId)
+    : await getActiveCharacterDirectory();
+  return path.join(characterDirectory, PORTRAIT_STORE_FILE_NAME);
 }
 
-async function loadPortraitStore(): Promise<StoredPortraitWorkspace> {
-  const value = await readJsonFile(await getPortraitStorePath());
+async function loadPortraitStore(characterId?: string): Promise<StoredPortraitWorkspace> {
+  const value = await readJsonFile(await getPortraitStorePath(characterId));
   if (!isRecord(value)) {
     return {
       officialAssets: [],
@@ -606,8 +609,10 @@ function replaceSheetRecord(
   };
 }
 
-export async function getCharacterPortraitWorkspace(): Promise<CharacterPortraitWorkspaceState> {
-  return toWorkspaceState(await loadPortraitStore());
+export async function getCharacterPortraitWorkspace(
+  characterId?: string,
+): Promise<CharacterPortraitWorkspaceState> {
+  return toWorkspaceState(await loadPortraitStore(characterId));
 }
 
 function validateVisualAssetSelection(

@@ -1,31 +1,57 @@
 <script setup lang="ts">
-import { Check, Clock3, Laugh, Pencil, Trash2 } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
+import { Check, Clock3, Laugh, Pencil, Search, Trash2 } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { Button } from '@/components/ui/button';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
   CharacterExpressionRecord,
+  CharacterLibraryCharacter,
   CharacterPortraitImage,
   CharacterPortraitTaskStatus,
 } from '@/types';
 
-defineProps<{
+const props = defineProps<{
+  characters: CharacterLibraryCharacter[];
+  characterSelectionDisabled: boolean;
   deletingFileName: string;
   records: CharacterExpressionRecord[];
   renamingTaskId: string;
+  selectedCharacterId: string;
 }>();
 
 const emit = defineEmits<{
   (event: 'delete', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
   (event: 'rename', record: CharacterExpressionRecord): void;
+  (event: 'update:selectedCharacterId', value: string): void;
 }>();
 
 const activeStatuses: CharacterPortraitTaskStatus[] = ['submitted', 'pending', 'processing'];
+const searchQuery = ref('');
+const filteredRecords = computed(() => {
+  const normalizedQuery = searchQuery.value.trim().toLocaleLowerCase('zh-CN');
+  if (!normalizedQuery) {
+    return props.records;
+  }
+  return props.records.filter(
+    record =>
+      record.name.toLocaleLowerCase('zh-CN').includes(normalizedQuery) ||
+      record.description.toLocaleLowerCase('zh-CN').includes(normalizedQuery),
+  );
+});
 
 function isActive(record: CharacterExpressionRecord): boolean {
   return activeStatuses.includes(record.status);
@@ -70,12 +96,38 @@ function formatDate(value: string): string {
 
 <template>
   <section class="flex min-h-0 flex-col bg-muted/15" aria-label="表情资产库">
+    <div
+      class="flex shrink-0 flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+    >
+      <Select
+        :model-value="selectedCharacterId"
+        :disabled="characterSelectionDisabled"
+        @update:model-value="emit('update:selectedCharacterId', String($event))"
+      >
+        <SelectTrigger class="w-full sm:w-56" aria-label="筛选角色">
+          <SelectValue placeholder="选择角色" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem v-for="character in characters" :key="character.id" :value="character.id">
+            {{ character.name }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+
+      <InputGroup class="w-full sm:w-72">
+        <InputGroupAddon>
+          <Search class="size-4" />
+        </InputGroupAddon>
+        <InputGroupInput v-model="searchQuery" placeholder="搜索表情名称或描述" />
+      </InputGroup>
+    </div>
+
     <ScrollArea class="min-h-0 flex-1">
       <div
-        v-if="records.length"
+        v-if="filteredRecords.length"
         class="mx-auto grid w-full max-w-5xl grid-cols-1 gap-x-5 gap-y-8 px-5 py-6 sm:grid-cols-2 xl:grid-cols-3 lg:px-8"
       >
-        <template v-for="record in records" :key="record.id">
+        <template v-for="record in filteredRecords" :key="record.id">
           <article v-if="isActive(record)" class="min-w-0 rounded-md border bg-background p-4">
             <div class="flex items-center justify-between gap-3 text-sm">
               <h3 class="truncate font-medium">{{ record.name }}</h3>
@@ -217,10 +269,24 @@ function formatDate(value: string): string {
           >
             <Laugh class="size-5 text-muted-foreground" />
           </div>
-          <h2 class="mt-4 text-sm font-medium">还没有表情</h2>
+          <h2 class="mt-4 text-sm font-medium">
+            {{ searchQuery.trim() ? '没有找到匹配的表情' : '还没有表情' }}
+          </h2>
           <p class="mt-1.5 text-sm leading-6 text-muted-foreground">
-            可以从左侧上传已有表情，或使用正式角色参考图发起生成。
+            {{
+              searchQuery.trim()
+                ? '可以调整搜索内容后重试。'
+                : '可以上传已有表情，或使用正式角色参考图发起生成。'
+            }}
           </p>
+          <Button
+            v-if="searchQuery.trim()"
+            class="mt-4"
+            variant="outline"
+            @click="searchQuery = ''"
+          >
+            清除搜索
+          </Button>
         </div>
       </div>
     </ScrollArea>

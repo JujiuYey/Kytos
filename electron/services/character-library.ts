@@ -368,7 +368,13 @@ export async function getCharacterLibrary(): Promise<CharacterLibraryState> {
 
 export async function getActiveCharacterDirectory(): Promise<string> {
   const store = await loadStore();
-  return path.join(await getWorkspaceDirectory(), CHARACTER_DIRECTORY, store.activeCharacterId);
+  return getCharacterDirectory(store.activeCharacterId);
+}
+
+export async function getCharacterDirectory(characterId: string): Promise<string> {
+  const store = await loadStore();
+  const character = findCharacter(store, characterId);
+  return path.join(await getWorkspaceDirectory(), CHARACTER_DIRECTORY, character.id);
 }
 
 export async function createCharacter(

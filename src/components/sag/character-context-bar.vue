@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { ArrowLeft, Camera, Laugh, UserRound } from 'lucide-vue-next';
+import { ArrowLeft, Camera, UserRound } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { CharacterLibraryState } from '@/types';
 
-type CharacterSection = 'character' | 'character-expression' | 'character-portrait';
+type CharacterSection = 'character' | 'character-portrait';
 
 const props = defineProps<{
   activeSection: CharacterSection;
@@ -58,7 +58,7 @@ onMounted(async () => {
       class="w-full sm:w-auto"
       @update:model-value="openSection($event as CharacterSection)"
     >
-      <TabsList class="grid w-full grid-cols-3 sm:flex sm:w-auto">
+      <TabsList class="grid w-full grid-cols-2 sm:flex sm:w-auto">
         <TabsTrigger value="character">
           <UserRound class="size-3.5" />
           角色特征
@@ -66,10 +66,6 @@ onMounted(async () => {
         <TabsTrigger value="character-portrait">
           <Camera class="size-3.5" />
           角色视觉
-        </TabsTrigger>
-        <TabsTrigger value="character-expression">
-          <Laugh class="size-3.5" />
-          表情管理
         </TabsTrigger>
       </TabsList>
     </Tabs>

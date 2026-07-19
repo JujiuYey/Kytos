@@ -7,19 +7,24 @@ import type {
   CharacterExpressionWorkspaceState,
   DeleteCharacterExpressionRequest,
   GenerateCharacterExpressionRequest,
+  GetCharacterExpressionTaskRequest,
+  GetCharacterExpressionWorkspaceRequest,
   RenameCharacterExpressionRequest,
   UploadCharacterExpressionRequest,
 } from '../../shared/character-expression';
-import { CHARACTER_EXPRESSION_SIZES } from '../../shared/character-expression';
+import {
+  CHARACTER_EXPRESSION_SIZES,
+  MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES,
+} from '../../shared/character-expression';
 import type {
   CharacterPortraitImage,
   CharacterPortraitResolution,
-  CharacterPortraitSelection,
   CharacterPortraitTaskStatus,
+  CharacterVisualAssetSelection,
 } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
 import type { SavedFileResult } from '../../shared/desktop';
-import { getActiveCharacterDirectory } from './character-library';
+import { getCharacterDirectory } from './character-library';
 import {
   getCharacterPortraitWorkspace,
   getOfficialCharacterVisualReferences,
@@ -39,7 +44,7 @@ const TASK_ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/;
 
 interface StoredExpressionWorkspace {
   records: CharacterExpressionRecord[];
-  version: 1;
+  version: 2;
 }
 
 interface ApiTaskImage {
@@ -71,9 +76,10 @@ function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
   );
 }
 
-function parseSelection(value: unknown): CharacterPortraitSelection | null {
+function parseVisualAssetSelection(value: unknown): CharacterVisualAssetSelection | null {
   if (
     !isRecord(value) ||
+    (value.kind !== 'portrait' && value.kind !== 'sheet') ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName ||
     typeof value.taskId !== 'string' ||
@@ -81,7 +87,11 @@ function parseSelection(value: unknown): CharacterPortraitSelection | null {
   ) {
     return null;
   }
-  return { fileName: value.fileName, taskId: value.taskId };
+  return { fileName: value.fileName, kind: value.kind, taskId: value.taskId };
+}
+
+function selectionKey(selection: CharacterVisualAssetSelection): string {
+  return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
 }
 
 function getExpressionAssetUrl(fileName: string): string {
@@ -121,7 +131,8 @@ function parseExpressionRecord(value: unknown): CharacterExpressionRecord | null
     !Number.isInteger(value.count) ||
     value.count < 1 ||
     value.count > 4 ||
-    !isTaskStatus(value.status)
+    !isTaskStatus(value.status) ||
+    !Array.isArray(value.referenceAssets)
   ) {
     return null;
   }
@@ -131,6 +142,20 @@ function parseExpressionRecord(value: unknown): CharacterExpressionRecord | null
         .map(parseImage)
         .filter((image): image is CharacterPortraitImage => Boolean(image))
     : [];
+  const parsedReferenceAssets = value.referenceAssets.map(parseVisualAssetSelection);
+  if (parsedReferenceAssets.some(asset => !asset)) {
+    return null;
+  }
+  const referenceAssets = parsedReferenceAssets.filter(
+    (asset): asset is CharacterVisualAssetSelection => Boolean(asset),
+  );
+  if (
+    referenceAssets.length > MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES ||
+    new Set(referenceAssets.map(selectionKey)).size !== referenceAssets.length ||
+    (value.source !== 'uploaded' && referenceAssets.length < 1)
+  ) {
+    return null;
+  }
 
   return {
     count: value.count,
@@ -143,8 +168,7 @@ function parseExpressionRecord(value: unknown): CharacterExpressionRecord | null
     originalName: typeof value.originalName === 'string' ? value.originalName : null,
     progress: typeof value.progress === 'number' ? Math.min(100, Math.max(0, value.progress)) : 0,
     prompt: value.prompt,
-    referencePortrait: parseSelection(value.referencePortrait),
-    referenceSheet: parseSelection(value.referenceSheet),
+    referenceAssets,
     resolution: value.resolution,
     size: value.size,
     source: value.source === 'uploaded' ? 'uploaded' : 'generated',
@@ -153,14 +177,17 @@ function parseExpressionRecord(value: unknown): CharacterExpressionRecord | null
   };
 }
 
-async function getExpressionStorePath(): Promise<string> {
-  return path.join(await getActiveCharacterDirectory(), EXPRESSION_STORE_FILE_NAME);
+async function getExpressionStorePath(characterId: string): Promise<string> {
+  return path.join(await getCharacterDirectory(characterId), EXPRESSION_STORE_FILE_NAME);
 }
 
-async function loadExpressionStore(): Promise<StoredExpressionWorkspace> {
-  const value = await readJsonFile(await getExpressionStorePath());
+async function loadExpressionStore(characterId: string): Promise<StoredExpressionWorkspace> {
+  const value = await readJsonFile(await getExpressionStorePath(characterId));
   if (!isRecord(value)) {
-    return { records: [], version: 1 };
+    return { records: [], version: 2 };
+  }
+  if (value.version !== 2) {
+    throw new Error('表情数据版本无效');
   }
   const records = Array.isArray(value.records)
     ? value.records
@@ -169,12 +196,15 @@ async function loadExpressionStore(): Promise<StoredExpressionWorkspace> {
     : [];
   return {
     records: records.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
-    version: 1,
+    version: 2,
   };
 }
 
-async function saveExpressionStore(store: StoredExpressionWorkspace): Promise<void> {
-  await writeJsonFile(await getExpressionStorePath(), store);
+async function saveExpressionStore(
+  characterId: string,
+  store: StoredExpressionWorkspace,
+): Promise<void> {
+  await writeJsonFile(await getExpressionStorePath(characterId), store);
 }
 
 function replaceRecord(
@@ -189,10 +219,13 @@ function replaceRecord(
   };
 }
 
-function validateGenerateRequest(request: GenerateCharacterExpressionRequest): void {
+function validateGenerateRequest(
+  request: GenerateCharacterExpressionRequest,
+): CharacterVisualAssetSelection[] {
   if (
     !request ||
     typeof request !== 'object' ||
+    typeof request.characterId !== 'string' ||
     typeof request.name !== 'string' ||
     !request.name.trim() ||
     request.name.length > MAX_NAME_LENGTH ||
@@ -203,10 +236,24 @@ function validateGenerateRequest(request: GenerateCharacterExpressionRequest): v
     request.count < 1 ||
     request.count > 4 ||
     !isExpressionSize(request.size) ||
-    !isResolution(request.resolution)
+    !isResolution(request.resolution) ||
+    !Array.isArray(request.referenceAssets) ||
+    request.referenceAssets.length < 1 ||
+    request.referenceAssets.length > MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES
   ) {
     throw new Error('表情生成参数无效');
   }
+  const referenceAssets = request.referenceAssets.map(parseVisualAssetSelection);
+  if (referenceAssets.some(asset => !asset)) {
+    throw new Error('选择的角色参考图无效');
+  }
+  const selections = referenceAssets.filter((asset): asset is CharacterVisualAssetSelection =>
+    Boolean(asset),
+  );
+  if (new Set(selections.map(selectionKey)).size !== selections.length) {
+    throw new Error('角色参考图不能重复选择');
+  }
+  return selections;
 }
 
 function buildExpressionPrompt(request: GenerateCharacterExpressionRequest): string {
@@ -224,6 +271,7 @@ function validateUploadRequest(request: UploadCharacterExpressionRequest): void 
   if (
     !request ||
     typeof request !== 'object' ||
+    typeof request.characterId !== 'string' ||
     typeof request.name !== 'string' ||
     !request.name.trim() ||
     request.name.length > MAX_NAME_LENGTH ||
@@ -382,7 +430,7 @@ async function downloadTaskImages(
 }
 
 async function getReferenceData(
-  selection: CharacterPortraitSelection,
+  selection: CharacterVisualAssetSelection,
   directoryName: string,
   image: CharacterPortraitImage,
 ): Promise<string> {
@@ -399,28 +447,38 @@ async function getReferenceData(
   return `data:${image.mimeType};base64,${imageData.toString('base64')}`;
 }
 
-export async function getCharacterExpressionWorkspace(): Promise<CharacterExpressionWorkspaceState> {
-  const store = await loadExpressionStore();
+export async function getCharacterExpressionWorkspace(
+  request: GetCharacterExpressionWorkspaceRequest,
+): Promise<CharacterExpressionWorkspaceState> {
+  if (!request || typeof request.characterId !== 'string') {
+    throw new Error('角色编号无效');
+  }
+  const store = await loadExpressionStore(request.characterId);
   return { records: store.records };
 }
 
 export async function generateCharacterExpression(
   request: GenerateCharacterExpressionRequest,
 ): Promise<CharacterExpressionRecord> {
-  validateGenerateRequest(request);
-  const portraitWorkspace = await getCharacterPortraitWorkspace();
-  const references = getOfficialCharacterVisualReferences(portraitWorkspace);
-  if (!references.length) {
-    throw new Error('请先将至少一张角色视觉图片设为正式资产');
-  }
+  const requestedAssets = validateGenerateRequest(request);
+  const portraitWorkspace = await getCharacterPortraitWorkspace(request.characterId);
+  const officialReferences = getOfficialCharacterVisualReferences(portraitWorkspace);
+  const referencesByKey = new Map(
+    officialReferences.map(reference => [selectionKey(reference.selection), reference]),
+  );
+  const references = requestedAssets.map(selection => {
+    const reference = referencesByKey.get(selectionKey(selection));
+    if (!reference) {
+      throw new Error('选择的角色参考图已失效，请重新选择');
+    }
+    return reference;
+  });
 
   const imageUrls = await Promise.all(
     references.map(reference =>
       getReferenceData(reference.selection, reference.directoryName, reference.image),
     ),
   );
-  const portraitSelection = references[0]?.selection ?? null;
-  const sheetSelection = references[1]?.selection ?? null;
   const apiKey = await getCredentialValue('apimart');
   const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
     body: JSON.stringify({
@@ -451,25 +509,34 @@ export async function generateCharacterExpression(
     originalName: null,
     progress: 0,
     prompt,
-    referencePortrait: { ...portraitSelection },
-    referenceSheet: { ...sheetSelection },
+    referenceAssets: requestedAssets.map(asset => ({ ...asset })),
     resolution: request.resolution,
     size: request.size,
     source: 'generated',
     status: 'submitted',
     updatedAt: now,
   };
-  await saveExpressionStore(replaceRecord(await loadExpressionStore(), record));
+  await saveExpressionStore(
+    request.characterId,
+    replaceRecord(await loadExpressionStore(request.characterId), record),
+  );
   return record;
 }
 
 export async function getCharacterExpressionTask(
-  taskId: string,
+  request: GetCharacterExpressionTaskRequest,
 ): Promise<CharacterExpressionRecord> {
+  if (!request || typeof request !== 'object') {
+    throw new Error('表情任务参数无效');
+  }
+  const { characterId, taskId } = request;
+  if (typeof characterId !== 'string') {
+    throw new Error('角色编号无效');
+  }
   if (!TASK_ID_PATTERN.test(taskId)) {
     throw new Error('表情生成任务编号无效');
   }
-  const store = await loadExpressionStore();
+  const store = await loadExpressionStore(characterId);
   const existingRecord = store.records.find(record => record.id === taskId);
   if (!existingRecord) {
     throw new Error('未找到表情生成任务');
@@ -508,7 +575,7 @@ export async function getCharacterExpressionTask(
     status: taskData.status,
     updatedAt: new Date().toISOString(),
   };
-  await saveExpressionStore(replaceRecord(store, updatedRecord));
+  await saveExpressionStore(characterId, replaceRecord(store, updatedRecord));
   return updatedRecord;
 }
 
@@ -535,8 +602,7 @@ export async function uploadCharacterExpression(
     originalName: request.fileName,
     progress: 100,
     prompt: '',
-    referencePortrait: null,
-    referenceSheet: null,
+    referenceAssets: [],
     resolution: '1k',
     size: '1:1',
     source: 'uploaded',
@@ -544,7 +610,10 @@ export async function uploadCharacterExpression(
     updatedAt: now,
   };
   try {
-    await saveExpressionStore(replaceRecord(await loadExpressionStore(), record));
+    await saveExpressionStore(
+      request.characterId,
+      replaceRecord(await loadExpressionStore(request.characterId), record),
+    );
   } catch (error: unknown) {
     await unlink(path.join(assetDirectory, fileName)).catch(() => undefined);
     throw error;
@@ -565,6 +634,7 @@ export async function renameCharacterExpression(
   if (
     !request ||
     typeof request !== 'object' ||
+    typeof request.characterId !== 'string' ||
     typeof request.taskId !== 'string' ||
     !TASK_ID_PATTERN.test(request.taskId) ||
     typeof request.name !== 'string' ||
@@ -574,7 +644,7 @@ export async function renameCharacterExpression(
     throw new Error('表情名称无效');
   }
 
-  const store = await loadExpressionStore();
+  const store = await loadExpressionStore(request.characterId);
   const record = store.records.find(item => item.id === request.taskId);
   if (!record) {
     throw new Error('未找到要重命名的表情');
@@ -592,7 +662,7 @@ export async function renameCharacterExpression(
         : item,
     ),
   };
-  await saveExpressionStore(nextStore);
+  await saveExpressionStore(request.characterId, nextStore);
   return { records: nextStore.records };
 }
 
@@ -602,6 +672,7 @@ export async function deleteCharacterExpression(
   if (
     !request ||
     typeof request !== 'object' ||
+    typeof request.characterId !== 'string' ||
     typeof request.taskId !== 'string' ||
     !TASK_ID_PATTERN.test(request.taskId) ||
     typeof request.fileName !== 'string' ||
@@ -609,7 +680,7 @@ export async function deleteCharacterExpression(
   ) {
     throw new Error('表情删除请求无效');
   }
-  const store = await loadExpressionStore();
+  const store = await loadExpressionStore(request.characterId);
   const record = store.records.find(item => item.id === request.taskId);
   const image = record?.images.find(item => item.fileName === request.fileName);
   if (!record || !image) {
@@ -627,13 +698,13 @@ export async function deleteCharacterExpression(
         )
       : store.records.filter(item => item.id !== record.id),
   };
-  await saveExpressionStore(nextStore);
+  await saveExpressionStore(request.characterId, nextStore);
   try {
     const workspacePath = await getWorkspaceDirectory();
     await unlink(path.join(workspacePath, 'assets', EXPRESSION_ASSET_DIRECTORY, request.fileName));
   } catch (error: unknown) {
     if (!isNodeError(error) || error.code !== 'ENOENT') {
-      await saveExpressionStore(store);
+      await saveExpressionStore(request.characterId, store);
       throw new Error(
         error instanceof Error ? `表情图片删除失败：${error.message}` : '表情图片删除失败',
       );

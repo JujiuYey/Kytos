@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { WandSparkles, X } from 'lucide-vue-next';
+import { Check, WandSparkles, X } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,33 +13,46 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ImageViewer } from '@/components/sag/image-viewer';
 import type {
   CharacterExpressionSize,
   CharacterPortraitImage,
   CharacterPortraitResolution,
+  CharacterVisualAssetSelection,
 } from '@/types';
+import { MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
 
-defineProps<{
+interface ExpressionReferenceAsset {
+  image: CharacterPortraitImage;
+  key: string;
+  selection: CharacterVisualAssetSelection;
+}
+
+const props = defineProps<{
   busy: boolean;
   count: number;
   description: string;
   disabled: boolean;
   name: string;
-  referenceAssets: CharacterPortraitImage[];
+  referenceAssets: ExpressionReferenceAsset[];
   resolution: CharacterPortraitResolution;
+  selectedReferenceKeys: string[];
   size: CharacterExpressionSize;
 }>();
 
 const emit = defineEmits<{
   (event: 'close'): void;
   (event: 'generate'): void;
+  (event: 'toggle-reference', selection: CharacterVisualAssetSelection): void;
   (event: 'update:count', value: number): void;
   (event: 'update:description', value: string): void;
   (event: 'update:name', value: string): void;
   (event: 'update:resolution', value: CharacterPortraitResolution): void;
   (event: 'update:size', value: CharacterExpressionSize): void;
 }>();
+
+function isReferenceSelected(key: string): boolean {
+  return props.selectedReferenceKeys.includes(key);
+}
 </script>
 
 <template>
@@ -57,31 +70,51 @@ const emit = defineEmits<{
           <div class="mb-3">
             <h2 id="expression-reference-heading" class="text-sm font-medium">角色参考</h2>
             <p class="mt-1 text-xs leading-5 text-muted-foreground">
-              使用当前角色的正式视觉资产，锁定角色身份、造型与画风。
+              从当前角色的正式视觉资产中选择生成参考，不会默认全部使用。
+            </p>
+            <p class="mt-1 text-xs tabular-nums text-muted-foreground">
+              已选择 {{ selectedReferenceKeys.length }} /
+              {{ Math.min(referenceAssets.length, MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES) }}
             </p>
           </div>
           <div class="grid grid-cols-2 gap-3">
-            <div v-for="(asset, index) in referenceAssets" :key="asset.fileName" class="min-w-0">
-              <ImageViewer
-                :alt="`${asset.name || `正式资产 ${index + 1}`}预览`"
-                :src="asset.url"
-                :title="asset.name || `正式资产 ${index + 1}`"
-                description="表情生成使用的身份与画风参考"
+            <div v-for="(asset, index) in referenceAssets" :key="asset.key" class="min-w-0">
+              <Button
+                variant="outline"
+                :aria-label="`${isReferenceSelected(asset.key) ? '取消选择' : '选择'}${asset.image.name || `正式资产 ${index + 1}`}`"
+                :aria-pressed="isReferenceSelected(asset.key)"
+                :disabled="
+                  busy ||
+                  (!isReferenceSelected(asset.key) &&
+                    selectedReferenceKeys.length >= MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES)
+                "
+                :class="[
+                  'relative block h-auto w-full overflow-hidden rounded-md p-0 focus-visible:ring-inset',
+                  isReferenceSelected(asset.key) && 'border-primary ring-2 ring-primary/20',
+                ]"
+                @click="emit('toggle-reference', asset.selection)"
               >
-                <Button
-                  variant="ghost"
-                  class="block h-auto w-full rounded-md border p-0 focus-visible:ring-inset"
-                  :aria-label="`查看${asset.name || `正式资产 ${index + 1}`}`"
+                <AiImage
+                  :alt="asset.image.name || `正式资产 ${index + 1}`"
+                  :src="asset.image.url"
+                  class="aspect-square w-full rounded-md bg-muted/30 object-contain"
+                />
+                <span
+                  v-if="isReferenceSelected(asset.key)"
+                  class="absolute right-2 top-2 flex size-5 items-center justify-center rounded-sm bg-primary text-primary-foreground shadow-sm"
                 >
-                  <AiImage
-                    :alt="asset.name || `正式资产 ${index + 1}`"
-                    :src="asset.url"
-                    class="aspect-square w-full rounded-md bg-muted/30 object-contain"
-                  />
-                </Button>
-              </ImageViewer>
-              <p class="mt-2 truncate text-center text-xs text-muted-foreground">
-                {{ asset.name || `正式资产 ${index + 1}` }}
+                  <Check class="size-3.5" />
+                </span>
+              </Button>
+              <p
+                :class="[
+                  'mt-2 truncate text-center text-xs',
+                  isReferenceSelected(asset.key)
+                    ? 'font-medium text-foreground'
+                    : 'text-muted-foreground',
+                ]"
+              >
+                {{ asset.image.name || `正式资产 ${index + 1}` }}
               </p>
             </div>
             <div
@@ -194,7 +227,11 @@ const emit = defineEmits<{
         {{ busy ? '正在生成表情' : '生成表情' }}
       </Button>
       <p class="mt-2 text-center text-xs text-muted-foreground">
-        使用两张正式角色参考图进行 GPT-Image-2 图生图，点击后将产生实际费用
+        {{
+          selectedReferenceKeys.length
+            ? `使用 ${selectedReferenceKeys.length} 张已选参考图进行 GPT-Image-2 图生图，点击后将产生实际费用`
+            : '请先选择至少一张正式角色参考图'
+        }}
       </p>
     </footer>
   </section>

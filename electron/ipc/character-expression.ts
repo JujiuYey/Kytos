@@ -2,6 +2,8 @@ import { ipcMain } from 'electron';
 import type {
   DeleteCharacterExpressionRequest,
   GenerateCharacterExpressionRequest,
+  GetCharacterExpressionTaskRequest,
+  GetCharacterExpressionWorkspaceRequest,
   RenameCharacterExpressionRequest,
   UploadCharacterExpressionRequest,
 } from '../../shared/character-expression';
@@ -32,15 +34,21 @@ export function registerCharacterExpressionIpc(assertTrustedSender: TrustedSende
     },
   );
 
-  ipcMain.handle('character-expression:get-task', async (event, taskId: string) => {
-    assertTrustedSender(event);
-    return getCharacterExpressionTask(taskId);
-  });
+  ipcMain.handle(
+    'character-expression:get-task',
+    async (event, request: GetCharacterExpressionTaskRequest) => {
+      assertTrustedSender(event);
+      return getCharacterExpressionTask(request);
+    },
+  );
 
-  ipcMain.handle('character-expression:get-workspace', async event => {
-    assertTrustedSender(event);
-    return getCharacterExpressionWorkspace();
-  });
+  ipcMain.handle(
+    'character-expression:get-workspace',
+    async (event, request: GetCharacterExpressionWorkspaceRequest) => {
+      assertTrustedSender(event);
+      return getCharacterExpressionWorkspace(request);
+    },
+  );
 
   ipcMain.handle(
     'character-expression:rename',

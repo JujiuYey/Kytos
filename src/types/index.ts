@@ -21,6 +21,7 @@ export type {
   CharacterLibraryCharacter,
   CharacterLibraryVisualAsset,
   CharacterLibraryState,
+  CharacterScopeRequest,
   CharacterSummary,
   CreateCharacterRequest,
   DeleteCharacterRequest,
@@ -33,10 +34,15 @@ export type {
   CharacterExpressionWorkspaceState,
   DeleteCharacterExpressionRequest,
   GenerateCharacterExpressionRequest,
+  GetCharacterExpressionTaskRequest,
+  GetCharacterExpressionWorkspaceRequest,
   RenameCharacterExpressionRequest,
   UploadCharacterExpressionRequest,
 } from '../../shared/character-expression';
-export { CHARACTER_EXPRESSION_SIZES } from '../../shared/character-expression';
+export {
+  CHARACTER_EXPRESSION_SIZES,
+  MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES,
+} from '../../shared/character-expression';
 export type {
   CharacterImageRecord,
   CharacterImageSize,
