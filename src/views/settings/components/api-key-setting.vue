@@ -13,7 +13,6 @@ import {
   Trash2,
 } from 'lucide-vue-next';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -25,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type { CredentialService, CredentialStatus } from '@/types';
 
 interface Props {
@@ -114,12 +114,12 @@ onMounted(() => {
         <div class="flex flex-wrap items-center gap-2">
           <KeyRound class="size-4 text-muted-foreground" />
           <h3 class="text-sm font-medium">{{ title }}</h3>
-          <Badge v-if="isLoading" variant="outline">读取中</Badge>
-          <Badge v-else-if="status?.configured" variant="secondary">
+          <SagStatusBadge v-if="isLoading" tone="info">读取中</SagStatusBadge>
+          <SagStatusBadge v-else-if="status?.configured" tone="success">
             <CheckCircle2 class="size-3" />
             已配置
-          </Badge>
-          <Badge v-else variant="outline">未配置</Badge>
+          </SagStatusBadge>
+          <SagStatusBadge v-else tone="warning">未配置</SagStatusBadge>
         </div>
         <p class="mt-1.5 text-sm leading-5 text-muted-foreground">
           {{ description }}

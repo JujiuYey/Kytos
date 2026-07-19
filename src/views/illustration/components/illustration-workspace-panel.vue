@@ -32,6 +32,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ImageViewer } from '@/components/sag/image-viewer';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
   CharacterPortraitResolution,
   CharacterPortraitImage,
@@ -125,9 +126,9 @@ function handleTitleChange(event: Event): void {
     <div class="flex h-12 shrink-0 items-center justify-between border-b px-4">
       <div class="flex items-center gap-2">
         <h2 class="text-sm font-medium">画面方案</h2>
-        <Badge :variant="topic.ready ? 'secondary' : 'outline'">
+        <SagStatusBadge :tone="topic.ready ? 'success' : 'info'">
           {{ topic.ready ? '可生成' : '对话整理中' }}
-        </Badge>
+        </SagStatusBadge>
       </div>
       <Badge variant="outline">{{ topic.versions.length }} 个版本</Badge>
     </div>
@@ -166,9 +167,9 @@ function handleTitleChange(event: Event): void {
         <section aria-labelledby="illustration-references-heading">
           <div class="mb-3 flex items-center justify-between gap-3">
             <h3 id="illustration-references-heading" class="text-sm font-medium">正式参考</h3>
-            <Badge :variant="styleReference ? 'secondary' : 'outline'">
+            <SagStatusBadge :tone="styleReference ? 'success' : 'neutral'">
               {{ styleReference ? '画风已锁定' : '未选画风' }}
-            </Badge>
+            </SagStatusBadge>
           </div>
           <div class="grid grid-cols-3 gap-2">
             <div
@@ -336,7 +337,15 @@ function handleTitleChange(event: Event): void {
                     }}
                   </span>
                 </div>
-                <Badge variant="outline">
+                <SagStatusBadge
+                  :tone="
+                    isActive(version)
+                      ? 'info'
+                      : version.status === 'completed'
+                        ? 'success'
+                        : 'error'
+                  "
+                >
                   {{
                     isActive(version)
                       ? '生成中'
@@ -344,7 +353,7 @@ function handleTitleChange(event: Event): void {
                         ? '已完成'
                         : '未完成'
                   }}
-                </Badge>
+                </SagStatusBadge>
               </div>
 
               <div v-if="isActive(version)" class="p-4">

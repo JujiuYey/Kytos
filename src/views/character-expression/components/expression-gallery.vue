@@ -2,12 +2,12 @@
 import { Check, Clock3, Laugh, Pencil, Trash2 } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ImageViewer } from '@/components/sag/image-viewer';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
   CharacterExpressionRecord,
   CharacterPortraitImage,
@@ -79,10 +79,10 @@ function formatDate(value: string): string {
           <article v-if="isActive(record)" class="min-w-0 rounded-md border bg-background p-4">
             <div class="flex items-center justify-between gap-3 text-sm">
               <h3 class="truncate font-medium">{{ record.name }}</h3>
-              <Badge variant="secondary" class="shrink-0">
+              <SagStatusBadge tone="info" class="shrink-0">
                 <Loader class="size-3" />
                 {{ getStatusLabel(record) }}
-              </Badge>
+              </SagStatusBadge>
             </div>
             <p class="mt-4 text-sm">GPT-Image-2 正在绘制这个表情</p>
             <div class="mt-3 flex items-center justify-between gap-4 text-xs text-muted-foreground">
@@ -98,7 +98,9 @@ function formatDate(value: string): string {
           >
             <div class="flex items-center justify-between gap-3">
               <h3 class="truncate text-sm font-medium">{{ record.name }}</h3>
-              <Badge variant="destructive" class="shrink-0">{{ getStatusLabel(record) }}</Badge>
+              <SagStatusBadge tone="error" class="shrink-0">
+                {{ getStatusLabel(record) }}
+              </SagStatusBadge>
             </div>
             <p class="mt-4 text-sm text-destructive">
               {{ record.errorMessage || '表情生成任务未完成' }}
@@ -155,10 +157,10 @@ function formatDate(value: string): string {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <Badge variant="secondary" class="shrink-0">
+                  <SagStatusBadge tone="success" class="shrink-0">
                     <Check class="size-3" />
                     {{ getStatusLabel(record) }}
-                  </Badge>
+                  </SagStatusBadge>
                 </div>
 
                 <p

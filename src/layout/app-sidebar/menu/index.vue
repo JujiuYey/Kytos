@@ -22,7 +22,10 @@ function handleClick(menu: MenuItem) {
 
 const currentKey = computed(() => {
   const pathParts = route.path.split('/').filter(Boolean);
-  return pathParts.length > 1 ? pathParts[1] : pathParts[0] || 'home';
+  const key = pathParts.length > 1 ? (pathParts[1] ?? 'home') : (pathParts[0] ?? 'home');
+  return ['character', 'character-expression', 'character-portrait'].includes(key)
+    ? 'characters'
+    : key;
 });
 
 const getMenuButtonClass = computed(() => (key: string) => ({

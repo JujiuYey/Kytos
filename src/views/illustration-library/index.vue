@@ -25,6 +25,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
   CharacterPortraitImage,
   IllustrationTopic,
@@ -403,10 +404,10 @@ onMounted(() => {
                 <span class="truncate">{{ formatDate(item.createdAt) }}</span>
               </span>
               <div class="flex shrink-0 items-center gap-1">
-                <Badge v-if="isStyleReference(item)" variant="secondary">
+                <SagStatusBadge v-if="isStyleReference(item)" tone="success">
                   <Check class="size-3" />
                   正式画风
-                </Badge>
+                </SagStatusBadge>
                 <Button
                   v-else
                   size="sm"

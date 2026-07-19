@@ -12,12 +12,18 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: Layout,
-    redirect: '/character',
+    redirect: '/characters',
     children: [
       {
         path: '/settings',
         name: 'settings',
         component: () => import('@/views/settings/index.vue'),
+      },
+      {
+        path: '/characters',
+        name: 'characters',
+        component: () => import('@/views/characters/index.vue'),
+        meta: { title: '角色管理' },
       },
       {
         path: '/character',
@@ -50,6 +56,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '插画管理' },
       },
       {
+        path: '/stories',
+        name: 'stories',
+        component: () => import('@/views/stories/index.vue'),
+        meta: { title: '故事管理' },
+      },
+      {
         path: '/story',
         name: 'story',
         component: () => import('@/views/story/index.vue'),
@@ -75,7 +87,7 @@ router.beforeEach(to => {
     return { name: 'setup' };
   }
   if (appStore.isWorkspaceConfigured && to.name === 'setup') {
-    return { name: 'character' };
+    return { name: 'characters' };
   }
   return true;
 });

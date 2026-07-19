@@ -19,6 +19,7 @@ import {
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { ImageViewer } from '@/components/sag/image-viewer';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -173,10 +174,8 @@ function handleTitleChange(event: Event): void {
             >成片 {{ finalShotCount }}/{{ story.shots.length }}</TabsTrigger
           >
         </TabsList>
-        <Badge
-          :variant="
-            story.storyboardStale ? 'destructive' : story.storyboardReady ? 'secondary' : 'outline'
-          "
+        <SagStatusBadge
+          :tone="story.storyboardStale ? 'warning' : story.storyboardReady ? 'success' : 'info'"
         >
           {{
             story.storyboardStale
@@ -187,7 +186,7 @@ function handleTitleChange(event: Event): void {
                   ? '等待分镜'
                   : '故事整理中'
           }}
-        </Badge>
+        </SagStatusBadge>
       </div>
 
       <TabsContent value="story" class="mt-0 min-h-0 overflow-hidden">
@@ -207,9 +206,9 @@ function handleTitleChange(event: Event): void {
             <section aria-labelledby="story-summary-heading">
               <div class="mb-3 flex items-center justify-between gap-3">
                 <h3 id="story-summary-heading" class="text-sm font-medium">故事定稿</h3>
-                <Badge :variant="story.storyReady ? 'secondary' : 'outline'">
+                <SagStatusBadge :tone="story.storyReady ? 'success' : 'info'">
                   {{ story.storyReady ? '已确认' : '对话整理中' }}
-                </Badge>
+                </SagStatusBadge>
               </div>
               <p class="whitespace-pre-wrap text-sm leading-6">
                 {{ story.draft.summary || '故事信息足够后，Agent 会在这里整理完整短篇。' }}
@@ -261,11 +260,11 @@ function handleTitleChange(event: Event): void {
             <section aria-labelledby="story-output-heading">
               <div class="mb-3 flex items-center justify-between gap-3">
                 <h3 id="story-output-heading" class="text-sm font-medium">统一输出</h3>
-                <Badge :variant="apimartConfigured && assetsReady ? 'secondary' : 'destructive'">
+                <SagStatusBadge :tone="apimartConfigured && assetsReady ? 'success' : 'error'">
                   {{
                     !apimartConfigured ? '缺少 API Key' : assetsReady ? '参考就绪' : '参考不完整'
                   }}
-                </Badge>
+                </SagStatusBadge>
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div class="space-y-2">
@@ -357,11 +356,13 @@ function handleTitleChange(event: Event): void {
                   <div class="flex min-w-0 items-center gap-2">
                     <span class="text-xs font-medium tabular-nums">{{ shot.order }}</span>
                     <h3 class="truncate text-sm font-medium">{{ shot.title || '未命名分镜' }}</h3>
-                    <Badge v-if="shot.id === story.keyShotId" variant="secondary">
+                    <SagStatusBadge v-if="shot.id === story.keyShotId" tone="info">
                       <Star class="size-3" />
                       关键帧
-                    </Badge>
-                    <Badge v-if="shot.imageStale" variant="destructive">画面待更新</Badge>
+                    </SagStatusBadge>
+                    <SagStatusBadge v-if="shot.imageStale" tone="warning">
+                      画面待更新
+                    </SagStatusBadge>
                   </div>
                   <div class="flex shrink-0 items-center gap-0.5">
                     <TooltipProvider :delay-duration="300">
@@ -518,12 +519,12 @@ function handleTitleChange(event: Event): void {
                         </Button>
                       </ImageViewer>
                       <div class="flex items-center justify-between gap-1 border-t px-2 py-1.5">
-                        <Badge
-                          :variant="shot.selectedVersionId === version.id ? 'secondary' : 'outline'"
+                        <SagStatusBadge
+                          :tone="shot.selectedVersionId === version.id ? 'success' : 'neutral'"
                         >
                           V{{ version.versionNumber }}
                           <Check v-if="shot.selectedVersionId === version.id" class="size-3" />
-                        </Badge>
+                        </SagStatusBadge>
                         <div class="flex items-center gap-0.5">
                           <TooltipProvider :delay-duration="300">
                             <Tooltip v-if="version.status === 'completed' && version.images[0]">
@@ -672,9 +673,9 @@ function handleTitleChange(event: Event): void {
                   <span class="text-xs tabular-nums text-muted-foreground">{{ shot.order }}</span>
                   <h4 class="truncate text-sm font-medium">{{ shot.title }}</h4>
                 </div>
-                <Badge v-if="story.storyboardStale || shot.imageStale" variant="destructive">
+                <SagStatusBadge v-if="story.storyboardStale || shot.imageStale" tone="warning">
                   待更新
-                </Badge>
+                </SagStatusBadge>
               </div>
               <template v-if="getSelectedImageUrl(shot)">
                 <ImageViewer

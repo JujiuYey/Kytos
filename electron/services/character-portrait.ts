@@ -23,6 +23,7 @@ import {
   CHARACTER_SHEET_SIZE,
 } from '../../shared/character-portrait';
 import type { SaveFileRequest, SavedFileResult } from '../../shared/desktop';
+import { getActiveCharacterDirectory } from './character-library';
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
@@ -184,7 +185,7 @@ function parseSelection(value: unknown): CharacterPortraitSelection | null {
 }
 
 async function getPortraitStorePath(): Promise<string> {
-  return path.join(await getWorkspaceDirectory(), PORTRAIT_STORE_FILE_NAME);
+  return path.join(await getActiveCharacterDirectory(), PORTRAIT_STORE_FILE_NAME);
 }
 
 async function loadPortraitStore(): Promise<StoredPortraitWorkspace> {
@@ -485,7 +486,7 @@ export async function uploadCharacterPortrait(request: SaveFileRequest): Promise
     originalName: request.fileName,
     progress: 100,
     prompt: '',
-    resolution: '2k',
+    resolution: '1k',
     size: '2:3',
     source: 'uploaded',
     status: 'completed',
@@ -519,7 +520,7 @@ export async function uploadCharacterSheet(request: SaveFileRequest): Promise<Sa
     progress: 100,
     prompt: '',
     referenceImage: null,
-    resolution: '2k',
+    resolution: '1k',
     size: CHARACTER_SHEET_SIZE,
     source: 'uploaded',
     status: 'completed',

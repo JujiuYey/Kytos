@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { BookOpen, Images, MessageSquare, Plus, Trash2 } from 'lucide-vue-next';
-import { Badge } from '@/components/ui/badge';
+import { BookMarked, BookOpen, Images, MessageSquare, Plus, Trash2 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -10,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type { StoryProject } from '@/types';
 
 defineProps<{
@@ -23,6 +23,7 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'create'): void;
   (event: 'delete'): void;
+  (event: 'manage'): void;
   (event: 'select', storyId: string): void;
   (event: 'update:mobilePane', value: 'chat' | 'workspace'): void;
 }>();
@@ -70,10 +71,20 @@ const emit = defineEmits<{
     </TabsList>
   </Tabs>
 
-  <Badge :variant="assetsReady ? 'secondary' : 'destructive'" class="hidden md:flex">
+  <SagStatusBadge :tone="assetsReady ? 'success' : 'error'" class="hidden md:flex">
     {{ assetsReady ? '正式参考就绪' : '缺少正式参考' }}
-  </Badge>
+  </SagStatusBadge>
 
+  <Button
+    size="sm"
+    variant="outline"
+    :disabled="busy"
+    aria-label="故事管理"
+    @click="emit('manage')"
+  >
+    <BookMarked class="size-4" />
+    <span class="hidden xl:inline">故事管理</span>
+  </Button>
   <Button
     size="icon"
     variant="ghost"

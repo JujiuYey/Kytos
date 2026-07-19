@@ -1,5 +1,12 @@
 import type { CharacterWorkspaceState, SaveCharacterProfileRequest } from './character';
 import type {
+  CharacterLibraryState,
+  CreateCharacterRequest,
+  DeleteCharacterRequest,
+  SelectCharacterRequest,
+  UpdateCharacterRequest,
+} from './character-library';
+import type {
   CharacterExpressionRecord,
   CharacterExpressionWorkspaceState,
   DeleteCharacterExpressionRequest,
@@ -84,6 +91,7 @@ export interface SavedFileResult {
 }
 
 export interface DesktopApi {
+  createCharacter: (request: CreateCharacterRequest) => Promise<CharacterLibraryState>;
   createStory: (request: CreateStoryRequest) => Promise<StoryProject>;
   createStoryShot: (request: CreateStoryShotRequest) => Promise<StoryProject>;
   createIllustrationTopic: (request: CreateIllustrationTopicRequest) => Promise<IllustrationTopic>;
@@ -99,6 +107,7 @@ export interface DesktopApi {
   deleteCharacterExpression: (
     request: DeleteCharacterExpressionRequest,
   ) => Promise<CharacterExpressionWorkspaceState>;
+  deleteCharacter: (request: DeleteCharacterRequest) => Promise<CharacterLibraryState>;
   deleteCharacterPortrait: (
     request: DeleteCharacterPortraitRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
@@ -120,6 +129,7 @@ export interface DesktopApi {
   generateStoryShot: (request: GenerateStoryShotRequest) => Promise<StoryShotVersion>;
   getCharacterExpressionTask: (taskId: string) => Promise<CharacterExpressionRecord>;
   getCharacterExpressionWorkspace: () => Promise<CharacterExpressionWorkspaceState>;
+  getCharacterLibrary: () => Promise<CharacterLibraryState>;
   getCharacterPortraitTask: (taskId: string) => Promise<CharacterPortraitRecord>;
   getCharacterPortraitWorkspace: () => Promise<CharacterPortraitWorkspaceState>;
   getCharacterSheetTask: (taskId: string) => Promise<CharacterSheetRecord>;
@@ -145,6 +155,7 @@ export interface DesktopApi {
   selectCharacterPortrait: (
     request: SelectCharacterPortraitRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
+  selectCharacter: (request: SelectCharacterRequest) => Promise<CharacterLibraryState>;
   selectCharacterSheet: (
     request: SelectCharacterSheetRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
@@ -162,6 +173,7 @@ export interface DesktopApi {
   uploadCharacterSheet: (request: SaveFileRequest) => Promise<SavedFileResult>;
   uploadIllustration: (request: UploadIllustrationRequest) => Promise<UploadedIllustration>;
   updateIllustrationTopic: (request: UpdateIllustrationTopicRequest) => Promise<IllustrationTopic>;
+  updateCharacter: (request: UpdateCharacterRequest) => Promise<CharacterLibraryState>;
   updateStory: (request: UpdateStoryRequest) => Promise<StoryProject>;
   updateStoryShot: (request: UpdateStoryShotRequest) => Promise<StoryShotUpdateResult>;
 }

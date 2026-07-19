@@ -19,8 +19,9 @@ import type {
 } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
 import type { SavedFileResult } from '../../shared/desktop';
-import { getCredentialValue } from './credentials';
+import { getActiveCharacterDirectory } from './character-library';
 import { getCharacterPortraitWorkspace } from './character-portrait';
+import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 
@@ -152,7 +153,7 @@ function parseExpressionRecord(value: unknown): CharacterExpressionRecord | null
 }
 
 async function getExpressionStorePath(): Promise<string> {
-  return path.join(await getWorkspaceDirectory(), EXPRESSION_STORE_FILE_NAME);
+  return path.join(await getActiveCharacterDirectory(), EXPRESSION_STORE_FILE_NAME);
 }
 
 async function loadExpressionStore(): Promise<StoredExpressionWorkspace> {
@@ -546,7 +547,7 @@ export async function uploadCharacterExpression(
     prompt: '',
     referencePortrait: null,
     referenceSheet: null,
-    resolution: '2k',
+    resolution: '1k',
     size: '1:1',
     source: 'uploaded',
     status: 'completed',

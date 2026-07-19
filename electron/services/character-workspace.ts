@@ -6,8 +6,8 @@ import type {
   SaveCharacterProfileRequest,
 } from '../../shared/character';
 import { CHARACTER_DRAFT_FIELDS, createEmptyCharacterDraft } from '../../shared/character';
+import { getActiveCharacterDirectory, updateActiveCharacterName } from './character-library';
 import { isNodeError, readJsonFile, writeJsonFile, writeTextFile } from './json-store';
-import { getWorkspaceDirectory } from './workspace';
 
 const DRAFT_FILE_NAME = 'character-draft.json';
 const PROFILE_FILE_NAME = 'ip.md';
@@ -40,21 +40,22 @@ async function readOptionalTextFile(filePath: string): Promise<string | null> {
 }
 
 export async function loadCharacterDraft(): Promise<CharacterDraft> {
-  const workspacePath = await getWorkspaceDirectory();
-  const value = await readJsonFile(path.join(workspacePath, DRAFT_FILE_NAME));
+  const characterPath = await getActiveCharacterDirectory();
+  const value = await readJsonFile(path.join(characterPath, DRAFT_FILE_NAME));
   return parseCharacterDraft(value);
 }
 
 export async function saveCharacterDraft(draft: CharacterDraft): Promise<void> {
-  const workspacePath = await getWorkspaceDirectory();
-  await writeJsonFile(path.join(workspacePath, DRAFT_FILE_NAME), draft);
+  const characterPath = await getActiveCharacterDirectory();
+  await writeJsonFile(path.join(characterPath, DRAFT_FILE_NAME), draft);
+  await updateActiveCharacterName(draft.name);
 }
 
 export async function getCharacterWorkspace(): Promise<CharacterWorkspaceState> {
-  const workspacePath = await getWorkspaceDirectory();
+  const characterPath = await getActiveCharacterDirectory();
   const [draft, profileMarkdown] = await Promise.all([
     loadCharacterDraft(),
-    readOptionalTextFile(path.join(workspacePath, PROFILE_FILE_NAME)),
+    readOptionalTextFile(path.join(characterPath, PROFILE_FILE_NAME)),
   ]);
   return { draft, profileMarkdown };
 }
@@ -69,6 +70,6 @@ export async function saveCharacterProfile(request: SaveCharacterProfileRequest)
     throw new Error('角色档案内容无效');
   }
 
-  const workspacePath = await getWorkspaceDirectory();
-  await writeTextFile(path.join(workspacePath, PROFILE_FILE_NAME), `${markdown}\n`);
+  const characterPath = await getActiveCharacterDirectory();
+  await writeTextFile(path.join(characterPath, PROFILE_FILE_NAME), `${markdown}\n`);
 }

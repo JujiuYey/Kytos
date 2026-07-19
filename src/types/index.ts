@@ -18,6 +18,14 @@ export type {
   SaveCharacterProfileRequest,
 } from '../../shared/character';
 export type {
+  CharacterLibraryState,
+  CharacterSummary,
+  CreateCharacterRequest,
+  DeleteCharacterRequest,
+  SelectCharacterRequest,
+  UpdateCharacterRequest,
+} from '../../shared/character-library';
+export type {
   CharacterExpressionRecord,
   CharacterExpressionSize,
   CharacterExpressionWorkspaceState,

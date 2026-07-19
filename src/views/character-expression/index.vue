@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
+import CharacterContextBar from '@/components/sag/character-context-bar.vue';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionSize,
@@ -32,7 +33,7 @@ const credentialStatus = ref<CredentialStatus | null>(null);
 const name = ref('开心');
 const description = ref('眼睛明亮，嘴角自然上扬，带有真诚而有感染力的笑意。');
 const size = ref<CharacterExpressionSize>('1:1');
-const resolution = ref<CharacterPortraitResolution>('2k');
+const resolution = ref<CharacterPortraitResolution>('1k');
 const count = ref(2);
 const errorMessage = ref('');
 const isInitializing = ref(true);
@@ -347,6 +348,8 @@ onBeforeUnmount(() => {
         "
       />
     </template>
+
+    <CharacterContextBar active-section="character-expression" />
 
     <Alert v-if="!isInitializing && !hasReferences" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />

@@ -347,7 +347,7 @@ function parseStory(value: unknown, migrateResolutionStale: boolean): StoryProje
   ) {
     return null;
   }
-  const resolution = isResolution(value.resolution) ? value.resolution : '2k';
+  const resolution = isResolution(value.resolution) ? value.resolution : '1k';
   const size = isSize(value.size) ? value.size : '16:9';
   const shots = normalizeShotOrder(
     Array.isArray(value.shots)
@@ -461,7 +461,7 @@ export async function createStory(_request: CreateStoryRequest): Promise<StoryPr
     id: `story_${randomUUID()}`,
     keyShotId: null,
     messages: [],
-    resolution: '2k',
+    resolution: '1k',
     shots: [],
     size: '16:9',
     storyboardReady: false,

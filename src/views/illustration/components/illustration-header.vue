@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ImagePlus, Images, MessageSquare, Plus, Trash2 } from 'lucide-vue-next';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -12,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type { IllustrationTopic } from '@/types';
 
 defineProps<{
@@ -83,9 +83,9 @@ const emit = defineEmits<{
       @update:model-value="emit('update:useCharacter', Boolean($event))"
     />
     <Label for="illustration-use-character" class="whitespace-nowrap text-xs">使用当前角色</Label>
-    <Badge v-if="useCharacter" :variant="referencesReady ? 'secondary' : 'destructive'">
+    <SagStatusBadge v-if="useCharacter" :tone="referencesReady ? 'success' : 'error'">
       {{ referencesReady ? '角色参考就绪' : '缺少角色参考' }}
-    </Badge>
+    </SagStatusBadge>
   </div>
 
   <Button

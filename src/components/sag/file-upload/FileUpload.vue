@@ -12,7 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type { UploadResult } from './types';
 import { useAppStore } from '@/stores/app';
 import type { SaveFileRequest } from '@/types';
@@ -408,13 +408,15 @@ defineExpose({
                 <p class="text-sm font-medium truncate">
                   {{ fileItem.file.name }}
                 </p>
-                <Badge
-                  :variant="
+                <SagStatusBadge
+                  :tone="
                     fileItem.status === 2
-                      ? 'default'
+                      ? 'success'
                       : fileItem.status === 3
-                        ? 'destructive'
-                        : 'secondary'
+                        ? 'error'
+                        : fileItem.status === 1
+                          ? 'info'
+                          : 'warning'
                   "
                 >
                   {{
@@ -426,7 +428,7 @@ defineExpose({
                           ? '成功'
                           : '失败'
                   }}
-                </Badge>
+                </SagStatusBadge>
               </div>
               <p class="text-xs text-muted-foreground">
                 {{ formatFileSize(fileItem.file.size) }}

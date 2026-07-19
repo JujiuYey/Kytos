@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { DefaultChatTransport } from 'ai';
 import type { ChatStatus } from 'ai';
 import { useChat } from '@ai-sdk/vue';
@@ -35,6 +35,7 @@ import StoryShotEditorDialog from './components/story-shot-editor-dialog.vue';
 import StoryWorkspacePanel from './components/story-workspace-panel.vue';
 
 const appStore = useAppStore();
+const route = useRoute();
 const router = useRouter();
 const stories = ref<StoryProject[]>([]);
 const activeStoryId = ref('');
@@ -281,12 +282,17 @@ async function initialize(): Promise<void> {
     portraitWorkspace.value = portraits;
     illustrationWorkspace.value = illustrations;
 
-    let story = stories.value[0];
+    const requestedStoryId =
+      typeof route.query.storyId === 'string' ? route.query.storyId : undefined;
+    let story = stories.value.find(item => item.id === requestedStoryId) ?? stories.value[0];
     if (!story) {
       story = await window.desktop.createStory({});
       stories.value = [story];
     }
     applyStory(story);
+    if (route.query.storyId !== story.id) {
+      await router.replace({ query: { ...route.query, storyId: story.id } });
+    }
     for (const item of stories.value) {
       for (const version of item.shots.flatMap(shot => shot.versions)) {
         if (['submitted', 'pending', 'processing'].includes(version.status)) {
@@ -345,6 +351,7 @@ async function createStory(): Promise<void> {
     const story = await window.desktop.createStory({});
     replaceStory(story);
     applyStory(story);
+    await router.replace({ query: { ...route.query, storyId: story.id } });
   } catch (createError: unknown) {
     toast.error(createError instanceof Error ? createError.message : String(createError));
   }
@@ -356,6 +363,7 @@ function selectStory(storyId: string): void {
     return;
   }
   applyStory(story);
+  void router.replace({ query: { ...route.query, storyId: story.id } });
 }
 
 async function updateProject(
@@ -585,6 +593,7 @@ async function confirmDeleteStory(): Promise<void> {
       stories.value = [nextStory];
     }
     applyStory(nextStory);
+    await router.replace({ query: { ...route.query, storyId: nextStory.id } });
   } catch (deleteError: unknown) {
     toast.error(deleteError instanceof Error ? deleteError.message : String(deleteError));
   } finally {
@@ -659,6 +668,7 @@ onBeforeUnmount(() => {
         :stories="stories"
         @create="createStory"
         @delete="deleteStoryDialogOpen = true"
+        @manage="router.push('/stories')"
         @select="selectStory"
       />
     </template>

@@ -2,7 +2,6 @@
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { CheckCircle2, ExternalLink, FolderOpen, Loader2 } from 'lucide-vue-next';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 import { useAppStore } from '@/stores/app';
 
 const appStore = useAppStore();
@@ -86,10 +86,10 @@ async function openWorkspace() {
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
             <p class="text-sm font-medium">当前工作区</p>
-            <Badge variant="secondary">
+            <SagStatusBadge tone="success">
               <CheckCircle2 class="size-3" />
               可用
-            </Badge>
+            </SagStatusBadge>
           </div>
           <p class="mt-1 break-all font-mono text-sm text-muted-foreground">
             {{ appStore.workspacePath }}

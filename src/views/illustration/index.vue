@@ -50,7 +50,7 @@ const deleteVersionTarget = ref<IllustrationVersion | null>(null);
 const mobilePane = ref<'chat' | 'workspace'>('chat');
 const prompt = ref('');
 const size = ref<IllustrationSize>('16:9');
-const resolution = ref<CharacterPortraitResolution>('2k');
+const resolution = ref<CharacterPortraitResolution>('1k');
 const baseReference = ref<IllustrationVersionReference | null>(null);
 const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let disposed = false;
@@ -202,7 +202,7 @@ function applyTopic(topic: IllustrationTopic): void {
   prompt.value = topic.brief.finalPrompt;
   const latestVersion = topic.versions[0];
   size.value = latestVersion?.size ?? '16:9';
-  resolution.value = latestVersion?.resolution ?? '2k';
+  resolution.value = latestVersion?.resolution ?? '1k';
   baseReference.value = null;
   clearError();
   generationError.value = '';

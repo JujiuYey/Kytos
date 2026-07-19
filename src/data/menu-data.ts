@@ -1,5 +1,5 @@
 import type { Component } from 'vue';
-import { BookOpen, Camera, ImagePlus, Images, Laugh, User } from 'lucide-vue-next';
+import { BookMarked, BookOpen, ImagePlus, Images, UsersRound } from 'lucide-vue-next';
 
 export interface MenuItem {
   title: string;
@@ -18,22 +18,10 @@ export const menuGroups: MenuGroup[] = [
     label: '角色形象',
     items: [
       {
-        title: '创建角色',
-        key: 'character',
-        icon: User,
-        path: '/character',
-      },
-      {
-        title: '角色视觉',
-        key: 'character-portrait',
-        icon: Camera,
-        path: '/character-portrait',
-      },
-      {
-        title: '表情管理',
-        key: 'character-expression',
-        icon: Laugh,
-        path: '/character-expression',
+        title: '角色管理',
+        key: 'characters',
+        icon: UsersRound,
+        path: '/characters',
       },
     ],
   },
@@ -51,6 +39,12 @@ export const menuGroups: MenuGroup[] = [
         key: 'illustration',
         icon: ImagePlus,
         path: '/illustration',
+      },
+      {
+        title: '故事管理',
+        key: 'stories',
+        icon: BookMarked,
+        path: '/stories',
       },
       {
         title: '故事创作',

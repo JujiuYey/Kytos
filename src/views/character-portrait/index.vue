@@ -9,6 +9,7 @@ import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upl
 import { CharacterSheetGeneratorPanel } from '@/components/sag/character-sheet-generator-panel';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
+import CharacterContextBar from '@/components/sag/character-context-bar.vue';
 import type {
   CharacterDraft,
   CharacterImageRecord,
@@ -41,8 +42,8 @@ const selectedSheet = ref<CharacterPortraitSelection | null>(null);
 const prompt = ref('');
 const sheetPrompt = ref('');
 const size = ref<CharacterPortraitSize>('2:3');
-const resolution = ref<CharacterPortraitResolution>('2k');
-const sheetResolution = ref<CharacterPortraitResolution>('2k');
+const resolution = ref<CharacterPortraitResolution>('1k');
+const sheetResolution = ref<CharacterPortraitResolution>('1k');
 const count = ref(2);
 const errorMessage = ref('');
 const isInitializing = ref(true);
@@ -284,7 +285,7 @@ async function initialize() {
       record => record.source === 'generated',
     );
     sheetPrompt.value = latestGeneratedSheet?.prompt || buildSheetPrompt();
-    sheetResolution.value = latestGeneratedSheet?.resolution || '2k';
+    sheetResolution.value = latestGeneratedSheet?.resolution || '1k';
 
     const unfinishedRecord = portraitWorkspace.records.find(record =>
       activeStatuses.includes(record.status),
@@ -521,6 +522,8 @@ onBeforeUnmount(() => {
         @upload="openUpload"
       />
     </template>
+
+    <CharacterContextBar active-section="character-portrait" />
 
     <Alert v-if="!isInitializing && !keyConfigured" class="mx-4 mt-3 shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />

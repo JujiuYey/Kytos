@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ImageViewer } from '@/components/sag/image-viewer';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
   CharacterImageRecord,
   CharacterPortraitImage,
@@ -165,17 +166,17 @@ function formatDate(value: string): string {
                 <h2 class="truncate text-sm font-medium">
                   {{ getAssetLabel(entry.kind) }}生成任务
                 </h2>
-                <Badge
-                  :variant="
+                <SagStatusBadge
+                  :tone="
                     entry.record.status === 'failed' || entry.record.status === 'cancelled'
-                      ? 'destructive'
-                      : 'secondary'
+                      ? 'error'
+                      : 'info'
                   "
                   class="shrink-0"
                 >
                   <Loader v-if="isActive(entry.record)" class="size-3" />
                   {{ getStatusLabel(entry.record) }}
-                </Badge>
+                </SagStatusBadge>
               </div>
 
               <template v-if="isActive(entry.record)">
@@ -230,14 +231,10 @@ function formatDate(value: string): string {
                     }}
                   </p>
                 </div>
-                <Badge
-                  v-if="isSelected(entry)"
-                  variant="secondary"
-                  class="shrink-0 gap-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                >
+                <SagStatusBadge v-if="isSelected(entry)" tone="success" class="shrink-0 gap-1">
                   <Check class="size-3" />
                   正式资产
-                </Badge>
+                </SagStatusBadge>
                 <Badge v-else variant="outline" class="shrink-0">
                   {{ entry.record.source === 'uploaded' ? '上传' : '生成' }}
                 </Badge>

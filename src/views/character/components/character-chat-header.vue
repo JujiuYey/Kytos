@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Bot, FileText, MessageSquare, RotateCcw } from 'lucide-vue-next';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import SagStatusBadge from '@/components/sag/status-badge.vue';
 
 defineProps<{
   busy: boolean;
@@ -29,9 +29,9 @@ const emit = defineEmits<{
     <div class="min-w-0">
       <div class="flex flex-wrap items-center gap-2">
         <h1 class="truncate text-sm font-medium">角色共创 Agent</h1>
-        <Badge :variant="keyConfigured ? 'secondary' : 'outline'">
+        <SagStatusBadge :tone="keyConfigured ? 'success' : 'warning'">
           {{ keyConfigured ? 'DeepSeek 已连接' : '等待 API Key' }}
-        </Badge>
+        </SagStatusBadge>
       </div>
       <p class="truncate text-xs text-muted-foreground">{{ model }}</p>
     </div>
