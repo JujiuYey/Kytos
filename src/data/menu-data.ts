@@ -33,6 +33,12 @@ export const menuGroups: MenuGroup[] = [
         path: '/characters',
       },
       {
+        title: '创建角色',
+        key: 'character-create',
+        icon: Sparkles,
+        path: '/character-create',
+      },
+      {
         title: '角色视觉',
         key: 'character-portrait',
         icon: Camera,

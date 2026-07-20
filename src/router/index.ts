@@ -26,6 +26,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '角色管理' },
       },
       {
+        path: '/character-create',
+        name: 'character-create',
+        component: () => import('@/views/character-create/index.vue'),
+        meta: { title: '创建角色' },
+      },
+      {
         path: '/character',
         name: 'character',
         component: () => import('@/views/character/index.vue'),
