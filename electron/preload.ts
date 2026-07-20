@@ -55,6 +55,7 @@ const desktopApi: DesktopApi = {
   saveIllustrationConversation: request =>
     ipcRenderer.invoke('illustration:save-conversation', request),
   saveStoryConversation: request => ipcRenderer.invoke('story:save-conversation', request),
+  saveCharacterVisualCard: request => ipcRenderer.invoke('character-visual-card:save', request),
   selectCharacterPortrait: request => ipcRenderer.invoke('character-portrait:select', request),
   selectCharacter: request => ipcRenderer.invoke('character-library:select-character', request),
   selectCharacterSheet: request => ipcRenderer.invoke('character-sheet:select', request),

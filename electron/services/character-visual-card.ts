@@ -19,9 +19,11 @@ import type {
   CharacterVisualCardWorkspaceState,
   GenerateCharacterVisualCardsRequest,
   GetCharacterVisualCardTaskRequest,
+  SaveCharacterVisualCardRequest,
 } from '../../shared/character-visual-card';
 import { CHARACTER_VISUAL_CARD_COUNT } from '../../shared/character-visual-card';
 import { getActiveCharacterDirectory } from './character-library';
+import { saveGeneratedVisualCard } from './character-portrait';
 import { loadCharacterDraft } from './character-workspace';
 import { getCredentialValue } from './credentials';
 import { createDeepSeekCompatibleProvider, DEEPSEEK_PROVIDER_OPTIONS } from './deepseek-provider';
@@ -126,6 +128,7 @@ function parseCard(value: unknown): CharacterVisualCard | null {
     image: parseImage(value.image),
     progress: typeof value.progress === 'number' ? Math.min(100, Math.max(0, value.progress)) : 0,
     prompt: value.prompt.slice(0, 2_000),
+    savedToVisualAt: typeof value.savedToVisualAt === 'string' ? value.savedToVisualAt : null,
     status: value.status,
     summary: value.summary.slice(0, 240),
     tags: value.tags
@@ -278,13 +281,13 @@ async function generateVisualHypotheses(
       guidance ? `\n\n本轮用户反馈：\n${guidance}` : ''
     }`,
     providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
-    system: `你是角色视觉概念设计师。输入是一份包含人物种子、形象锚点和视觉表现的结构化草稿。请生成 3 个可以被图片模型直接执行的完整形象方向。
+    system: `你是角色视觉概念设计师。输入是一份包含人物种子、形象锚点和视觉表现的结构化草稿。请生成 1 个可以被图片模型直接执行的完整形象方向。
 
 工作边界：
-1. 草稿中已经填写的形象锚点和视觉表现都是硬约束，不能在三张卡之间随机改变；exclusions 中的内容不能出现。
+1. 草稿中已经填写的形象锚点和视觉表现都是硬约束，不能随机改变；exclusions 中的内容不能出现。
 2. 人物种子只提供最少的创作上下文，不能覆盖或重新推断已经明确的脸部、发型、体态、服装和配色。
-3. 草稿中仍为空白的视觉字段可以作为本轮可撤回的探索变量，并让三张卡形成有意义的差异。
-4. 三个方向必须是内部协调的完整组合，不要拆成互不相关的发型卡、五官卡或服装卡，也不能只换颜色。
+3. 草稿中仍为空白的视觉字段可以作为本轮可撤回的探索变量。本轮用户反馈存在时，必须以它说明的保留项和调整方向为准。
+4. 输出必须是内部协调的完整组合，不要拆成互不相关的发型、五官或服装，也不能只换颜色。
 5. prompt 使用简短分段，依次写：主体、形象锚点、视觉表现、姿态与视线、构图、排除项。只写画面中能看见的内容。
 6. 每个 summary 用一句中文解释本卡探索了哪些未确定变量；tags 只放 3 到 6 个具体可见标签。
 7. 只输出 JSON，不要 Markdown、解释或代码围栏。
@@ -464,6 +467,7 @@ async function submitCard(
       image: null,
       progress: 0,
       prompt,
+      savedToVisualAt: null,
       status: 'submitted',
       taskId: getSubmittedTaskId(payload),
       updatedAt: now,
@@ -477,6 +481,7 @@ async function submitCard(
       image: null,
       progress: 0,
       prompt,
+      savedToVisualAt: null,
       status: 'failed',
       taskId: null,
       updatedAt: now,
@@ -582,4 +587,45 @@ export async function getCharacterVisualCardTask(
     updatedAt,
   };
   return persistCardUpdate(storePath, request, updatedCard);
+}
+
+export async function saveCharacterVisualCard(
+  request: SaveCharacterVisualCardRequest,
+): Promise<CharacterVisualCardDraw> {
+  if (
+    !request ||
+    typeof request !== 'object' ||
+    typeof request.drawId !== 'string' ||
+    !DRAW_ID_PATTERN.test(request.drawId) ||
+    typeof request.cardId !== 'string' ||
+    !CARD_ID_PATTERN.test(request.cardId)
+  ) {
+    throw new Error('视觉卡保存参数无效');
+  }
+
+  const storePath = await getStorePath();
+  const store = await loadStore(storePath);
+  const draw = store.draws.find(item => item.id === request.drawId);
+  const card = draw?.cards.find(item => item.id === request.cardId);
+  if (!draw || !card) {
+    throw new Error('未找到视觉卡');
+  }
+  if (card.status !== 'completed' || !card.image) {
+    throw new Error('视觉卡生成完成后才能保存');
+  }
+  if (card.savedToVisualAt) {
+    return draw;
+  }
+
+  await saveGeneratedVisualCard({
+    cardId: card.id,
+    image: card.image,
+    name: card.title,
+  });
+  const savedAt = new Date().toISOString();
+  return persistCardUpdate(storePath, request, {
+    ...card,
+    savedToVisualAt: savedAt,
+    updatedAt: savedAt,
+  });
 }

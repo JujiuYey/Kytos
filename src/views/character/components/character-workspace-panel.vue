@@ -14,16 +14,16 @@ const props = defineProps<{
   drawDisabledReason: string;
   draft: CharacterDraft;
   pollingStates: GenerationPollingStateMap;
+  savingCardIds: string[];
   visualDraws: CharacterVisualCardDraw[];
 }>();
 
 const emit = defineEmits<{
   (event: 'close'): void;
-  (event: 'continue-visual', card: CharacterVisualCard): void;
+  (event: 'adjust-visual', card: CharacterVisualCard): void;
   (event: 'draw-visual'): void;
-  (event: 'redraw-visual', draw: CharacterVisualCardDraw): void;
   (
-    event: 'refine-visual',
+    event: 'save-visual',
     payload: { card: CharacterVisualCard; draw: CharacterVisualCardDraw },
   ): void;
 }>();
@@ -75,9 +75,9 @@ watch(
         :busy="drawBusy"
         :draws="visualDraws"
         :polling-states="pollingStates"
-        @continue="emit('continue-visual', $event)"
-        @redraw="emit('redraw-visual', $event)"
-        @refine="emit('refine-visual', $event)"
+        :saving-card-ids="savingCardIds"
+        @adjust="emit('adjust-visual', $event)"
+        @save="emit('save-visual', $event)"
       />
     </TabsContent>
 

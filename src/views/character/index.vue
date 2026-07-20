@@ -52,6 +52,9 @@ const initializationError = ref('');
 const isInitializing = ref(true);
 const isDrawing = ref(false);
 const isVisualCardDialogOpen = ref(false);
+const adjustmentCard = ref<CharacterVisualCard | null>(null);
+const adjustmentMessages = ref<string[]>([]);
+const savingCardIds = ref<string[]>([]);
 const isResetDialogOpen = ref(false);
 const uploadDialogOpen = ref(false);
 const workspaceOpen = ref(true);
@@ -112,6 +115,9 @@ const drawDisabledReason = computed(() => {
   }
   if (!hasCharacterSeed.value) {
     return '先聊出人物种子或一个明确的形象方向';
+  }
+  if (adjustmentCard.value && adjustmentMessages.value.length === 0) {
+    return '先在对话中说明下一张需要保留什么、调整什么';
   }
   return '';
 });
@@ -255,12 +261,12 @@ function handleVisualUploaded(): void {
   toast.success('角色形象已保存到角色视觉');
 }
 
-async function generateVisualCards(options?: { guidance?: string }): Promise<void> {
+async function generateVisualCards(options?: { guidance?: string }): Promise<boolean> {
   if (!canDrawVisual.value) {
     if (drawDisabledReason.value) {
       toast.error(drawDisabledReason.value);
     }
-    return;
+    return false;
   }
   isVisualCardDialogOpen.value = false;
   isDrawing.value = true;
@@ -277,38 +283,73 @@ async function generateVisualCards(options?: { guidance?: string }): Promise<voi
     } else {
       toast.success('视觉卡已提交生成');
     }
+    return true;
   } catch (drawError: unknown) {
     toast.error(drawError instanceof Error ? drawError.message : String(drawError));
+    return false;
   } finally {
     isDrawing.value = false;
   }
 }
 
-function redrawVisualCards(_draw: CharacterVisualCardDraw): void {
-  void generateVisualCards();
-}
-
-function refineVisualCard(payload: {
+async function saveVisualCard(payload: {
   card: CharacterVisualCard;
   draw: CharacterVisualCardDraw;
-}): void {
-  void generateVisualCards({
-    guidance: `保留这个视觉方向并生成三个相近但有明确差异的变体：${payload.card.summary}\n可见特征：${payload.card.tags.join('、')}`,
-  });
+}): Promise<void> {
+  if (payload.card.savedToVisualAt || savingCardIds.value.includes(payload.card.id)) {
+    return;
+  }
+  savingCardIds.value = [...savingCardIds.value, payload.card.id];
+  try {
+    const draw = await window.desktop.saveCharacterVisualCard({
+      cardId: payload.card.id,
+      drawId: payload.draw.id,
+    });
+    replaceVisualDraw(draw);
+    toast.success('视觉卡已保存到角色视觉');
+  } catch (saveError: unknown) {
+    toast.error(saveError instanceof Error ? saveError.message : String(saveError));
+  } finally {
+    savingCardIds.value = savingCardIds.value.filter(cardId => cardId !== payload.card.id);
+  }
 }
 
-function continueVisualDirection(card: CharacterVisualCard): void {
+function adjustVisualDirection(card: CharacterVisualCard): void {
+  if (!canDrawVisual.value) {
+    toast.error(drawDisabledReason.value);
+    return;
+  }
+  adjustmentCard.value = card;
+  adjustmentMessages.value = [];
   mobilePane.value = 'chat';
   void send(
-    `我更喜欢视觉卡「${card.title}」的方向：${card.summary}。可见特征是${card.tags.join('、')}。我们继续聊这个方向，但先不要把这些外观假设写入角色档案。`,
+    `我想继续调整视觉卡「${card.title}」。当前方向是：${card.summary}。可见特征包括：${card.tags.join('、')}。请先问我下一张需要保留什么、调整什么；这张卡里的视觉假设先不要写入角色档案。`,
+    false,
   );
 }
 
-async function send(message: string | PromptInputMessage) {
+async function generateFromDialog(): Promise<void> {
+  const card = adjustmentCard.value;
+  const userGuidance = adjustmentMessages.value.join('\n').slice(-1_200);
+  const generated = await generateVisualCards({
+    guidance: card
+      ? `以上一张视觉卡为基础继续调整。上一张方向：${card.summary}\n可见特征：${card.tags.join('、')}\n用户在对话中提出的调整要求：${userGuidance}`
+      : undefined,
+  });
+  if (generated) {
+    adjustmentCard.value = null;
+    adjustmentMessages.value = [];
+  }
+}
+
+async function send(message: string | PromptInputMessage, captureAdjustment = true) {
   const text = typeof message === 'string' ? message.trim() : message.text.trim();
   const files = typeof message === 'string' ? [] : message.files;
   if ((!text && files.length === 0) || isInputDisabled.value || isBusy.value) {
     return;
+  }
+  if (captureAdjustment && adjustmentCard.value && text) {
+    adjustmentMessages.value = [...adjustmentMessages.value, text];
   }
   await sendMessage({ files, text });
 }
@@ -323,6 +364,8 @@ async function retry() {
 function resetConversation() {
   clearError();
   messages.value = [];
+  adjustmentCard.value = null;
+  adjustmentMessages.value = [];
   isResetDialogOpen.value = false;
   mobilePane.value = 'chat';
 }
@@ -426,13 +469,13 @@ onBeforeUnmount(() => {
           :draw-disabled-reason="drawDisabledReason"
           :draft="draft"
           :polling-states="pollingStates"
+          :saving-card-ids="savingCardIds"
           :visual-draws="visualDraws"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeWorkspace"
-          @continue-visual="continueVisualDirection"
+          @adjust-visual="adjustVisualDirection"
           @draw-visual="openVisualCardDialog"
-          @redraw-visual="redrawVisualCards"
-          @refine-visual="refineVisualCard"
+          @save-visual="saveVisualCard"
         />
       </aside>
     </div>
@@ -462,8 +505,9 @@ onBeforeUnmount(() => {
 
     <CharacterVisualCardDialog
       v-model:open="isVisualCardDialogOpen"
+      :adjustment-card="adjustmentCard"
       :busy="isDrawing"
-      @generate="generateVisualCards()"
+      @generate="generateFromDialog"
     />
   </SagPage>
 </template>

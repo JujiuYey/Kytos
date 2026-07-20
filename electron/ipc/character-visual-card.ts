@@ -2,11 +2,13 @@ import { ipcMain } from 'electron';
 import type {
   GenerateCharacterVisualCardsRequest,
   GetCharacterVisualCardTaskRequest,
+  SaveCharacterVisualCardRequest,
 } from '../../shared/character-visual-card';
 import {
   generateCharacterVisualCards,
   getCharacterVisualCardTask,
   getCharacterVisualCardWorkspace,
+  saveCharacterVisualCard,
 } from '../services/character-visual-card';
 import type { TrustedSenderGuard } from './trusted-sender';
 
@@ -20,6 +22,13 @@ export function registerCharacterVisualCardIpc(assertTrustedSender: TrustedSende
     async (event, request: GenerateCharacterVisualCardsRequest) => {
       assertTrustedSender(event);
       return generateCharacterVisualCards(request);
+    },
+  );
+  ipcMain.handle(
+    'character-visual-card:save',
+    async (event, request: SaveCharacterVisualCardRequest) => {
+      assertTrustedSender(event);
+      return saveCharacterVisualCard(request);
     },
   );
   ipcMain.handle(

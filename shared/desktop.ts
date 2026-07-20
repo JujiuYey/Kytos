@@ -4,6 +4,7 @@ import type {
   CharacterVisualCardWorkspaceState,
   GenerateCharacterVisualCardsRequest,
   GetCharacterVisualCardTaskRequest,
+  SaveCharacterVisualCardRequest,
 } from './character-visual-card';
 import type {
   CharacterLibraryState,
@@ -182,6 +183,9 @@ export interface DesktopApi {
     request: SaveIllustrationConversationRequest,
   ) => Promise<IllustrationTopic>;
   saveStoryConversation: (request: SaveStoryConversationRequest) => Promise<StoryProject>;
+  saveCharacterVisualCard: (
+    request: SaveCharacterVisualCardRequest,
+  ) => Promise<CharacterVisualCardDraw>;
   selectCharacterPortrait: (
     request: SelectCharacterPortraitRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;

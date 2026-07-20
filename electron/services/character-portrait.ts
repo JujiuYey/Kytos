@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   CharacterPortraitImage,
@@ -67,6 +67,12 @@ export interface OfficialCharacterVisualReference {
   directoryName: string;
   image: CharacterPortraitImage;
   selection: CharacterVisualAssetSelection;
+}
+
+interface SaveGeneratedVisualCardRequest {
+  cardId: string;
+  image: CharacterPortraitImage;
+  name: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -618,6 +624,69 @@ export async function getCharacterPortraitWorkspace(
   characterId?: string,
 ): Promise<CharacterPortraitWorkspaceState> {
   return toWorkspaceState(await loadPortraitStore(characterId));
+}
+
+export async function saveGeneratedVisualCard(
+  request: SaveGeneratedVisualCardRequest,
+): Promise<void> {
+  if (
+    !TASK_ID_PATTERN.test(request.cardId) ||
+    !request.name.trim() ||
+    request.name.length > MAX_NAME_LENGTH ||
+    path.basename(request.image.fileName) !== request.image.fileName
+  ) {
+    throw new Error('视觉卡资产无效');
+  }
+
+  const store = await loadPortraitStore();
+  if (store.records.some(record => record.id === request.cardId)) {
+    return;
+  }
+
+  const extension = path.extname(request.image.fileName) || '.png';
+  const fileName = `${request.cardId}${extension}`;
+  const workspacePath = await getWorkspaceDirectory();
+  const sourcePath = path.join(
+    workspacePath,
+    'assets',
+    'character-visual-cards',
+    request.image.fileName,
+  );
+  const assetDirectory = path.join(workspacePath, 'assets', PORTRAIT_ASSET_DIRECTORY);
+  const destinationPath = path.join(assetDirectory, fileName);
+  await mkdir(assetDirectory, { recursive: true });
+  await copyFile(sourcePath, destinationPath);
+
+  const now = new Date().toISOString();
+  const image: CharacterPortraitImage = {
+    fileName,
+    mimeType: request.image.mimeType,
+    name: request.name.trim(),
+    url: getCharacterAssetUrl(PORTRAIT_ASSET_DIRECTORY, fileName),
+  };
+  const record: CharacterPortraitRecord = {
+    count: 1,
+    createdAt: now,
+    errorMessage: null,
+    id: request.cardId,
+    images: [image],
+    name: request.name.trim(),
+    originalName: null,
+    progress: 100,
+    prompt: '',
+    resolution: '1k',
+    size: '2:3',
+    source: 'generated',
+    status: 'completed',
+    updatedAt: now,
+  };
+
+  try {
+    await savePortraitStore(replaceRecord(store, record));
+  } catch (error: unknown) {
+    await unlink(destinationPath).catch(() => undefined);
+    throw error;
+  }
 }
 
 function validateVisualAssetSelection(

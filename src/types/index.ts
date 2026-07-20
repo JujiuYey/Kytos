@@ -75,6 +75,7 @@ export type {
   CharacterVisualHypothesis,
   GenerateCharacterVisualCardsRequest,
   GetCharacterVisualCardTaskRequest,
+  SaveCharacterVisualCardRequest,
 } from '../../shared/character-visual-card';
 export { CHARACTER_VISUAL_CARD_COUNT } from '../../shared/character-visual-card';
 export {

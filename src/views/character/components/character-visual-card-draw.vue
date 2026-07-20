@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { MessageCircle, RefreshCw, Sparkles } from '@lucide/vue';
+import { Check, Save, SlidersHorizontal, Sparkles } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,21 +10,17 @@ import {
 } from '@/components/sag/generation-polling-status';
 import type { CharacterVisualCard, CharacterVisualCardDraw } from '@/types';
 
-const props = defineProps<{
+defineProps<{
   busy: boolean;
   draw: CharacterVisualCardDraw;
   pollingStates: GenerationPollingStateMap;
+  savingCardIds: string[];
 }>();
 
 const emit = defineEmits<{
-  (event: 'continue', card: CharacterVisualCard): void;
-  (event: 'redraw', draw: CharacterVisualCardDraw): void;
-  (event: 'refine', payload: { card: CharacterVisualCard; draw: CharacterVisualCardDraw }): void;
+  (event: 'adjust', card: CharacterVisualCard): void;
+  (event: 'save', payload: { card: CharacterVisualCard; draw: CharacterVisualCardDraw }): void;
 }>();
-
-const isDrawActive = computed(() =>
-  props.draw.cards.some(card => ['submitted', 'pending', 'processing'].includes(card.status)),
-);
 
 function statusLabel(card: CharacterVisualCard): string {
   const labels: Record<CharacterVisualCard['status'], string> = {
@@ -54,28 +49,19 @@ function badgeVariant(
 
 <template>
   <section class="p-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="flex flex-wrap items-start gap-3">
       <div class="min-w-0">
         <div class="flex items-center gap-2">
           <Sparkles class="size-4 text-muted-foreground" />
           <h3 class="text-sm font-medium">角色视觉抽卡</h3>
         </div>
         <p class="mt-1 text-xs text-muted-foreground">
-          这些是可撤回的视觉假设，不会写入角色档案或正式资产
+          这是可撤回的视觉假设；满意时保存，不满意时说明下一步调整方向
         </p>
       </div>
-      <Button
-        size="sm"
-        variant="outline"
-        :disabled="busy || isDrawActive"
-        @click="emit('redraw', draw)"
-      >
-        <RefreshCw class="size-3.5" />
-        换一组
-      </Button>
     </div>
 
-    <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+    <div class="mt-4 grid grid-cols-[minmax(0,22rem)] justify-center gap-3">
       <article
         v-for="card in draw.cards"
         :key="card.id"
@@ -119,18 +105,25 @@ function badgeVariant(
             </Badge>
           </div>
           <div v-if="card.status === 'completed'" class="mt-auto grid gap-2 pt-4">
-            <Button size="sm" variant="outline" :disabled="busy" @click="emit('continue', card)">
-              <MessageCircle class="size-3.5" />
-              继续聊这个方向
-            </Button>
             <Button
               size="sm"
-              variant="ghost"
-              :disabled="busy"
-              @click="emit('refine', { card, draw })"
+              :variant="card.savedToVisualAt ? 'secondary' : 'default'"
+              :disabled="busy || Boolean(card.savedToVisualAt) || savingCardIds.includes(card.id)"
+              @click="emit('save', { card, draw })"
             >
-              <RefreshCw class="size-3.5" />
-              沿此方向再抽
+              <Check v-if="card.savedToVisualAt" class="size-3.5" />
+              <Save v-else class="size-3.5" />
+              {{
+                card.savedToVisualAt
+                  ? '已保存到角色视觉'
+                  : savingCardIds.includes(card.id)
+                    ? '正在保存'
+                    : '保存到角色视觉'
+              }}
+            </Button>
+            <Button size="sm" variant="outline" :disabled="busy" @click="emit('adjust', card)">
+              <SlidersHorizontal class="size-3.5" />
+              调整方向
             </Button>
           </div>
         </div>

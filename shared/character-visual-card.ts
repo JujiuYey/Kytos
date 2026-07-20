@@ -1,7 +1,7 @@
 import type { CharacterDraft } from './character';
 import type { CharacterPortraitImage, CharacterPortraitTaskStatus } from './character-portrait';
 
-export const CHARACTER_VISUAL_CARD_COUNT = 3;
+export const CHARACTER_VISUAL_CARD_COUNT = 1;
 
 export interface CharacterVisualHypothesis {
   prompt: string;
@@ -16,6 +16,7 @@ export interface CharacterVisualCard extends CharacterVisualHypothesis {
   id: string;
   image: CharacterPortraitImage | null;
   progress: number;
+  savedToVisualAt: string | null;
   status: CharacterPortraitTaskStatus;
   taskId: string | null;
   updatedAt: string;
@@ -43,3 +44,5 @@ export interface GetCharacterVisualCardTaskRequest {
   cardId: string;
   drawId: string;
 }
+
+export type SaveCharacterVisualCardRequest = GetCharacterVisualCardTaskRequest;
