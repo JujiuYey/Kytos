@@ -1,6 +1,5 @@
 import type { CharacterPromptDraft, CharacterPromptMessage } from './workflow-data';
 
-export const GENERATION_DELAY_MS = 1800;
 export const PROMPT_REPLY_DELAY_MS = 550;
 
 const COLOR_WORDS = [

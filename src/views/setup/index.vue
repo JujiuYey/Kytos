@@ -24,7 +24,7 @@ async function finishSetup(action: () => Promise<void>) {
   errorMessage.value = '';
   try {
     await action();
-    await router.replace('/character');
+    await router.replace('/character-create');
   } catch (error: unknown) {
     errorMessage.value = getErrorMessage(error);
   } finally {

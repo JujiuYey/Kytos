@@ -34,8 +34,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: '/character',
         name: 'character',
-        component: () => import('@/views/character/index.vue'),
-        meta: { title: '特征' },
+        redirect: { name: 'character-create' },
       },
       {
         path: '/character-portrait',

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import {
   ArrowLeft,
   ArrowRight,
@@ -13,14 +14,13 @@ import { toast } from 'vue-sonner';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SagPage } from '@/components/sag/sag-page';
-import type { SavedFileResult } from '@/types';
+import type { CharacterVisualGeneration, SaveFileRequest, SavedFileResult } from '@/types';
 import CharacterCreateStepper from './components/character-create-stepper.vue';
 import CharacterGenerationStep from './components/character-generation-step.vue';
 import CharacterPromptStep from './components/character-prompt-step.vue';
 import CharacterSourceStep from './components/character-source-step.vue';
 import CharacterStyleStep from './components/character-style-step.vue';
 import {
-  GENERATION_DELAY_MS,
   PROMPT_REPLY_DELAY_MS,
   buildFinalPrompt,
   extractPromptDraft,
@@ -38,19 +38,24 @@ import {
   type StyleId,
 } from './workflow-data';
 
+const route = useRoute();
+const router = useRouter();
 const currentStep = ref<Step>(1);
 const furthestStep = ref<Step>(1);
 const selectedStyle = ref<StyleId | null>(null);
 const sourceImageUrl = ref('');
 const sourceImageName = ref('');
+const sourceImageFile = ref<SaveFileRequest | null>(null);
 const prompt = ref('');
 const promptMessages = ref<CharacterPromptMessage[]>([]);
 const promptDraft = ref<CharacterPromptDraft>(createEmptyCharacterPromptDraft());
 const isPromptAssistantResponding = ref(false);
 const isGenerating = ref(false);
+const isSaving = ref(false);
 const hasGenerated = ref(false);
 const isSaved = ref(false);
 const generationCount = ref(0);
+const activeGeneration = ref<CharacterVisualGeneration | null>(null);
 let generationTimer: ReturnType<typeof setTimeout> | null = null;
 let promptReplyTimer: ReturnType<typeof setTimeout> | null = null;
 let promptMessageSequence = 0;
@@ -58,7 +63,9 @@ let promptMessageSequence = 0;
 const selectedStyleDetails = computed(() =>
   CHARACTER_STYLES.find(style => style.id === selectedStyle.value),
 );
-const generationStyleDetails = computed(() => selectedStyleDetails.value ?? CHARACTER_STYLES[0]);
+const isEditing = computed(
+  () => route.query.mode === 'edit' && typeof route.query.characterId === 'string',
+);
 const currentStepDetails = computed(() => CHARACTER_WORKFLOW_STEPS[currentStep.value - 1]);
 const canContinue = computed(() => {
   if (currentStep.value === 1) return true;
@@ -174,6 +181,10 @@ function handleUploadSuccess(result: SavedFileResult): void {
   sourceImageName.value = result.originalName;
 }
 
+function handleReferenceSelected(request: SaveFileRequest): void {
+  sourceImageFile.value = request;
+}
+
 function revokeSourceImageUrl(): void {
   if (sourceImageUrl.value.startsWith('blob:')) URL.revokeObjectURL(sourceImageUrl.value);
 }
@@ -182,27 +193,83 @@ function resetSource(): void {
   revokeSourceImageUrl();
   sourceImageUrl.value = '';
   sourceImageName.value = '';
+  sourceImageFile.value = null;
 }
 
-function generateImage(): void {
-  if (isGenerating.value) return;
+async function generateImage(): Promise<void> {
+  if (isGenerating.value || !prompt.value.trim()) return;
   isGenerating.value = true;
   hasGenerated.value = false;
   isSaved.value = false;
   generationCount.value += 1;
-  generationTimer = setTimeout(() => {
+  try {
+    activeGeneration.value = await window.desktop.generateCharacterVisual({
+      prompt: prompt.value,
+      referenceImage: sourceImageFile.value
+        ? {
+            fileData: sourceImageFile.value.fileData,
+            fileName: sourceImageFile.value.fileName,
+            mimeType: sourceImageFile.value.mimeType,
+          }
+        : undefined,
+    });
+    await pollGeneration(activeGeneration.value.id);
+  } catch (error: unknown) {
     isGenerating.value = false;
-    hasGenerated.value = true;
-    toast.success('角色形象已生成，可以继续调整或保存');
-  }, GENERATION_DELAY_MS);
+    toast.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
-function saveImage(): void {
-  isSaved.value = true;
-  toast.success('Demo：角色形象已保存');
+async function pollGeneration(generationId: string): Promise<void> {
+  try {
+    const generation = await window.desktop.getCharacterVisualGeneration({ generationId });
+    activeGeneration.value = generation;
+    if (['submitted', 'pending', 'processing'].includes(generation.status)) {
+      generationTimer = setTimeout(() => void pollGeneration(generationId), 2500);
+      return;
+    }
+    isGenerating.value = false;
+    if (generation.status === 'completed') {
+      hasGenerated.value = true;
+      toast.success('角色形象已生成，可以继续调整或保存');
+    } else {
+      toast.error(generation.errorMessage || '角色形象生成失败');
+    }
+  } catch (error: unknown) {
+    isGenerating.value = false;
+    toast.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function saveImage(): Promise<void> {
+  if (isSaving.value || !hasGenerated.value) return;
+  isSaving.value = true;
+  try {
+    if (!activeGeneration.value?.image) throw new Error('未找到当前生成结果');
+    const result = await window.desktop.saveCharacterVisual({
+      characterId:
+        isEditing.value && typeof route.query.characterId === 'string'
+          ? route.query.characterId
+          : undefined,
+      generationId: activeGeneration.value.id,
+    });
+    isSaved.value = true;
+    if (!isEditing.value) {
+      await router.replace({
+        name: 'character-create',
+        query: { characterId: result.characterId, mode: 'edit' },
+      });
+    }
+    toast.success('正式角色视觉已保存');
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    isSaving.value = false;
+  }
 }
 
 function startOver(): void {
+  activeGeneration.value = null;
   hasGenerated.value = false;
   isSaved.value = false;
   currentStep.value = 1;
@@ -233,8 +300,10 @@ onBeforeUnmount(() => {
           <Sparkles class="size-4" />
         </div>
         <div class="min-w-0">
-          <h1 class="truncate text-sm font-semibold">创建角色</h1>
-          <p class="truncate text-xs text-muted-foreground">先做出一张满意的角色形象</p>
+          <h1 class="truncate text-sm font-semibold">{{ isEditing ? '编辑角色' : '创建角色' }}</h1>
+          <p class="truncate text-xs text-muted-foreground">
+            {{ isEditing ? '调整角色形象，直到满意为止' : '先做出一张满意的角色形象' }}
+          </p>
         </div>
       </div>
       <span class="text-xs text-muted-foreground">{{ currentStep }} / 4</span>
@@ -277,6 +346,7 @@ onBeforeUnmount(() => {
               :source-image-name="sourceImageName"
               :source-image-url="sourceImageUrl"
               @remove-image="resetSource"
+              @reference-selected="handleReferenceSelected"
               @upload-success="handleUploadSuccess"
             />
             <CharacterPromptStep
@@ -294,10 +364,11 @@ onBeforeUnmount(() => {
             <CharacterGenerationStep
               v-else
               :generation-count="generationCount"
+              :generated-image="activeGeneration?.image?.url || ''"
               :has-generated="hasGenerated"
               :is-generating="isGenerating"
               :is-saved="isSaved"
-              :selected-style-image="generationStyleDetails?.image || ''"
+              :progress="activeGeneration?.progress || 0"
               :selected-style-name="selectedStyleDetails?.name || '访谈生成风格'"
             />
           </Transition>
@@ -339,11 +410,11 @@ onBeforeUnmount(() => {
           <Button
             v-if="currentStep === 4 && hasGenerated"
             class="min-w-40 justify-center gap-2"
-            :disabled="isSaved"
+            :disabled="isSaved || isSaving"
             @click="saveImage"
           >
             <Save class="size-4" />
-            {{ isSaved ? '已保存' : '满意，保存这个形象' }}
+            {{ isSaving ? '保存中' : isSaved ? '已设为正式视觉' : '满意，设为正式视觉' }}
           </Button>
           <Button
             v-else

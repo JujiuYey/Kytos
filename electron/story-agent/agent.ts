@@ -1,6 +1,5 @@
 import { ToolLoopAgent, isStepCount, tool } from 'ai';
 import { z } from 'zod';
-import type { CharacterDraft } from '../../shared/character';
 import type { StoryDraft, StoryProject, StoryShotContent } from '../../shared/story';
 import { STORY_SHOT_LIMITS } from '../../shared/story';
 import {
@@ -73,12 +72,7 @@ const storyShotPatchSchema = z
   })
   .refine(value => Object.keys(value).some(key => key !== 'shotId'), '至少更新一个分镜字段');
 
-export function createStoryAgent(options: {
-  apiKey: string;
-  characterDraft: CharacterDraft;
-  model: string;
-  story: StoryProject;
-}) {
+export function createStoryAgent(options: { apiKey: string; model: string; story: StoryProject }) {
   const deepSeek = createDeepSeekCompatibleProvider(options.apiKey);
   let currentDraft = options.story.draft;
   let currentShots = options.story.shots;
@@ -105,9 +99,6 @@ export function createStoryAgent(options: {
 8. 故事修改导致分镜待检查后，只有用户明确确认当前分镜可以继续时，才调用 confirmStoryboard。
 9. 不要声称图片已经生成。付费生图只能由用户在界面中点击确认。建议先生成关键帧，再生成其他分镜。
 10. 不输出隐藏思维过程，使用简洁自然的中文。
-
-当前角色档案：
-${JSON.stringify(options.characterDraft, null, 2)}
 
 当前故事草稿：
 ${JSON.stringify(currentDraft, null, 2)}

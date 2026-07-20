@@ -8,20 +8,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
@@ -29,21 +20,14 @@ import { SagPage } from '@/components/sag/sag-page';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type { CharacterImageSize, CharacterLibraryState, CharacterSummary } from '@/types';
 
-type EditorMode = 'create' | 'rename';
-
 const router = useRouter();
 const library = ref<CharacterLibraryState | null>(null);
 const loading = ref(true);
 const busy = ref(false);
 const errorMessage = ref('');
-const editorOpen = ref(false);
-const editorMode = ref<EditorMode>('create');
-const editorName = ref('');
-const editorCharacter = ref<CharacterSummary | null>(null);
 const deleteTarget = ref<CharacterSummary | null>(null);
 
 const characters = computed(() => library.value?.characters ?? []);
-const editorTitle = computed(() => (editorMode.value === 'create' ? '新建角色' : '重命名角色'));
 
 const visualAssetAspectClasses: Record<CharacterImageSize, string> = {
   '1:1': 'aspect-square',
@@ -74,47 +58,21 @@ async function loadLibrary(): Promise<void> {
   }
 }
 
-function openEditor(mode: EditorMode, character: CharacterSummary | null = null): void {
-  editorMode.value = mode;
-  editorCharacter.value = character;
-  editorName.value = character?.name ?? '';
-  editorOpen.value = true;
+function createCharacter(): void {
+  void router.push({ name: 'character-create' });
 }
 
-async function submitEditor(): Promise<void> {
-  const name = editorName.value.trim();
-  if (!name || busy.value) {
-    return;
-  }
-  busy.value = true;
-  try {
-    if (editorMode.value === 'create') {
-      library.value = await window.desktop.createCharacter({ name });
-    } else if (editorCharacter.value) {
-      library.value = await window.desktop.updateCharacter({
-        characterId: editorCharacter.value.id,
-        name,
-      });
-    } else {
-      return;
-    }
-    editorOpen.value = false;
-    toast.success(editorMode.value === 'create' ? '角色已创建' : '角色名称已更新');
-  } catch (error: unknown) {
-    toast.error(error instanceof Error ? error.message : String(error));
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function openCharacter(character: CharacterSummary): Promise<void> {
+async function editCharacter(character: CharacterSummary): Promise<void> {
   if (busy.value) {
     return;
   }
   busy.value = true;
   try {
     library.value = await window.desktop.selectCharacter({ characterId: character.id });
-    await router.push({ name: 'character' });
+    await router.push({
+      name: 'character-create',
+      query: { characterId: character.id, mode: 'edit' },
+    });
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : String(error));
   } finally {
@@ -163,7 +121,7 @@ onMounted(() => {
           <p class="truncate text-xs text-muted-foreground">管理多个角色及其完整形象资料</p>
         </div>
       </div>
-      <Button :disabled="busy" @click="openEditor('create')">
+      <Button :disabled="busy" @click="createCharacter">
         <Plus class="size-4" />
         新建角色
       </Button>
@@ -208,8 +166,8 @@ onMounted(() => {
             variant="ghost"
             class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
             :disabled="busy"
-            :aria-label="`进入角色 ${character.name}`"
-            @click="openCharacter(character)"
+            :aria-label="`编辑角色 ${character.name}`"
+            @click="editCharacter(character)"
           >
             <AiImage
               v-if="character.visualAsset"
@@ -256,9 +214,9 @@ onMounted(() => {
                 size="sm"
                 variant="outline"
                 :disabled="busy"
-                @click="openCharacter(character)"
+                @click="editCharacter(character)"
               >
-                进入角色
+                编辑角色
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
@@ -267,9 +225,9 @@ onMounted(() => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem @select="openEditor('rename', character)">
+                  <DropdownMenuItem @select="editCharacter(character)">
                     <Pencil class="size-4" />
-                    重命名
+                    编辑角色
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     class="text-destructive focus:text-destructive"
@@ -285,27 +243,6 @@ onMounted(() => {
         </article>
       </div>
     </ScrollArea>
-
-    <Dialog v-model:open="editorOpen">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{{ editorTitle }}</DialogTitle>
-          <DialogDescription> 每个角色拥有独立的角色特征、角色视觉和表情资料。 </DialogDescription>
-        </DialogHeader>
-        <Input
-          v-model="editorName"
-          placeholder="角色名称"
-          maxlength="100"
-          @keydown.enter.prevent="submitEditor"
-        />
-        <DialogFooter>
-          <Button variant="outline" :disabled="busy" @click="editorOpen = false">取消</Button>
-          <Button :disabled="busy || !editorName.trim()" @click="submitEditor">
-            {{ busy ? '保存中' : '保存' }}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
 
     <SagConfirmDialog
       :open="Boolean(deleteTarget)"

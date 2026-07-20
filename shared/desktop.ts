@@ -1,19 +1,17 @@
 import type { CharacterWorkspaceState } from './character';
 import type {
-  CharacterVisualCardDraw,
-  CharacterVisualCardWorkspaceState,
-  GenerateCharacterVisualCardsRequest,
-  GetCharacterVisualCardTaskRequest,
-  SaveCharacterVisualCardRequest,
-} from './character-visual-card';
-import type {
   CharacterLibraryState,
   CharacterScopeRequest,
-  CreateCharacterRequest,
   DeleteCharacterRequest,
   SelectCharacterRequest,
-  UpdateCharacterRequest,
 } from './character-library';
+import type {
+  CharacterVisualGeneration,
+  GenerateCharacterVisualRequest,
+  GetCharacterVisualGenerationRequest,
+  SaveCharacterVisualRequest,
+  SaveCharacterVisualResult,
+} from './character-create';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionWorkspaceState,
@@ -104,7 +102,6 @@ export interface SavedFileResult {
 }
 
 export interface DesktopApi {
-  createCharacter: (request: CreateCharacterRequest) => Promise<CharacterLibraryState>;
   createStory: (request: CreateStoryRequest) => Promise<StoryProject>;
   createStoryShot: (request: CreateStoryShotRequest) => Promise<StoryProject>;
   createIllustrationTopic: (request: CreateIllustrationTopicRequest) => Promise<IllustrationTopic>;
@@ -140,9 +137,6 @@ export interface DesktopApi {
   generateCharacterPortrait: (
     request: GenerateCharacterPortraitRequest,
   ) => Promise<CharacterPortraitRecord>;
-  generateCharacterVisualCards: (
-    request: GenerateCharacterVisualCardsRequest,
-  ) => Promise<CharacterVisualCardDraw>;
   generateCharacterSheet: (request: GenerateCharacterSheetRequest) => Promise<CharacterSheetRecord>;
   generateIllustration: (request: GenerateIllustrationRequest) => Promise<IllustrationVersion>;
   generateStoryShot: (request: GenerateStoryShotRequest) => Promise<StoryShotVersion>;
@@ -157,11 +151,13 @@ export interface DesktopApi {
   getCharacterPortraitWorkspace: (
     request?: CharacterScopeRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
-  getCharacterVisualCardTask: (
-    request: GetCharacterVisualCardTaskRequest,
-  ) => Promise<CharacterVisualCardDraw>;
-  getCharacterVisualCardWorkspace: () => Promise<CharacterVisualCardWorkspaceState>;
   getCharacterSheetTask: (taskId: string) => Promise<CharacterSheetRecord>;
+  generateCharacterVisual: (
+    request: GenerateCharacterVisualRequest,
+  ) => Promise<CharacterVisualGeneration>;
+  getCharacterVisualGeneration: (
+    request: GetCharacterVisualGenerationRequest,
+  ) => Promise<CharacterVisualGeneration>;
   getCharacterWorkspace: () => Promise<CharacterWorkspaceState>;
   getIllustrationTask: (taskId: string) => Promise<IllustrationVersion>;
   getIllustrationWorkspace: () => Promise<IllustrationWorkspaceState>;
@@ -179,13 +175,11 @@ export interface DesktopApi {
   ) => Promise<CharacterPortraitWorkspaceState>;
   selectDirectory: () => Promise<string | null>;
   saveFile: (request: SaveFileRequest) => Promise<SavedFileResult>;
+  saveCharacterVisual: (request: SaveCharacterVisualRequest) => Promise<SaveCharacterVisualResult>;
   saveIllustrationConversation: (
     request: SaveIllustrationConversationRequest,
   ) => Promise<IllustrationTopic>;
   saveStoryConversation: (request: SaveStoryConversationRequest) => Promise<StoryProject>;
-  saveCharacterVisualCard: (
-    request: SaveCharacterVisualCardRequest,
-  ) => Promise<CharacterVisualCardDraw>;
   selectCharacterPortrait: (
     request: SelectCharacterPortraitRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
@@ -210,7 +204,6 @@ export interface DesktopApi {
   uploadCharacterSheet: (request: SaveFileRequest) => Promise<SavedFileResult>;
   uploadIllustration: (request: UploadIllustrationRequest) => Promise<UploadedIllustration>;
   updateIllustrationTopic: (request: UpdateIllustrationTopicRequest) => Promise<IllustrationTopic>;
-  updateCharacter: (request: UpdateCharacterRequest) => Promise<CharacterLibraryState>;
   updateStory: (request: UpdateStoryRequest) => Promise<StoryProject>;
   updateStoryShot: (request: UpdateStoryShotRequest) => Promise<StoryShotUpdateResult>;
 }

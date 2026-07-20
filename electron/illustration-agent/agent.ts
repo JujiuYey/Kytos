@@ -1,6 +1,5 @@
 import { ToolLoopAgent, isStepCount, tool } from 'ai';
 import { z } from 'zod';
-import type { CharacterDraft } from '../../shared/character';
 import type { IllustrationBrief, IllustrationTopic } from '../../shared/illustration';
 import { updateIllustrationBrief } from '../services/illustration';
 import {
@@ -38,7 +37,6 @@ const illustrationPlanSchema = z.object({
 
 export function createIllustrationAgent(options: {
   apiKey: string;
-  characterDraft: CharacterDraft;
   model: string;
   topic: IllustrationTopic;
 }) {
@@ -51,9 +49,6 @@ export function createIllustrationAgent(options: {
     return result;
   }
 
-  const characterContext = options.topic.useCharacter
-    ? JSON.stringify(options.characterDraft, null, 2)
-    : '本主题未启用当前角色。画面可以是纯场景或其他通用插画，不要擅自加入当前角色。';
   return new ToolLoopAgent({
     model: deepSeek(options.model),
     providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
@@ -70,9 +65,6 @@ export function createIllustrationAgent(options: {
 8. 不输出隐藏思维过程，使用简洁自然的中文。
 
 是否使用当前角色：${options.topic.useCharacter ? '是' : '否'}
-当前角色档案：
-${characterContext}
-
 当前画面草稿：
 ${JSON.stringify(currentBrief, null, 2)}`,
     stopWhen: isStepCount(4),

@@ -11,10 +11,12 @@ defineProps<{
 
 const emit = defineEmits<{
   (event: 'removeImage'): void;
+  (event: 'referenceSelected', request: SaveFileRequest): void;
   (event: 'uploadSuccess', result: SavedFileResult): void;
 }>();
 
 async function localUploadHandler(request: SaveFileRequest): Promise<SavedFileResult> {
+  emit('referenceSelected', request);
   const blob = new Blob([request.fileData], { type: request.mimeType });
   return {
     fileName: request.fileName,

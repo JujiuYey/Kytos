@@ -1,17 +1,23 @@
 import { ipcMain } from 'electron';
 import type {
-  CreateCharacterRequest,
   DeleteCharacterRequest,
   SelectCharacterRequest,
-  UpdateCharacterRequest,
 } from '../../shared/character-library';
+import type {
+  GenerateCharacterVisualRequest,
+  GetCharacterVisualGenerationRequest,
+  SaveCharacterVisualRequest,
+} from '../../shared/character-create';
 import {
-  createCharacter,
   deleteCharacter,
   getCharacterLibrary,
   selectCharacter,
-  updateCharacter,
 } from '../services/character-library';
+import {
+  generateCharacterVisual,
+  getCharacterVisualGeneration,
+  saveCharacterVisual,
+} from '../services/character-create';
 import type { TrustedSenderGuard } from './trusted-sender';
 
 export function registerCharacterLibraryIpc(assertTrustedSender: TrustedSenderGuard): void {
@@ -20,17 +26,24 @@ export function registerCharacterLibraryIpc(assertTrustedSender: TrustedSenderGu
     return getCharacterLibrary();
   });
   ipcMain.handle(
-    'character-library:create-character',
-    async (event, request: CreateCharacterRequest) => {
+    'character-library:generate-visual',
+    async (event, request: GenerateCharacterVisualRequest) => {
       assertTrustedSender(event);
-      return createCharacter(request);
+      return generateCharacterVisual(request);
     },
   );
   ipcMain.handle(
-    'character-library:update-character',
-    async (event, request: UpdateCharacterRequest) => {
+    'character-library:get-visual-generation',
+    async (event, request: GetCharacterVisualGenerationRequest) => {
       assertTrustedSender(event);
-      return updateCharacter(request);
+      return getCharacterVisualGeneration(request);
+    },
+  );
+  ipcMain.handle(
+    'character-library:save-visual',
+    async (event, request: SaveCharacterVisualRequest) => {
+      assertTrustedSender(event);
+      return saveCharacterVisual(request);
     },
   );
   ipcMain.handle(

@@ -1,6 +1,5 @@
 import { createAgentUIStreamResponse } from 'ai';
 import { DEFAULT_DEEPSEEK_MODEL } from '../../shared/character';
-import { loadCharacterDraft } from '../services/character-workspace';
 import { getCredentialValue } from '../services/credentials';
 import { getStory } from '../services/story';
 import { createStoryAgent } from './agent';
@@ -66,14 +65,12 @@ export async function handleStoryAgentRequest(request: Request): Promise<Respons
       throw new Error('故事对话请求过大');
     }
     const body = parseRequestBody(await request.json());
-    const [apiKey, characterDraft, story] = await Promise.all([
+    const [apiKey, story] = await Promise.all([
       getCredentialValue('deepseek'),
-      loadCharacterDraft(),
       getStory(body.storyId),
     ]);
     const agent = createStoryAgent({
       apiKey,
-      characterDraft,
       model: resolveModel(body.model),
       story,
     });

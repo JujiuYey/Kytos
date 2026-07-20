@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { net, protocol } from 'electron';
-import { handleCharacterAgentRequest } from './character-agent/route';
 import { handleIllustrationAgentRequest } from './illustration-agent/route';
 import { handleStoryAgentRequest } from './story-agent/route';
 import { getWorkspaceDirectory } from './services/workspace';
@@ -10,9 +9,9 @@ const APP_SCHEME = 'app';
 const APP_HOST = 'bundle';
 const WORKSPACE_IMAGE_DIRECTORIES = [
   'character-expressions',
+  'character-candidates',
   'character-portraits',
   'character-sheets',
-  'character-visual-cards',
   'illustrations',
   'story-frames',
 ] as const;
@@ -43,10 +42,6 @@ export function registerAppProtocol(): void {
     const url = new URL(request.url);
     if (url.host !== APP_HOST) {
       return new Response('Not found', { status: 404 });
-    }
-
-    if (url.pathname === '/api/character-agent') {
-      return handleCharacterAgentRequest(request);
     }
 
     if (url.pathname === '/api/illustration-agent') {

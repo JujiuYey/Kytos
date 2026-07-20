@@ -2,7 +2,6 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopApi } from '../shared/desktop';
 
 const desktopApi: DesktopApi = {
-  createCharacter: request => ipcRenderer.invoke('character-library:create-character', request),
   createStory: request => ipcRenderer.invoke('story:create', request),
   createStoryShot: request => ipcRenderer.invoke('story:create-shot', request),
   createIllustrationTopic: request => ipcRenderer.invoke('illustration:create-topic', request),
@@ -22,8 +21,6 @@ const desktopApi: DesktopApi = {
   generateCharacterExpressionPrompt: request =>
     ipcRenderer.invoke('character-expression:generate-prompt', request),
   generateCharacterPortrait: request => ipcRenderer.invoke('character-portrait:generate', request),
-  generateCharacterVisualCards: request =>
-    ipcRenderer.invoke('character-visual-card:generate', request),
   generateCharacterSheet: request => ipcRenderer.invoke('character-sheet:generate', request),
   generateIllustration: request => ipcRenderer.invoke('illustration:generate', request),
   generateStoryShot: request => ipcRenderer.invoke('story:generate-shot', request),
@@ -35,10 +32,11 @@ const desktopApi: DesktopApi = {
   getCharacterPortraitTask: taskId => ipcRenderer.invoke('character-portrait:get-task', taskId),
   getCharacterPortraitWorkspace: request =>
     ipcRenderer.invoke('character-portrait:get-workspace', request),
-  getCharacterVisualCardTask: request =>
-    ipcRenderer.invoke('character-visual-card:get-task', request),
-  getCharacterVisualCardWorkspace: () => ipcRenderer.invoke('character-visual-card:get-workspace'),
   getCharacterSheetTask: taskId => ipcRenderer.invoke('character-sheet:get-task', taskId),
+  generateCharacterVisual: request =>
+    ipcRenderer.invoke('character-library:generate-visual', request),
+  getCharacterVisualGeneration: request =>
+    ipcRenderer.invoke('character-library:get-visual-generation', request),
   getCharacterWorkspace: () => ipcRenderer.invoke('character:get-workspace'),
   getIllustrationTask: taskId => ipcRenderer.invoke('illustration:get-task', taskId),
   getIllustrationWorkspace: () => ipcRenderer.invoke('illustration:get-workspace'),
@@ -52,10 +50,10 @@ const desktopApi: DesktopApi = {
   renameCharacterVisualAsset: request => ipcRenderer.invoke('character-visual:rename', request),
   selectDirectory: () => ipcRenderer.invoke('dialog:select-directory'),
   saveFile: request => ipcRenderer.invoke('file:save', request),
+  saveCharacterVisual: request => ipcRenderer.invoke('character-library:save-visual', request),
   saveIllustrationConversation: request =>
     ipcRenderer.invoke('illustration:save-conversation', request),
   saveStoryConversation: request => ipcRenderer.invoke('story:save-conversation', request),
-  saveCharacterVisualCard: request => ipcRenderer.invoke('character-visual-card:save', request),
   selectCharacterPortrait: request => ipcRenderer.invoke('character-portrait:select', request),
   selectCharacter: request => ipcRenderer.invoke('character-library:select-character', request),
   selectCharacterSheet: request => ipcRenderer.invoke('character-sheet:select', request),
@@ -72,7 +70,6 @@ const desktopApi: DesktopApi = {
   uploadCharacterSheet: request => ipcRenderer.invoke('character-sheet:upload', request),
   uploadIllustration: request => ipcRenderer.invoke('illustration:upload', request),
   updateIllustrationTopic: request => ipcRenderer.invoke('illustration:update-topic', request),
-  updateCharacter: request => ipcRenderer.invoke('character-library:update-character', request),
   updateStory: request => ipcRenderer.invoke('story:update', request),
   updateStoryShot: request => ipcRenderer.invoke('story:update-shot', request),
 };

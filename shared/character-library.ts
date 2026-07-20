@@ -23,15 +23,6 @@ export interface CharacterLibraryState {
   characters: CharacterLibraryCharacter[];
 }
 
-export interface CreateCharacterRequest {
-  name: string;
-}
-
-export interface UpdateCharacterRequest {
-  characterId: string;
-  name: string;
-}
-
 export interface DeleteCharacterRequest {
   characterId: string;
 }

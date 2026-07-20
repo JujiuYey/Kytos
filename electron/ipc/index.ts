@@ -3,7 +3,6 @@ import { registerCharacterExpressionIpc } from './character-expression';
 import { registerCharacterIpc } from './character';
 import { registerCharacterLibraryIpc } from './character-library';
 import { registerCharacterPortraitIpc } from './character-portrait';
-import { registerCharacterVisualCardIpc } from './character-visual-card';
 import { registerCredentialsIpc } from './credentials';
 import { registerFilesIpc } from './files';
 import { registerIllustrationIpc } from './illustration';
@@ -17,7 +16,6 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): 
   registerCharacterLibraryIpc(assertTrustedSender);
   registerCharacterExpressionIpc(assertTrustedSender);
   registerCharacterPortraitIpc(assertTrustedSender);
-  registerCharacterVisualCardIpc(assertTrustedSender);
   registerSettingsIpc(assertTrustedSender);
   registerCredentialsIpc(assertTrustedSender);
   registerFilesIpc(assertTrustedSender);

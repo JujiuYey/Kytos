@@ -8,11 +8,8 @@ export type {
   SetCredentialRequest,
 } from '../../shared/desktop';
 export type {
-  CharacterAgentMessage,
   CharacterDraft,
   CharacterDraftField,
-  CharacterDraftPatch,
-  CharacterDraftUpdateResult,
   CharacterWorkspaceState,
 } from '../../shared/character';
 export type {
@@ -21,11 +18,17 @@ export type {
   CharacterLibraryState,
   CharacterScopeRequest,
   CharacterSummary,
-  CreateCharacterRequest,
   DeleteCharacterRequest,
   SelectCharacterRequest,
-  UpdateCharacterRequest,
 } from '../../shared/character-library';
+export type {
+  CharacterVisualGeneration,
+  CharacterVisualReferenceImage,
+  GenerateCharacterVisualRequest,
+  GetCharacterVisualGenerationRequest,
+  SaveCharacterVisualRequest,
+  SaveCharacterVisualResult,
+} from '../../shared/character-create';
 export type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceKind,
@@ -68,26 +71,13 @@ export type {
   SetCharacterVisualAssetOfficialRequest,
   UploadCharacterVisualAssetRequest,
 } from '../../shared/character-portrait';
-export type {
-  CharacterVisualCard,
-  CharacterVisualCardDraw,
-  CharacterVisualCardWorkspaceState,
-  CharacterVisualHypothesis,
-  GenerateCharacterVisualCardsRequest,
-  GetCharacterVisualCardTaskRequest,
-  SaveCharacterVisualCardRequest,
-} from '../../shared/character-visual-card';
-export { CHARACTER_VISUAL_CARD_COUNT } from '../../shared/character-visual-card';
 export {
-  CHARACTER_AGENT_ENDPOINT,
-  CHARACTER_CORE_FIELDS,
   CHARACTER_DRAFT_FIELDS,
   CHARACTER_SEED_FIELDS,
   CHARACTER_VISUAL_ANCHOR_FIELDS,
   CHARACTER_VISUAL_PRESENTATION_FIELDS,
   DEFAULT_DEEPSEEK_MODEL,
   createEmptyCharacterDraft,
-  getCharacterDraftProgress,
   normalizeCharacterDraft,
 } from '../../shared/character';
 export {

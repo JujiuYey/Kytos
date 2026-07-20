@@ -5,10 +5,8 @@ import type {
   CharacterLibraryState,
   CharacterLibraryVisualAsset,
   CharacterSummary,
-  CreateCharacterRequest,
   DeleteCharacterRequest,
   SelectCharacterRequest,
-  UpdateCharacterRequest,
 } from '../../shared/character-library';
 import type { CharacterImageSize, CharacterPortraitSize } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_SIZES, CHARACTER_SHEET_SIZE } from '../../shared/character-portrait';
@@ -45,13 +43,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function createCharacterId(): string {
   return `character_${randomUUID()}`;
-}
-
-function validateName(value: unknown): string {
-  if (typeof value !== 'string' || !value.trim() || value.trim().length > MAX_NAME_LENGTH) {
-    throw new Error('角色名称无效');
-  }
-  return value.trim();
 }
 
 function parseCharacter(value: unknown): CharacterSummary | null {
@@ -272,16 +263,6 @@ async function initializeCharacterDraft(
   }
 }
 
-async function updateCharacterDraftName(
-  workspacePath: string,
-  characterId: string,
-  name: string,
-): Promise<void> {
-  const draftPath = getCharacterDraftPath(workspacePath, characterId);
-  const value = await readJsonFile(draftPath);
-  await writeJsonFile(draftPath, { ...(isRecord(value) ? value : {}), name });
-}
-
 async function createInitialStore(workspacePath: string): Promise<StoredCharacterLibrary> {
   const now = new Date().toISOString();
   const character: CharacterSummary = {
@@ -377,63 +358,50 @@ export async function getCharacterDirectory(characterId: string): Promise<string
   return path.join(await getWorkspaceDirectory(), CHARACTER_DIRECTORY, character.id);
 }
 
-export async function createCharacter(
-  request: CreateCharacterRequest,
-): Promise<CharacterLibraryState> {
-  const name = validateName(request?.name);
-  const store = await mutateStore(async store => {
+export async function prepareCharacterVisualSave(characterId?: string): Promise<{
+  characterId: string;
+  created: boolean;
+}> {
+  if (characterId !== undefined) {
+    const store = await mutateStore(store => {
+      const character = findCharacter(store, characterId);
+      return { ...store, activeCharacterId: character.id };
+    });
+    return { characterId: store.activeCharacterId, created: false };
+  }
+
+  let createdCharacterId = '';
+  await mutateStore(async store => {
     const now = new Date().toISOString();
+    createdCharacterId = createCharacterId();
+    const usedNames = new Set(store.characters.map(character => character.name));
+    let sequence = store.characters.length + 1;
+    while (usedNames.has(`角色 ${sequence}`)) sequence += 1;
     const character: CharacterSummary = {
       createdAt: now,
-      id: createCharacterId(),
-      name,
+      id: createdCharacterId,
+      name: `角色 ${sequence}`,
       updatedAt: now,
     };
-    await initializeCharacterDraft(await getWorkspaceDirectory(), character.id, character.name);
+    await mkdir(path.join(await getWorkspaceDirectory(), CHARACTER_DIRECTORY, createdCharacterId), {
+      recursive: true,
+    });
     return {
       ...store,
       activeCharacterId: character.id,
       characters: [character, ...store.characters],
     };
   });
-  return toCharacterLibraryState(store);
+  return { characterId: createdCharacterId, created: true };
 }
 
-export async function updateCharacter(
-  request: UpdateCharacterRequest,
-): Promise<CharacterLibraryState> {
-  const name = validateName(request?.name);
-  const store = await mutateStore(async store => {
-    const character = findCharacter(store, request.characterId);
-    const now = new Date().toISOString();
-    await updateCharacterDraftName(await getWorkspaceDirectory(), character.id, name);
-    return {
-      ...store,
-      characters: store.characters.map(item =>
-        item.id === character.id ? { ...item, name, updatedAt: now } : item,
-      ),
-    };
-  });
-  return toCharacterLibraryState(store);
-}
-
-export async function updateActiveCharacterName(name: string): Promise<void> {
-  if (!name.trim()) {
-    return;
-  }
+export async function rollbackCharacterVisualSave(characterId: string): Promise<void> {
   await mutateStore(store => {
-    const character = findCharacter(store, store.activeCharacterId);
-    const normalizedName = name.trim().slice(0, MAX_NAME_LENGTH);
-    if (character.name === normalizedName) {
-      return store;
-    }
-    const now = new Date().toISOString();
-    return {
-      ...store,
-      characters: store.characters.map(item =>
-        item.id === character.id ? { ...item, name: normalizedName, updatedAt: now } : item,
-      ),
-    };
+    const characters = store.characters.filter(character => character.id !== characterId);
+    if (characters.length === store.characters.length || !characters.length) return store;
+    const activeCharacterId =
+      store.activeCharacterId === characterId ? characters[0].id : store.activeCharacterId;
+    return { ...store, activeCharacterId, characters };
   });
 }
 

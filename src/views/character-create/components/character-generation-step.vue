@@ -4,10 +4,11 @@ import { Progress } from '@/components/ui/progress';
 
 defineProps<{
   generationCount: number;
+  generatedImage: string;
   hasGenerated: boolean;
   isGenerating: boolean;
   isSaved: boolean;
-  selectedStyleImage: string;
+  progress: number;
   selectedStyleName: string;
 }>();
 </script>
@@ -27,7 +28,7 @@ defineProps<{
       <p class="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
         先把「{{ selectedStyleName }}」和你的描述组合起来，生成一张可以继续调整的初稿。
       </p>
-      <Progress :value="65" class="mt-6 max-w-xs" />
+      <Progress :value="progress" class="mt-6 max-w-xs" />
     </div>
 
     <div v-else-if="hasGenerated" class="space-y-5">
@@ -43,7 +44,7 @@ defineProps<{
           class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700"
         >
           <Check class="size-3.5" />
-          已保存
+          已设为正式视觉
         </span>
       </div>
 
@@ -51,7 +52,7 @@ defineProps<{
         class="flex aspect-square max-h-[640px] items-center justify-center overflow-hidden rounded-xl border bg-muted/10"
       >
         <img
-          :src="selectedStyleImage"
+          :src="generatedImage"
           :alt="`生成的${selectedStyleName}角色示例`"
           class="size-full object-contain"
         />
