@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ChatStatus } from 'ai';
-import { Bot, WandSparkles } from '@lucide/vue';
+import { Bot, Check, PencilLine, WandSparkles } from '@lucide/vue';
 import {
   Conversation,
   ConversationContent,
@@ -9,6 +9,7 @@ import {
 } from '@/components/ai-elements/conversation';
 import { Loader } from '@/components/ai-elements/loader';
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
+import { Tool, ToolContent, ToolHeader } from '@/components/ai-elements/tool';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import {
   PromptInput,
@@ -22,12 +23,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import CharacterPromptDraftPanel from './character-prompt-draft-panel.vue';
-import type { CharacterPromptDraft, CharacterPromptMessage } from '../workflow-data';
+import type { CharacterCreateAgentMessage } from '@/types';
+import type { CharacterPromptDraft } from '../workflow-data';
 
 const props = defineProps<{
   isResponding: boolean;
   draft: CharacterPromptDraft;
-  messages: CharacterPromptMessage[];
+  messages: CharacterCreateAgentMessage[];
   modelValue: string;
   styleName: string;
   suggestions: string[];
@@ -79,9 +81,39 @@ function handleSubmit(message: PromptInputMessage): void {
 
         <Conversation class="min-h-0 flex-1">
           <ConversationContent class="w-full gap-5 px-4 py-5 sm:px-5">
-            <Message v-for="message in messages" :key="message.id" :from="message.role">
+            <Message
+              v-for="message in messages"
+              :key="message.id"
+              :from="message.role === 'user' ? 'user' : 'assistant'"
+            >
               <MessageContent class="w-full">
-                <MessageResponse :content="message.content" />
+                <template v-for="(part, index) in message.parts" :key="`${message.id}-${index}`">
+                  <MessageResponse v-if="part.type === 'text'" :content="part.text" />
+                  <Tool v-else-if="part.type === 'tool-updateCharacterDraft'" class="mb-0">
+                    <ToolHeader :type="part.type" :state="part.state" title="同步形象草稿" />
+                    <ToolContent>
+                      <div
+                        class="flex items-start gap-2 border-t px-3 py-3 text-sm text-muted-foreground"
+                      >
+                        <PencilLine class="mt-0.5 size-4 shrink-0" />
+                        <span v-if="part.state === 'output-available'">右侧形象草稿已更新</span>
+                        <span v-else>正在整理已确认的人物信息</span>
+                      </div>
+                    </ToolContent>
+                  </Tool>
+                  <Tool v-else-if="part.type === 'tool-finalizeCharacterPrompt'" class="mb-0">
+                    <ToolHeader :type="part.type" :state="part.state" title="整理最终提示词" />
+                    <ToolContent>
+                      <div
+                        class="flex items-start gap-2 border-t px-3 py-3 text-sm text-muted-foreground"
+                      >
+                        <Check class="mt-0.5 size-4 shrink-0" />
+                        <span v-if="part.state === 'output-available'">最终提示词已整理完成</span>
+                        <span v-else>正在融合人物细节和画法约束</span>
+                      </div>
+                    </ToolContent>
+                  </Tool>
+                </template>
               </MessageContent>
             </Message>
 

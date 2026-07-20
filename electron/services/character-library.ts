@@ -358,7 +358,10 @@ export async function getCharacterDirectory(characterId: string): Promise<string
   return path.join(await getWorkspaceDirectory(), CHARACTER_DIRECTORY, character.id);
 }
 
-export async function prepareCharacterVisualSave(characterId?: string): Promise<{
+export async function prepareCharacterVisualSave(
+  characterId?: string,
+  requestedName?: string,
+): Promise<{
   characterId: string;
   created: boolean;
 }> {
@@ -374,13 +377,17 @@ export async function prepareCharacterVisualSave(characterId?: string): Promise<
   await mutateStore(async store => {
     const now = new Date().toISOString();
     createdCharacterId = createCharacterId();
+    const normalizedName = requestedName?.trim();
+    if (normalizedName && normalizedName.length > MAX_NAME_LENGTH) {
+      throw new Error('角色名称最多 100 个字符');
+    }
     const usedNames = new Set(store.characters.map(character => character.name));
     let sequence = store.characters.length + 1;
     while (usedNames.has(`角色 ${sequence}`)) sequence += 1;
     const character: CharacterSummary = {
       createdAt: now,
       id: createdCharacterId,
-      name: `角色 ${sequence}`,
+      name: normalizedName || `角色 ${sequence}`,
       updatedAt: now,
     };
     await mkdir(path.join(await getWorkspaceDirectory(), CHARACTER_DIRECTORY, createdCharacterId), {

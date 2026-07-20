@@ -8,6 +8,7 @@ defineProps<{
   hasGenerated: boolean;
   isGenerating: boolean;
   isSaved: boolean;
+  isUploadedAsset: boolean;
   progress: number;
   selectedStyleName: string;
 }>();
@@ -35,9 +36,11 @@ defineProps<{
       <div class="flex items-center justify-between gap-3">
         <div>
           <p class="text-xs font-semibold uppercase text-muted-foreground">
-            第 {{ generationCount }} 次生成
+            {{ isUploadedAsset ? '已有角色视觉资产' : `第 ${generationCount} 次生成` }}
           </p>
-          <h3 id="result-heading" class="mt-1 text-xl font-semibold">这张方向接近你想要的吗？</h3>
+          <h3 id="result-heading" class="mt-1 text-xl font-semibold">
+            {{ isUploadedAsset ? '这张图片已设为正式视觉' : '这张方向接近你想要的吗？' }}
+          </h3>
         </div>
         <span
           v-if="isSaved"

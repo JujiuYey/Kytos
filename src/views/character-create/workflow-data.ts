@@ -3,40 +3,12 @@ import contrastLineImage from '@/assets/character-styles/contrast-line-male.png'
 import doodleImage from '@/assets/character-styles/doodle-male.png';
 import notionImage from '@/assets/character-styles/notion-male.png';
 import qVersionImage from '@/assets/character-styles/q-version-male.png';
+import type { CharacterCreateDraft } from '@/types';
 
 export type Step = 1 | 2 | 3 | 4;
 export type StyleId = 'notion' | 'doodle' | 'contrast-line' | 'q-version' | 'chibi';
 
-export interface CharacterPromptMessage {
-  id: string;
-  role: 'assistant' | 'user';
-  content: string;
-}
-
-export interface CharacterPromptDraft {
-  age: string;
-  gender: string;
-  hairColor: string;
-  hairstyle: string;
-  clothingColor: string;
-  clothingStyle: string;
-  clothingLength: string;
-  bottomsColor: string;
-  bottomsStyle: string;
-  bottomsLength: string;
-  shoesColor: string;
-  shoesStyle: string;
-  shoesHeight: string;
-  accessories: string;
-  props: string;
-  characterMood: string;
-  primaryColor: string;
-  secondaryColor: string;
-  accentColor: string;
-  backgroundColor: string;
-  forbiddenColors: string;
-  overallStyleKeywords: string;
-}
+export type CharacterPromptDraft = CharacterCreateDraft;
 
 export function createEmptyCharacterPromptDraft(): CharacterPromptDraft {
   return {
@@ -83,8 +55,8 @@ export const CHARACTER_WORKFLOW_STEPS = [
   },
   {
     number: 2,
-    label: '参考照片',
-    description: '有清晰的人物照片就上传作为参考；没有照片也可以直接进入下一步。',
+    label: '提供素材',
+    description: '照片可以作为 AI 生图参考；如果已经有完整角色视觉，也可以上传后直接设为正式资产。',
   },
   {
     number: 3,

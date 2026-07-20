@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
+  CharacterImageSource,
   CharacterPortraitImage,
   CharacterPortraitRecord,
   CharacterPortraitResolution,
@@ -769,6 +770,7 @@ export async function uploadCharacterVisualAsset(
 export async function saveOfficialCharacterVisual(
   characterId: string,
   request: SaveFileRequest,
+  source: CharacterImageSource = 'generated',
 ): Promise<void> {
   const { image, uploadId } = await saveUploadedImage(
     { ...request, name: '正式角色视觉' },
@@ -787,7 +789,7 @@ export async function saveOfficialCharacterVisual(
     prompt: '',
     resolution: '1k',
     size: '1:1',
-    source: 'generated',
+    source,
     status: 'completed',
     updatedAt: now,
   };

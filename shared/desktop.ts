@@ -9,6 +9,7 @@ import type {
   CharacterVisualGeneration,
   GenerateCharacterVisualRequest,
   GetCharacterVisualGenerationRequest,
+  SaveCharacterVisualAssetRequest,
   SaveCharacterVisualRequest,
   SaveCharacterVisualResult,
 } from './character-create';
@@ -176,6 +177,9 @@ export interface DesktopApi {
   selectDirectory: () => Promise<string | null>;
   saveFile: (request: SaveFileRequest) => Promise<SavedFileResult>;
   saveCharacterVisual: (request: SaveCharacterVisualRequest) => Promise<SaveCharacterVisualResult>;
+  saveCharacterVisualAsset: (
+    request: SaveCharacterVisualAssetRequest,
+  ) => Promise<SaveCharacterVisualResult>;
   saveIllustrationConversation: (
     request: SaveIllustrationConversationRequest,
   ) => Promise<IllustrationTopic>;

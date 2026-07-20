@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { DefaultChatTransport } from 'ai';
+import { useChat } from '@ai-sdk/vue';
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,51 +16,64 @@ import { toast } from 'vue-sonner';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SagPage } from '@/components/sag/sag-page';
-import type { CharacterVisualGeneration, SaveFileRequest, SavedFileResult } from '@/types';
+import { useAppStore } from '@/stores/app';
+import type {
+  CharacterCreateAgentMessage,
+  CharacterVisualGeneration,
+  SaveFileRequest,
+  SavedFileResult,
+} from '@/types';
+import { CHARACTER_CREATE_AGENT_ENDPOINT, DEFAULT_DEEPSEEK_MODEL } from '@/types';
 import CharacterCreateStepper from './components/character-create-stepper.vue';
 import CharacterGenerationStep from './components/character-generation-step.vue';
 import CharacterPromptStep from './components/character-prompt-step.vue';
 import CharacterSourceStep from './components/character-source-step.vue';
 import CharacterStyleStep from './components/character-style-step.vue';
-import {
-  PROMPT_REPLY_DELAY_MS,
-  buildFinalPrompt,
-  extractPromptDraft,
-  getPromptOpening,
-  getPromptReply,
-  getPromptSuggestions,
-} from './prompt-interview';
+import { getPromptSuggestions } from './prompt-interview';
 import {
   CHARACTER_STYLES,
   CHARACTER_WORKFLOW_STEPS,
   createEmptyCharacterPromptDraft,
   type CharacterPromptDraft,
-  type CharacterPromptMessage,
   type Step,
   type StyleId,
 } from './workflow-data';
 
 const route = useRoute();
 const router = useRouter();
+const appStore = useAppStore();
 const currentStep = ref<Step>(1);
 const furthestStep = ref<Step>(1);
 const selectedStyle = ref<StyleId | null>(null);
 const sourceImageUrl = ref('');
 const sourceImageName = ref('');
 const sourceImageFile = ref<SaveFileRequest | null>(null);
+const characterName = ref('');
 const prompt = ref('');
-const promptMessages = ref<CharacterPromptMessage[]>([]);
 const promptDraft = ref<CharacterPromptDraft>(createEmptyCharacterPromptDraft());
-const isPromptAssistantResponding = ref(false);
 const isGenerating = ref(false);
 const isSaving = ref(false);
 const hasGenerated = ref(false);
 const isSaved = ref(false);
 const generationCount = ref(0);
 const activeGeneration = ref<CharacterVisualGeneration | null>(null);
+const uploadedOfficialUrl = ref('');
 let generationTimer: ReturnType<typeof setTimeout> | null = null;
-let promptReplyTimer: ReturnType<typeof setTimeout> | null = null;
-let promptMessageSequence = 0;
+
+const model = computed(() => appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL);
+const transport = new DefaultChatTransport<CharacterCreateAgentMessage>({
+  api: CHARACTER_CREATE_AGENT_ENDPOINT,
+});
+const {
+  error: chatError,
+  messages,
+  sendMessage,
+  status: chatStatus,
+  stop,
+} = useChat<CharacterCreateAgentMessage>({ transport });
+const isPromptAssistantResponding = computed(
+  () => chatStatus.value === 'submitted' || chatStatus.value === 'streaming',
+);
 
 const selectedStyleDetails = computed(() =>
   CHARACTER_STYLES.find(style => style.id === selectedStyle.value),
@@ -74,7 +89,7 @@ const canContinue = computed(() => {
   return !isGenerating.value;
 });
 const promptSuggestions = computed(() => {
-  const answerCount = promptMessages.value.filter(message => message.role === 'user').length;
+  const answerCount = messages.value.filter(message => message.role === 'user').length;
   return getPromptSuggestions(answerCount, selectedStyleDetails.value?.name);
 });
 
@@ -82,73 +97,53 @@ function selectStyle(styleId: StyleId | null): void {
   selectedStyle.value = styleId;
   const style = CHARACTER_STYLES.find(option => option.id === styleId);
   promptDraft.value.overallStyleKeywords = style ? [style.name, ...style.tags].join('、') : '';
-  if (promptMessages.value.length) prompt.value = '';
+  prompt.value = '';
 }
 
-function createPromptMessage(role: CharacterPromptMessage['role'], content: string) {
-  promptMessageSequence += 1;
-  return { id: `prompt-message-${promptMessageSequence}`, role, content };
-}
-
-function preparePromptConversation(): void {
-  if (promptMessages.value.length) return;
-  promptMessages.value = [
-    createPromptMessage(
-      'assistant',
-      getPromptOpening(Boolean(sourceImageUrl.value), selectedStyleDetails.value?.name),
-    ),
-  ];
-}
-
-function compilePrompt(announce = true): void {
-  prompt.value = buildFinalPrompt({
+function agentBody() {
+  return {
     draft: promptDraft.value,
-    messages: promptMessages.value,
     hasReferenceImage: Boolean(sourceImageUrl.value),
-    stylePrompt: selectedStyleDetails.value?.stylePrompt,
-  });
-  hasGenerated.value = false;
-  isSaved.value = false;
-  if (announce) {
-    promptMessages.value = [
-      ...promptMessages.value,
-      createPromptMessage(
-        'assistant',
-        '我已经把目前确认的人物信息和风格设定合并成最终提示词。你可以直接进入下一步，也可以继续告诉我哪里需要调整。',
-      ),
-    ];
-  }
+    model: model.value,
+    stylePrompt: selectedStyleDetails.value?.stylePrompt || '',
+  };
 }
 
-function sendPromptAnswer(answer: string): void {
+async function sendPromptAnswer(answer: string): Promise<void> {
   const text = answer.trim();
   if (!text || isPromptAssistantResponding.value) return;
-
-  const hadCompiledPrompt = Boolean(prompt.value.trim());
-  promptMessages.value = [...promptMessages.value, createPromptMessage('user', text)];
-  const answerCount = promptMessages.value.filter(message => message.role === 'user').length;
-  promptDraft.value = extractPromptDraft(promptDraft.value, text, answerCount);
-  prompt.value = '';
-  isPromptAssistantResponding.value = true;
   hasGenerated.value = false;
   isSaved.value = false;
+  await sendMessage({ text }, { body: agentBody() });
+}
 
-  if (promptReplyTimer) clearTimeout(promptReplyTimer);
-  promptReplyTimer = setTimeout(() => {
-    if (answerCount >= 3) {
-      compilePrompt(false);
+async function compilePrompt(): Promise<void> {
+  if (isPromptAssistantResponding.value) return;
+  hasGenerated.value = false;
+  isSaved.value = false;
+  await sendMessage(
+    { text: '请根据目前已经确认的人物信息调用 finalizeCharacterPrompt，整理出最终生图提示词。' },
+    { body: agentBody() },
+  );
+}
+
+function syncAgentOutputs(): void {
+  for (const message of messages.value) {
+    for (const part of message.parts) {
+      if (part.type === 'tool-updateCharacterDraft' && part.state === 'output-available') {
+        promptDraft.value = { ...part.output.draft };
+      }
+      if (part.type === 'tool-finalizeCharacterPrompt' && part.state === 'output-available') {
+        promptDraft.value = { ...part.output.draft };
+        prompt.value = part.output.prompt;
+      }
     }
-    const reply = getPromptReply(answerCount, hadCompiledPrompt);
-    promptMessages.value = [...promptMessages.value, createPromptMessage('assistant', reply)];
-    isPromptAssistantResponding.value = false;
-    promptReplyTimer = null;
-  }, PROMPT_REPLY_DELAY_MS);
+  }
 }
 
 function goToStep(step: Step): void {
   if (step > furthestStep.value) return;
   currentStep.value = step;
-  if (step === 3) preparePromptConversation();
 }
 
 function validateStep(): boolean {
@@ -166,7 +161,6 @@ function nextStep(): void {
   }
   if (!validateStep()) return;
   const next = (currentStep.value + 1) as Step;
-  if (next === 3) preparePromptConversation();
   currentStep.value = next;
   furthestStep.value = Math.max(furthestStep.value, next) as Step;
 }
@@ -194,6 +188,39 @@ function resetSource(): void {
   sourceImageUrl.value = '';
   sourceImageName.value = '';
   sourceImageFile.value = null;
+}
+
+async function saveUploadedAsOfficial(): Promise<void> {
+  const file = sourceImageFile.value;
+  if (!file || isSaving.value) return;
+  isSaving.value = true;
+  try {
+    const result = await window.desktop.saveCharacterVisualAsset({
+      characterId:
+        isEditing.value && typeof route.query.characterId === 'string'
+          ? route.query.characterId
+          : undefined,
+      name: isEditing.value ? undefined : characterName.value,
+      fileData: file.fileData,
+      fileName: file.fileName,
+      mimeType: file.mimeType,
+    });
+    uploadedOfficialUrl.value = sourceImageUrl.value;
+    activeGeneration.value = null;
+    hasGenerated.value = true;
+    isSaved.value = true;
+    currentStep.value = 4;
+    furthestStep.value = 4;
+    await router.replace({
+      name: 'character-create',
+      query: { characterId: result.characterId, mode: 'edit' },
+    });
+    toast.success('已有图片已设为正式角色视觉');
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    isSaving.value = false;
+  }
 }
 
 async function generateImage(): Promise<void> {
@@ -270,6 +297,7 @@ async function saveImage(): Promise<void> {
 
 function startOver(): void {
   activeGeneration.value = null;
+  uploadedOfficialUrl.value = '';
   hasGenerated.value = false;
   isSaved.value = false;
   currentStep.value = 1;
@@ -283,9 +311,14 @@ watch([selectedStyle, sourceImageUrl, prompt], () => {
   }
 });
 
+watch(messages, syncAgentOutputs, { deep: true });
+watch(chatError, error => {
+  if (error) toast.error(error.message);
+});
+
 onBeforeUnmount(() => {
   if (generationTimer) clearTimeout(generationTimer);
-  if (promptReplyTimer) clearTimeout(promptReplyTimer);
+  void stop();
   revokeSourceImageUrl();
 });
 </script>
@@ -343,31 +376,36 @@ onBeforeUnmount(() => {
             />
             <CharacterSourceStep
               v-else-if="currentStep === 2"
+              :character-name="characterName"
+              :is-editing="isEditing"
               :source-image-name="sourceImageName"
               :source-image-url="sourceImageUrl"
               @remove-image="resetSource"
               @reference-selected="handleReferenceSelected"
+              @save-as-official="saveUploadedAsOfficial"
               @upload-success="handleUploadSuccess"
+              @update:character-name="characterName = $event"
             />
             <CharacterPromptStep
               v-else-if="currentStep === 3"
               :draft="promptDraft"
               :is-responding="isPromptAssistantResponding"
-              :messages="promptMessages"
+              :messages="messages"
               :model-value="prompt"
               :style-name="selectedStyleDetails?.name || '由访谈决定'"
               :suggestions="promptSuggestions"
-              @compile="compilePrompt()"
+              @compile="compilePrompt"
               @send="sendPromptAnswer"
               @update:model-value="prompt = $event"
             />
             <CharacterGenerationStep
               v-else
               :generation-count="generationCount"
-              :generated-image="activeGeneration?.image?.url || ''"
+              :generated-image="activeGeneration?.image?.url || uploadedOfficialUrl"
               :has-generated="hasGenerated"
               :is-generating="isGenerating"
               :is-saved="isSaved"
+              :is-uploaded-asset="Boolean(uploadedOfficialUrl)"
               :progress="activeGeneration?.progress || 0"
               :selected-style-name="selectedStyleDetails?.name || '访谈生成风格'"
             />
@@ -399,7 +437,7 @@ onBeforeUnmount(() => {
             重新开始
           </Button>
           <Button
-            v-if="currentStep === 4 && hasGenerated"
+            v-if="currentStep === 4 && hasGenerated && !uploadedOfficialUrl"
             variant="outline"
             class="min-w-32 justify-center gap-2"
             @click="nextStep"

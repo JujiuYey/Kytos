@@ -22,13 +22,19 @@ export type {
   SelectCharacterRequest,
 } from '../../shared/character-library';
 export type {
+  CharacterCreateAgentMessage,
+  CharacterCreateDraft,
+  CharacterCreateDraftUpdateResult,
+  CharacterCreatePromptResult,
   CharacterVisualGeneration,
   CharacterVisualReferenceImage,
   GenerateCharacterVisualRequest,
   GetCharacterVisualGenerationRequest,
+  SaveCharacterVisualAssetRequest,
   SaveCharacterVisualRequest,
   SaveCharacterVisualResult,
 } from '../../shared/character-create';
+export { CHARACTER_CREATE_AGENT_ENDPOINT } from '../../shared/character-create';
 export type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceKind,

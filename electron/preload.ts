@@ -51,6 +51,8 @@ const desktopApi: DesktopApi = {
   selectDirectory: () => ipcRenderer.invoke('dialog:select-directory'),
   saveFile: request => ipcRenderer.invoke('file:save', request),
   saveCharacterVisual: request => ipcRenderer.invoke('character-library:save-visual', request),
+  saveCharacterVisualAsset: request =>
+    ipcRenderer.invoke('character-library:save-visual-asset', request),
   saveIllustrationConversation: request =>
     ipcRenderer.invoke('illustration:save-conversation', request),
   saveStoryConversation: request => ipcRenderer.invoke('story:save-conversation', request),

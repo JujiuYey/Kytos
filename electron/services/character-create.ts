@@ -5,6 +5,7 @@ import type {
   CharacterVisualGeneration,
   GenerateCharacterVisualRequest,
   GetCharacterVisualGenerationRequest,
+  SaveCharacterVisualAssetRequest,
   SaveCharacterVisualRequest,
   SaveCharacterVisualResult,
 } from '../../shared/character-create';
@@ -335,4 +336,26 @@ export async function saveCharacterVisual(
     path.join(await getWorkspaceDirectory(), 'assets', ASSET_DIRECTORY, generation.image.fileName),
   ).catch(() => undefined);
   return result;
+}
+
+export async function saveCharacterVisualAsset(
+  request: SaveCharacterVisualAssetRequest,
+): Promise<SaveCharacterVisualResult> {
+  if (
+    !request ||
+    typeof request !== 'object' ||
+    !(request.fileData instanceof Uint8Array) ||
+    !request.fileName ||
+    !request.mimeType.startsWith('image/')
+  ) {
+    throw new Error('角色视觉资产无效');
+  }
+  const prepared = await prepareCharacterVisualSave(request.characterId, request.name);
+  try {
+    await saveOfficialCharacterVisual(prepared.characterId, request, 'uploaded');
+  } catch (error: unknown) {
+    if (prepared.created) await rollbackCharacterVisualSave(prepared.characterId);
+    throw error;
+  }
+  return { characterId: prepared.characterId, library: await getCharacterLibrary() };
 }

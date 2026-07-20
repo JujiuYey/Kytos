@@ -6,6 +6,7 @@ import type {
 import type {
   GenerateCharacterVisualRequest,
   GetCharacterVisualGenerationRequest,
+  SaveCharacterVisualAssetRequest,
   SaveCharacterVisualRequest,
 } from '../../shared/character-create';
 import {
@@ -17,6 +18,7 @@ import {
   generateCharacterVisual,
   getCharacterVisualGeneration,
   saveCharacterVisual,
+  saveCharacterVisualAsset,
 } from '../services/character-create';
 import type { TrustedSenderGuard } from './trusted-sender';
 
@@ -25,6 +27,13 @@ export function registerCharacterLibraryIpc(assertTrustedSender: TrustedSenderGu
     assertTrustedSender(event);
     return getCharacterLibrary();
   });
+  ipcMain.handle(
+    'character-library:save-visual-asset',
+    async (event, request: SaveCharacterVisualAssetRequest) => {
+      assertTrustedSender(event);
+      return saveCharacterVisualAsset(request);
+    },
+  );
   ipcMain.handle(
     'character-library:generate-visual',
     async (event, request: GenerateCharacterVisualRequest) => {

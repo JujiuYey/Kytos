@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { net, protocol } from 'electron';
+import { handleCharacterCreateAgentRequest } from './character-create-agent/route';
 import { handleIllustrationAgentRequest } from './illustration-agent/route';
 import { handleStoryAgentRequest } from './story-agent/route';
 import { getWorkspaceDirectory } from './services/workspace';
@@ -46,6 +47,10 @@ export function registerAppProtocol(): void {
 
     if (url.pathname === '/api/illustration-agent') {
       return handleIllustrationAgentRequest(request);
+    }
+
+    if (url.pathname === '/api/character-create-agent') {
+      return handleCharacterCreateAgentRequest(request);
     }
 
     if (url.pathname === '/api/story-agent') {
