@@ -13,6 +13,7 @@ import {
   type ImageReferencePickerFilter,
   type ImageReferencePickerOption,
 } from '@/components/sag/image-reference-picker-dialog';
+import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
@@ -75,6 +76,7 @@ const resolution = ref<CharacterPortraitResolution>('1k');
 const selectedCharacterReferences = ref<CharacterExpressionReferenceSelection[]>([]);
 const revisionTarget = ref<IllustrationVersion | null>(null);
 const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const pollingStates = ref<GenerationPollingStateMap>({});
 let disposed = false;
 
 const model = computed(() => appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL);
@@ -459,6 +461,11 @@ function schedulePoll(taskId: string): void {
   if (currentTimer) {
     clearTimeout(currentTimer);
   }
+  const previousState = pollingStates.value[taskId];
+  pollingStates.value = {
+    ...pollingStates.value,
+    [taskId]: { attempt: previousState?.attempt ?? 0, phase: 'waiting' },
+  };
   pollTimers.set(
     taskId,
     setTimeout(() => {
@@ -471,6 +478,11 @@ async function pollTask(taskId: string): Promise<void> {
   if (disposed) {
     return;
   }
+  const previousState = pollingStates.value[taskId];
+  pollingStates.value = {
+    ...pollingStates.value,
+    [taskId]: { attempt: (previousState?.attempt ?? 0) + 1, phase: 'requesting' },
+  };
   try {
     const version = await window.desktop.getIllustrationTask(taskId);
     replaceVersion(version);
@@ -480,6 +492,9 @@ async function pollTask(taskId: string): Promise<void> {
       return;
     }
     pollTimers.delete(taskId);
+    const nextPollingStates = { ...pollingStates.value };
+    delete nextPollingStates[taskId];
+    pollingStates.value = nextPollingStates;
     if (version.status === 'completed') {
       toast.success(`V${version.versionNumber} 已生成并保存到工作区`);
       mobilePane.value = 'workspace';
@@ -489,6 +504,10 @@ async function pollTask(taskId: string): Promise<void> {
   } catch (pollError: unknown) {
     generationError.value = pollError instanceof Error ? pollError.message : String(pollError);
     pollTimers.delete(taskId);
+    pollingStates.value = {
+      ...pollingStates.value,
+      [taskId]: { attempt: pollingStates.value[taskId]?.attempt ?? 1, phase: 'paused' },
+    };
   }
 }
 
@@ -632,6 +651,7 @@ onBeforeUnmount(() => {
     clearTimeout(timer);
   }
   pollTimers.clear();
+  pollingStates.value = {};
 });
 </script>
 
@@ -697,6 +717,7 @@ onBeforeUnmount(() => {
           :art-styles="artStyles"
           :busy="generationBusy"
           :prompt="prompt"
+          :polling-states="pollingStates"
           :character-references="characterReferencePreviews"
           :references-ready="referencesReady"
           :resolution="resolution"

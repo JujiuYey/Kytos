@@ -5,9 +5,12 @@ import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  GenerationPollingStatus,
+  type GenerationTaskPollingState,
+} from '@/components/sag/generation-polling-status';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
@@ -43,6 +46,7 @@ type GalleryEntry = GalleryImageEntry | GalleryTaskEntry;
 const props = defineProps<{
   deletingFileName: string;
   officialAssets: CharacterVisualAssetSelection[];
+  pollingState: GenerationTaskPollingState;
   portraitRecords: CharacterPortraitRecord[];
   selectingFileName: string;
   renamingFileName: string;
@@ -124,6 +128,13 @@ function isSelected(entry: GalleryEntry): boolean {
   );
 }
 
+function toggleOfficialStatus(entry: GalleryEntry): void {
+  if (entry.type !== 'image') {
+    return;
+  }
+  emit('official', entry.kind, entry.record, entry.image, !isSelected(entry));
+}
+
 function getStatusLabel(record: CharacterImageRecord): string {
   if (record.source === 'uploaded') {
     return '已上传';
@@ -202,13 +213,11 @@ function formatDate(value: string): string {
 
               <template v-if="isActive(entry.record)">
                 <p class="mt-4 text-sm">GPT-Image-2 正在绘制“{{ entry.record.name }}”</p>
-                <div
-                  class="mt-3 flex items-center justify-between gap-4 text-xs text-muted-foreground"
-                >
-                  <span>可以离开此页面，下次进入时会继续查询任务。</span>
-                  <span class="shrink-0 tabular-nums">{{ entry.record.progress }}%</span>
-                </div>
-                <Progress :model-value="entry.record.progress" class="mt-2" />
+                <GenerationPollingStatus
+                  class="mt-4"
+                  :attempt="pollingState.taskId === entry.record.id ? pollingState.attempt : 0"
+                  :phase="pollingState.taskId === entry.record.id ? pollingState.phase : 'waiting'"
+                />
               </template>
 
               <p v-else class="mt-4 text-sm text-destructive">
@@ -241,50 +250,52 @@ function formatDate(value: string): string {
             </ImageViewer>
 
             <div class="space-y-3 border-t px-3 py-3">
-              <div class="flex min-w-0 items-start justify-between gap-2">
-                <div class="min-w-0">
-                  <h2 class="truncate text-sm font-medium">{{ getImageName(entry) }}</h2>
-                  <p class="mt-1 truncate text-xs text-muted-foreground">
+              <div class="min-w-0 space-y-1">
+                <div class="flex min-w-0 items-start justify-between gap-2">
+                  <h2 class="min-w-0 truncate text-sm font-medium">{{ getImageName(entry) }}</h2>
+                  <SagStatusBadge v-if="isSelected(entry)" tone="success" class="shrink-0 gap-1">
+                    <Check class="size-3" />
+                    正式资产
+                  </SagStatusBadge>
+                  <Badge v-else variant="outline" class="shrink-0">
+                    {{ entry.record.source === 'uploaded' ? '上传' : '生成' }}
+                  </Badge>
+                </div>
+                <div
+                  class="flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground"
+                >
+                  <p class="min-w-0 truncate">
                     {{
                       entry.record.source === 'uploaded'
                         ? entry.record.originalName || '上传图片'
                         : `候选 ${entry.imageIndex + 1} · ${entry.record.size} · ${entry.record.resolution.toUpperCase()}`
                     }}
                   </p>
+                  <span class="flex shrink-0 items-center gap-1">
+                    <Clock3 class="size-3.5 shrink-0" />
+                    <span>{{ formatDate(entry.record.createdAt) }}</span>
+                  </span>
                 </div>
-                <SagStatusBadge v-if="isSelected(entry)" tone="success" class="shrink-0 gap-1">
-                  <Check class="size-3" />
-                  正式资产
-                </SagStatusBadge>
-                <Badge v-else variant="outline" class="shrink-0">
-                  {{ entry.record.source === 'uploaded' ? '上传' : '生成' }}
-                </Badge>
               </div>
 
               <div class="flex min-w-0 items-center justify-between gap-3">
-                <span class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                  <Clock3 class="size-3.5 shrink-0" />
-                  <span class="truncate">{{ formatDate(entry.record.createdAt) }}</span>
-                </span>
+                <Button
+                  size="sm"
+                  :variant="isSelected(entry) ? 'secondary' : 'outline'"
+                  :disabled="
+                    selectingFileName === entry.image.fileName || Boolean(deletingFileName)
+                  "
+                  @click="toggleOfficialStatus(entry)"
+                >
+                  {{
+                    selectingFileName === entry.image.fileName
+                      ? '保存中'
+                      : isSelected(entry)
+                        ? '移出正式资产'
+                        : '设为正式资产'
+                  }}
+                </Button>
                 <div class="flex shrink-0 items-center gap-1.5">
-                  <Button
-                    size="sm"
-                    :variant="isSelected(entry) ? 'ghost' : 'outline'"
-                    :disabled="
-                      selectingFileName === entry.image.fileName || Boolean(deletingFileName)
-                    "
-                    @click="
-                      emit('official', entry.kind, entry.record, entry.image, !isSelected(entry))
-                    "
-                  >
-                    {{
-                      selectingFileName === entry.image.fileName
-                        ? '保存中'
-                        : isSelected(entry)
-                          ? '移出正式资产'
-                          : '设为正式资产'
-                    }}
-                  </Button>
                   <TooltipProvider :delay-duration="300">
                     <Tooltip>
                       <TooltipTrigger as-child>

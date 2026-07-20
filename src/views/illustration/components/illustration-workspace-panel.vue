@@ -11,13 +11,11 @@ import {
   Trash2,
 } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
-import { Loader } from '@/components/ai-elements/loader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
@@ -29,6 +27,10 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  GenerationPollingStatus,
+  type GenerationPollingStateMap,
+} from '@/components/sag/generation-polling-status';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { ImageOutputSettings } from '@/components/sag/image-output-settings';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
@@ -53,6 +55,7 @@ const props = defineProps<{
   artStyles: ArtStyle[];
   busy: boolean;
   characterReferences: IllustrationCharacterReferencePreview[];
+  pollingStates: GenerationPollingStateMap;
   prompt: string;
   referencesReady: boolean;
   resolution: CharacterPortraitResolution;
@@ -343,15 +346,13 @@ function handleTitleChange(event: Event): void {
               </div>
 
               <div v-if="isActive(version)" class="p-4">
-                <div class="flex items-center gap-2 text-sm">
-                  <Loader />
-                  GPT-Image-2 正在绘制
-                </div>
-                <div class="mt-3 flex justify-between text-xs text-muted-foreground">
-                  <span>可以离开页面，稍后会继续查询</span>
-                  <span class="tabular-nums">{{ version.progress }}%</span>
-                </div>
-                <Progress :model-value="version.progress" class="mt-2" />
+                <p class="text-sm">GPT-Image-2 正在绘制</p>
+                <GenerationPollingStatus
+                  class="mt-3"
+                  compact
+                  :attempt="pollingStates[version.id]?.attempt ?? 0"
+                  :phase="pollingStates[version.id]?.phase ?? 'waiting'"
+                />
               </div>
 
               <div

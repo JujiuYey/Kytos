@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upload-dialog';
 import { CharacterPortraitWorkflow } from '@/components/sag/character-portrait-workflow';
+import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
 import type {
@@ -54,6 +55,7 @@ const errorMessage = ref('');
 const isInitializing = ref(true);
 const isSubmitting = ref(false);
 const isPolling = ref(false);
+const pollingState = ref<GenerationTaskPollingState>({ attempt: 0, phase: 'idle', taskId: '' });
 const selectingFileName = ref('');
 const renamingFileName = ref('');
 const deletingFileName = ref('');
@@ -165,8 +167,17 @@ function clearPollTimer() {
   }
 }
 
+function resetPollingState(): void {
+  pollingState.value = { attempt: 0, phase: 'idle', taskId: '' };
+}
+
 function schedulePoll(taskId: string) {
   clearPollTimer();
+  pollingState.value = {
+    attempt: pollingState.value.taskId === taskId ? pollingState.value.attempt : 0,
+    phase: 'waiting',
+    taskId,
+  };
   portraitPollTimer = setTimeout(() => {
     void pollPortraitTask(taskId);
   }, 2500);
@@ -177,6 +188,11 @@ async function pollPortraitTask(taskId: string) {
     return;
   }
   isPolling.value = true;
+  pollingState.value = {
+    attempt: pollingState.value.taskId === taskId ? pollingState.value.attempt + 1 : 1,
+    phase: 'requesting',
+    taskId,
+  };
   try {
     const record = await window.desktop.getCharacterPortraitTask(taskId);
     records.value = replaceRecord(records.value, record);
@@ -185,7 +201,7 @@ async function pollPortraitTask(taskId: string) {
       schedulePoll(taskId);
       return;
     }
-    isPolling.value = false;
+    resetPollingState();
     if (record.status === 'completed') {
       toast.success(`“${record.name}”已生成并保存到工作区`);
       mobilePane.value = 'gallery';
@@ -193,8 +209,10 @@ async function pollPortraitTask(taskId: string) {
       errorMessage.value = record.errorMessage || '角色视觉生成任务未完成';
     }
   } catch (pollError: unknown) {
-    isPolling.value = false;
+    pollingState.value = { ...pollingState.value, phase: 'paused' };
     errorMessage.value = pollError instanceof Error ? pollError.message : String(pollError);
+  } finally {
+    isPolling.value = false;
   }
 }
 
@@ -240,6 +258,7 @@ function applyCharacterWorkspace(
 async function loadCharacterWorkspace(characterId: string): Promise<void> {
   const requestId = ++loadRequestId;
   clearPollTimer();
+  resetPollingState();
   isPolling.value = false;
   isInitializing.value = true;
   errorMessage.value = '';
@@ -536,7 +555,7 @@ onBeforeUnmount(() => {
       />
     </template>
 
-    <Alert v-if="!isInitializing && !keyConfigured" class="mx-4 mt-3 shrink-0 sm:mx-5">
+    <Alert v-if="!isInitializing && !keyConfigured" class="mx-4 mt-3 w-auto shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
       <AlertTitle>生成图片需要 APIMart API Key</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
@@ -548,7 +567,7 @@ onBeforeUnmount(() => {
     <Alert
       v-if="workspaceMode === 'cards' && errorMessage"
       variant="destructive"
-      class="mx-4 mt-3 shrink-0 sm:mx-5"
+      class="mx-4 mt-3 w-auto shrink-0 sm:mx-5"
     >
       <AlertCircle class="size-4" />
       <AlertTitle>角色图片流程暂时中断</AlertTitle>
@@ -582,6 +601,7 @@ onBeforeUnmount(() => {
         <PortraitGallery
           :deleting-file-name="deletingFileName"
           :official-assets="officialAssets"
+          :polling-state="pollingState"
           :portrait-records="records"
           :renaming-file-name="renamingFileName"
           :selecting-file-name="selectingFileName"

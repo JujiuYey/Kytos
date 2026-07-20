@@ -5,6 +5,7 @@ import { AlertCircle } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { ImageReferencePickerDialog } from '@/components/sag/image-reference-picker-dialog';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
@@ -48,6 +49,7 @@ const errorMessage = ref('');
 const isInitializing = ref(true);
 const isSubmitting = ref(false);
 const isPolling = ref(false);
+const pollingState = ref<GenerationTaskPollingState>({ attempt: 0, phase: 'idle', taskId: '' });
 const deletingFileName = ref('');
 const renamingTaskId = ref('');
 const deleteDialogOpen = ref(false);
@@ -207,8 +209,17 @@ function clearPollTimer(): void {
   }
 }
 
+function resetPollingState(): void {
+  pollingState.value = { attempt: 0, phase: 'idle', taskId: '' };
+}
+
 function schedulePoll(taskId: string, characterId: string): void {
   clearPollTimer();
+  pollingState.value = {
+    attempt: pollingState.value.taskId === taskId ? pollingState.value.attempt : 0,
+    phase: 'waiting',
+    taskId,
+  };
   pollTimer = setTimeout(() => {
     void pollExpressionTask(taskId, characterId);
   }, 2500);
@@ -219,6 +230,11 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
     return;
   }
   isPolling.value = true;
+  pollingState.value = {
+    attempt: pollingState.value.taskId === taskId ? pollingState.value.attempt + 1 : 1,
+    phase: 'requesting',
+    taskId,
+  };
   try {
     const record = await window.desktop.getCharacterExpressionTask({ characterId, taskId });
     if (selectedCharacterId.value !== characterId) {
@@ -230,7 +246,7 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
       schedulePoll(taskId, characterId);
       return;
     }
-    isPolling.value = false;
+    resetPollingState();
     if (record.status === 'completed') {
       toast.success(`“${record.name}”表情已生成并保存到工作区`);
       mobilePane.value = 'gallery';
@@ -241,8 +257,10 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
     if (selectedCharacterId.value !== characterId) {
       return;
     }
-    isPolling.value = false;
+    pollingState.value = { ...pollingState.value, phase: 'paused' };
     errorMessage.value = pollError instanceof Error ? pollError.message : String(pollError);
+  } finally {
+    isPolling.value = false;
   }
 }
 
@@ -276,6 +294,7 @@ function applyCharacterWorkspace(
 async function loadCharacterWorkspace(characterId: string): Promise<void> {
   const requestId = ++loadRequestId;
   clearPollTimer();
+  resetPollingState();
   isPolling.value = false;
   isInitializing.value = true;
   errorMessage.value = '';
@@ -568,6 +587,7 @@ onBeforeUnmount(() => {
           :characters="characters"
           :character-selection-disabled="characterSelectionDisabled"
           :deleting-file-name="deletingFileName"
+          :polling-state="pollingState"
           :records="records"
           :renaming-task-id="renamingTaskId"
           :selected-character-id="selectedCharacterId"

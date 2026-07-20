@@ -6,6 +6,7 @@ import type { ChatStatus } from 'ai';
 import { useChat } from '@ai-sdk/vue';
 import { AlertCircle } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
+import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -60,6 +61,7 @@ const workspaceTab = ref<'story' | 'storyboard' | 'final'>('story');
 const submittingShotIds = ref<string[]>([]);
 const baseReferences = ref<Record<string, StoryVersionReference | null>>({});
 const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const pollingStates = ref<GenerationPollingStateMap>({});
 let disposed = false;
 
 const model = computed(() => appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL);
@@ -457,6 +459,11 @@ function schedulePoll(taskId: string): void {
   if (currentTimer) {
     clearTimeout(currentTimer);
   }
+  const previousState = pollingStates.value[taskId];
+  pollingStates.value = {
+    ...pollingStates.value,
+    [taskId]: { attempt: previousState?.attempt ?? 0, phase: 'waiting' },
+  };
   pollTimers.set(
     taskId,
     setTimeout(() => {
@@ -469,6 +476,11 @@ async function pollTask(taskId: string): Promise<void> {
   if (disposed) {
     return;
   }
+  const previousState = pollingStates.value[taskId];
+  pollingStates.value = {
+    ...pollingStates.value,
+    [taskId]: { attempt: (previousState?.attempt ?? 0) + 1, phase: 'requesting' },
+  };
   try {
     const version = await window.desktop.getStoryShotTask(taskId);
     const shot = replaceVersion(version);
@@ -478,6 +490,9 @@ async function pollTask(taskId: string): Promise<void> {
       return;
     }
     pollTimers.delete(taskId);
+    const nextPollingStates = { ...pollingStates.value };
+    delete nextPollingStates[taskId];
+    pollingStates.value = nextPollingStates;
     if (version.status === 'completed') {
       toast.success(`第 ${shot?.order ?? '-'} 镜 V${version.versionNumber} 已生成并设为正式画面`);
       workspaceTab.value = 'storyboard';
@@ -488,6 +503,10 @@ async function pollTask(taskId: string): Promise<void> {
   } catch (pollError: unknown) {
     operationError.value = pollError instanceof Error ? pollError.message : String(pollError);
     pollTimers.delete(taskId);
+    pollingStates.value = {
+      ...pollingStates.value,
+      [taskId]: { attempt: pollingStates.value[taskId]?.attempt ?? 1, phase: 'paused' },
+    };
   }
 }
 
@@ -660,6 +679,7 @@ onBeforeUnmount(() => {
     clearTimeout(timer);
   }
   pollTimers.clear();
+  pollingStates.value = {};
 });
 </script>
 
@@ -719,6 +739,7 @@ onBeforeUnmount(() => {
           :assets-ready="assetsReady"
           :busy="navigationBusy"
           :character-assets-ready="characterAssetsReady"
+          :polling-states="pollingStates"
           :story="activeStory"
           :submitting-shot-ids="submittingShotIds"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"

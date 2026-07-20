@@ -5,7 +5,6 @@ import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { Button } from '@/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
-import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
@@ -15,6 +14,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  GenerationPollingStatus,
+  type GenerationTaskPollingState,
+} from '@/components/sag/generation-polling-status';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
@@ -28,6 +31,7 @@ const props = defineProps<{
   characters: CharacterLibraryCharacter[];
   characterSelectionDisabled: boolean;
   deletingFileName: string;
+  pollingState: GenerationTaskPollingState;
   records: CharacterExpressionRecord[];
   renamingTaskId: string;
   selectedCharacterId: string;
@@ -137,11 +141,11 @@ function formatDate(value: string): string {
               </SagStatusBadge>
             </div>
             <p class="mt-4 text-sm">GPT-Image-2 正在绘制这个表情</p>
-            <div class="mt-3 flex items-center justify-between gap-4 text-xs text-muted-foreground">
-              <span>可以离开此页面，下次进入时会继续查询任务。</span>
-              <span class="shrink-0 tabular-nums">{{ record.progress }}%</span>
-            </div>
-            <Progress :model-value="record.progress" class="mt-2" />
+            <GenerationPollingStatus
+              class="mt-4"
+              :attempt="pollingState.taskId === record.id ? pollingState.attempt : 0"
+              :phase="pollingState.taskId === record.id ? pollingState.phase : 'waiting'"
+            />
           </article>
 
           <article

@@ -17,7 +17,10 @@ import {
   Trash2,
 } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
-import { Loader } from '@/components/ai-elements/loader';
+import {
+  GenerationPollingStatus,
+  type GenerationPollingStateMap,
+} from '@/components/sag/generation-polling-status';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { ImageOutputSettings } from '@/components/sag/image-output-settings';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
@@ -25,7 +28,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
@@ -53,6 +55,7 @@ const props = defineProps<{
   assetsReady: boolean;
   busy: boolean;
   characterAssetsReady: boolean;
+  pollingStates: GenerationPollingStateMap;
   story: StoryProject;
   submittingShotIds: string[];
   tab: 'story' | 'storyboard' | 'final';
@@ -492,13 +495,13 @@ function handleTitleChange(event: Event): void {
                     >
                       <div
                         v-if="isActive(version)"
-                        class="flex aspect-video flex-col items-center justify-center gap-2 bg-muted/30 px-3"
+                        class="flex aspect-video items-center bg-muted/30 px-3"
                       >
-                        <Loader />
-                        <span class="text-xs tabular-nums text-muted-foreground">
-                          {{ version.progress }}%
-                        </span>
-                        <Progress :model-value="version.progress" class="w-full" />
+                        <GenerationPollingStatus
+                          compact
+                          :attempt="pollingStates[version.id]?.attempt ?? 0"
+                          :phase="pollingStates[version.id]?.phase ?? 'waiting'"
+                        />
                       </div>
                       <div
                         v-else-if="version.status === 'failed' || version.status === 'cancelled'"
