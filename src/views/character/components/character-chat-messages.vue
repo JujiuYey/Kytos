@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ChatStatus } from 'ai';
-import { Bot, PencilLine } from '@lucide/vue';
+import { Bot, PencilLine, Upload } from '@lucide/vue';
 import {
   Conversation,
   ConversationContent,
@@ -22,6 +22,7 @@ defineProps<{
 
 const emit = defineEmits<{
   (event: 'suggest', text: string): void;
+  (event: 'upload-visual'): void;
 }>();
 
 const fieldLabels: Record<CharacterDraftField, string> = {
@@ -83,6 +84,10 @@ function getMessageAttachments(message: CharacterAgentMessage): AttachmentData[]
             :suggestion="suggestion"
             @click="emit('suggest', $event)"
           />
+          <Suggestion suggestion="已有确定的角色形象？直接上传" @click="emit('upload-visual')">
+            <Upload class="size-4" />
+            已有确定的角色形象？直接上传
+          </Suggestion>
         </Suggestions>
       </ConversationEmptyState>
 

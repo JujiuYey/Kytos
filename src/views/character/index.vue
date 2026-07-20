@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/app';
+import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upload-dialog';
 import { SagPage } from '@/components/sag/sag-page';
 import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
 import CharacterContextBar from '@/components/sag/character-context-bar.vue';
@@ -26,6 +27,8 @@ import type {
   CharacterVisualCard,
   CharacterVisualCardDraw,
   CredentialStatus,
+  SavedFileResult,
+  UploadCharacterVisualAssetRequest,
 } from '@/types';
 import {
   CHARACTER_AGENT_ENDPOINT,
@@ -50,6 +53,7 @@ const isInitializing = ref(true);
 const isDrawing = ref(false);
 const isVisualCardDialogOpen = ref(false);
 const isResetDialogOpen = ref(false);
+const uploadDialogOpen = ref(false);
 const workspaceOpen = ref(true);
 const mobilePane = ref<'chat' | 'draft'>('chat');
 const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -243,6 +247,14 @@ function openVisualCardDialog(): void {
   isVisualCardDialogOpen.value = true;
 }
 
+function uploadVisualAsset(request: UploadCharacterVisualAssetRequest): Promise<SavedFileResult> {
+  return window.desktop.uploadCharacterVisualAsset(request);
+}
+
+function handleVisualUploaded(): void {
+  toast.success('角色形象已保存到角色视觉');
+}
+
 async function generateVisualCards(options?: { guidance?: string }): Promise<void> {
   if (!canDrawVisual.value) {
     if (drawDisabledReason.value) {
@@ -382,7 +394,12 @@ onBeforeUnmount(() => {
         ]"
         aria-label="角色共创对话"
       >
-        <CharacterChatMessages :messages="messages" :status="chatStatus" @suggest="send" />
+        <CharacterChatMessages
+          :messages="messages"
+          :status="chatStatus"
+          @suggest="send"
+          @upload-visual="uploadDialogOpen = true"
+        />
         <CharacterChatInput
           :disabled="isInputDisabled"
           :draw-busy="isDrawing"
@@ -419,6 +436,14 @@ onBeforeUnmount(() => {
         />
       </aside>
     </div>
+
+    <CharacterAssetUploadDialog
+      v-model:open="uploadDialogOpen"
+      title="直接上传角色形象"
+      description="图片会保存到当前角色的角色视觉库，可在角色视觉中继续管理。"
+      :upload-handler="uploadVisualAsset"
+      @uploaded="handleVisualUploaded"
+    />
 
     <Dialog v-model:open="isResetDialogOpen">
       <DialogContent class="sm:max-w-md">
