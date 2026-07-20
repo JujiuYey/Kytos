@@ -6,24 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { CharacterLibraryState } from '@/types';
 
-type CharacterSection = 'art-style' | 'character' | 'character-portrait';
-
-const props = defineProps<{
-  activeSection: CharacterSection;
-}>();
-
 const router = useRouter();
 const library = ref<CharacterLibraryState | null>(null);
 
 const activeCharacter = computed(() =>
   library.value?.characters.find(character => character.id === library.value?.activeCharacterId),
 );
-const contextLabel = computed(() =>
-  props.activeSection === 'art-style' ? '工作区共享' : '当前角色',
-);
-const contextName = computed(() =>
-  props.activeSection === 'art-style' ? '全部角色与创作' : activeCharacter.value?.name,
-);
+const contextLabel = '当前角色';
+const contextName = computed(() => activeCharacter.value?.name);
 
 onMounted(async () => {
   try {

@@ -13,7 +13,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/app';
 import type {
-  ArtStyle,
   CharacterPortraitResolution,
   CharacterPortraitWorkspaceState,
   CredentialStatus,
@@ -44,7 +43,6 @@ const activeStoryId = ref('');
 const deepseekStatus = ref<CredentialStatus | null>(null);
 const apimartStatus = ref<CredentialStatus | null>(null);
 const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
-const artStyles = ref<ArtStyle[]>([]);
 const initializationError = ref('');
 const operationError = ref('');
 const isInitializing = ref(true);
@@ -73,10 +71,7 @@ const apimartConfigured = computed(() => Boolean(apimartStatus.value?.configured
 const characterAssetsReady = computed(() =>
   Boolean(portraitWorkspace.value?.officialAssets.length),
 );
-const styleReady = computed(() =>
-  artStyles.value.some(style => style.id === activeStory.value?.artStyleId),
-);
-const assetsReady = computed(() => characterAssetsReady.value && styleReady.value);
+const assetsReady = computed(() => characterAssetsReady.value);
 
 const transport = new DefaultChatTransport<StoryAgentMessage>({
   api: STORY_AGENT_ENDPOINT,
@@ -272,18 +267,16 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   initializationError.value = '';
   try {
-    const [workspace, deepseek, apimart, portraits, artStyleWorkspace] = await Promise.all([
+    const [workspace, deepseek, apimart, portraits] = await Promise.all([
       window.desktop.getStoryWorkspace(),
       window.desktop.getCredentialStatus('deepseek'),
       window.desktop.getCredentialStatus('apimart'),
       window.desktop.getCharacterPortraitWorkspace(),
-      window.desktop.getArtStyleWorkspace(),
     ]);
     stories.value = workspace.stories;
     deepseekStatus.value = deepseek;
     apimartStatus.value = apimart;
     portraitWorkspace.value = portraits;
-    artStyles.value = artStyleWorkspace.styles;
 
     const requestedStoryId =
       typeof route.query.storyId === 'string' ? route.query.storyId : undefined;
@@ -376,7 +369,6 @@ function selectStory(storyId: string): void {
 
 async function updateProject(
   patch: Partial<{
-    artStyleId: string;
     confirmStoryboard: boolean;
     keyShotId: string;
     resolution: CharacterPortraitResolution;
@@ -735,7 +727,6 @@ onBeforeUnmount(() => {
         <StoryWorkspacePanel
           v-model:tab="workspaceTab"
           :apimart-configured="apimartConfigured"
-          :art-styles="artStyles"
           :assets-ready="assetsReady"
           :busy="navigationBusy"
           :character-assets-ready="characterAssetsReady"
@@ -744,7 +735,6 @@ onBeforeUnmount(() => {
           :submitting-shot-ids="submittingShotIds"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @add-shot="openAddShot"
-          @update:art-style-id="updateProject({ artStyleId: $event })"
           @confirm-storyboard="updateProject({ confirmStoryboard: true })"
           @configure-service="router.push('/settings')"
           @delete-shot="deleteShotTarget = $event"
@@ -753,7 +743,6 @@ onBeforeUnmount(() => {
           @generate-remaining="generateRemaining"
           @generate-shot="submitShotGeneration"
           @manage-assets="manageAssets"
-          @manage-style="router.push('/art-style')"
           @move-shot="moveShot"
           @rename="updateProject({ title: $event })"
           @select-version="selectVersion"

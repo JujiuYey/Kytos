@@ -6,11 +6,6 @@ import type {
   GetCharacterVisualCardTaskRequest,
 } from './character-visual-card';
 import type {
-  ArtStyleWorkspaceState,
-  DeleteArtStyleRequest,
-  SaveArtStyleRequest,
-} from './art-style';
-import type {
   CharacterLibraryState,
   CharacterScopeRequest,
   CreateCharacterRequest,
@@ -53,7 +48,6 @@ import type {
   IllustrationVersion,
   IllustrationWorkspaceState,
   SaveIllustrationConversationRequest,
-  SelectIllustrationStyleReferenceRequest,
   UpdateIllustrationTopicRequest,
   UploadedIllustration,
   UploadIllustrationRequest,
@@ -109,7 +103,6 @@ export interface SavedFileResult {
 }
 
 export interface DesktopApi {
-  deleteArtStyle: (request: DeleteArtStyleRequest) => Promise<ArtStyleWorkspaceState>;
   createCharacter: (request: CreateCharacterRequest) => Promise<CharacterLibraryState>;
   createStory: (request: CreateStoryRequest) => Promise<StoryProject>;
   createStoryShot: (request: CreateStoryShotRequest) => Promise<StoryProject>;
@@ -155,7 +148,6 @@ export interface DesktopApi {
   getCharacterExpressionTask: (
     request: GetCharacterExpressionTaskRequest,
   ) => Promise<CharacterExpressionRecord>;
-  getArtStyleWorkspace: () => Promise<ArtStyleWorkspaceState>;
   getCharacterExpressionWorkspace: (
     request: GetCharacterExpressionWorkspaceRequest,
   ) => Promise<CharacterExpressionWorkspaceState>;
@@ -186,7 +178,6 @@ export interface DesktopApi {
   ) => Promise<CharacterPortraitWorkspaceState>;
   selectDirectory: () => Promise<string | null>;
   saveFile: (request: SaveFileRequest) => Promise<SavedFileResult>;
-  saveArtStyle: (request: SaveArtStyleRequest) => Promise<ArtStyleWorkspaceState>;
   saveIllustrationConversation: (
     request: SaveIllustrationConversationRequest,
   ) => Promise<IllustrationTopic>;
@@ -198,9 +189,6 @@ export interface DesktopApi {
   selectCharacterSheet: (
     request: SelectCharacterSheetRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
-  selectIllustrationStyleReference: (
-    request: SelectIllustrationStyleReferenceRequest,
-  ) => Promise<IllustrationWorkspaceState>;
   selectStoryShotVersion: (request: SelectStoryShotVersionRequest) => Promise<StoryProject>;
   setCredential: (request: SetCredentialRequest) => Promise<CredentialStatus>;
   setCharacterVisualAssetOfficial: (

@@ -19,10 +19,8 @@ import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {
   CharacterPortraitResolution,
-  ArtStyle,
   CharacterExpressionReferenceSelection,
   CharacterExpressionWorkspaceState,
-  CharacterPortraitImage,
   CharacterPortraitWorkspaceState,
   CharacterVisualAssetSelection,
   CredentialStatus,
@@ -60,7 +58,6 @@ const deepseekStatus = ref<CredentialStatus | null>(null);
 const apimartStatus = ref<CredentialStatus | null>(null);
 const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
 const expressionWorkspace = ref<CharacterExpressionWorkspaceState | null>(null);
-const artStyles = ref<ArtStyle[]>([]);
 const initializationError = ref('');
 const generationError = ref('');
 const isInitializing = ref(true);
@@ -82,9 +79,6 @@ let disposed = false;
 const model = computed(() => appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL);
 const activeTopic = computed(
   () => topics.value.find(topic => topic.id === activeTopicId.value) ?? null,
-);
-const selectedArtStyle = computed(() =>
-  artStyles.value.find(style => style.id === activeTopic.value?.artStyleId),
 );
 const deepseekConfigured = computed(() => Boolean(deepseekStatus.value?.configured));
 const apimartConfigured = computed(() => Boolean(apimartStatus.value?.configured));
@@ -144,12 +138,7 @@ const characterReferencePreviews = computed(() =>
   })),
 );
 const referencesReady = computed(() => selectedCharacterReferenceOptions.value.length > 0);
-const styleReferenceImage = computed<CharacterPortraitImage | null>(() => {
-  return selectedArtStyle.value?.referenceImage ?? null;
-});
-const maxCharacterReferenceCount = computed(() =>
-  Math.max(1, MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(Boolean(styleReferenceImage.value))),
-);
+const maxCharacterReferenceCount = computed(() => MAX_ILLUSTRATION_REFERENCE_IMAGES);
 
 function characterReferenceKey(selection: CharacterExpressionReferenceSelection): string {
   return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
@@ -327,7 +316,6 @@ async function initialize(): Promise<void> {
     });
     topics.value = workspace.topics;
     uploads.value = workspace.uploads;
-    artStyles.value = workspace.artStyles;
     deepseekStatus.value = deepseek;
     apimartStatus.value = apimart;
     portraitWorkspace.value = portraits;
@@ -430,20 +418,6 @@ async function updateUseCharacter(value: boolean): Promise<void> {
   }
 }
 
-async function updateArtStyle(styleId: string): Promise<void> {
-  const topic = activeTopic.value;
-  if (!topic || generationBusy.value || styleId === topic.artStyleId) {
-    return;
-  }
-  try {
-    replaceTopic(
-      await window.desktop.updateIllustrationTopic({ artStyleId: styleId, topicId: topic.id }),
-    );
-  } catch (updateError: unknown) {
-    toast.error(updateError instanceof Error ? updateError.message : String(updateError));
-  }
-}
-
 async function renameTopic(title: string): Promise<void> {
   const topic = activeTopic.value;
   if (!topic) {
@@ -528,9 +502,7 @@ async function generate(
   try {
     const maxReferences = Math.max(
       0,
-      MAX_ILLUSTRATION_REFERENCE_IMAGES -
-        Number(Boolean(styleReferenceImage.value)) -
-        Number(Boolean(options.baseVersion)),
+      MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(Boolean(options.baseVersion)),
     );
     const characterReferences = topic.useCharacter
       ? selectedCharacterReferences.value
@@ -713,8 +685,6 @@ onBeforeUnmount(() => {
       >
         <IllustrationWorkspacePanel
           :apimart-configured="apimartConfigured"
-          :art-style="selectedArtStyle ?? null"
-          :art-styles="artStyles"
           :busy="generationBusy"
           :prompt="prompt"
           :polling-states="pollingStates"
@@ -722,17 +692,14 @@ onBeforeUnmount(() => {
           :references-ready="referencesReady"
           :resolution="resolution"
           :size="size"
-          :style-reference="styleReferenceImage"
           :topic="activeTopic"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @delete-version="deleteVersionTarget = $event"
           @generate="generate"
-          @manage-style="router.push('/art-style')"
           @open-reference-picker="referenceDialogOpen = true"
           @rename="renameTopic"
           @revise="openRevisionDialog"
           @update:prompt="prompt = $event"
-          @update:art-style-id="updateArtStyle"
           @update:resolution="resolution = $event"
           @update:size="size = $event"
           @update:use-character="updateUseCharacter"

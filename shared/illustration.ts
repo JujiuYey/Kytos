@@ -5,7 +5,6 @@ import type {
   CharacterPortraitSelection,
   CharacterPortraitTaskStatus,
 } from './character-portrait';
-import type { ArtStyle } from './art-style';
 import type { CharacterExpressionReferenceSelection } from './character-expression';
 
 export const ILLUSTRATION_AGENT_ENDPOINT = 'app://bundle/api/illustration-agent';
@@ -48,22 +47,7 @@ export interface IllustrationVersionReference {
   versionId: string;
 }
 
-export type IllustrationStyleReference =
-  | {
-      fileName: string;
-      source: 'generated';
-      topicId: string;
-      versionId: string;
-    }
-  | {
-      fileName: string;
-      source: 'uploaded';
-      uploadId: string;
-    };
-
 export interface IllustrationVersion {
-  artStyleId: string | null;
-  artStyleName: string | null;
   baseVersion: IllustrationVersionReference | null;
   characterReferences: CharacterExpressionReferenceSelection[];
   createdAt: string;
@@ -74,7 +58,6 @@ export interface IllustrationVersion {
   prompt: string;
   referencePortrait: CharacterPortraitSelection | null;
   referenceSheet: CharacterPortraitSelection | null;
-  referenceStyle: IllustrationStyleReference | null;
   resolution: CharacterPortraitResolution;
   size: IllustrationSize;
   status: CharacterPortraitTaskStatus;
@@ -84,7 +67,6 @@ export interface IllustrationVersion {
 }
 
 export interface IllustrationTopic {
-  artStyleId: string | null;
   brief: IllustrationBrief;
   createdAt: string;
   id: string;
@@ -107,7 +89,6 @@ export interface UploadedIllustration {
 }
 
 export interface IllustrationWorkspaceState {
-  artStyles: ArtStyle[];
   topics: IllustrationTopic[];
   uploads: UploadedIllustration[];
 }
@@ -117,7 +98,6 @@ export interface CreateIllustrationTopicRequest {
 }
 
 export interface UpdateIllustrationTopicRequest {
-  artStyleId?: string | null;
   title?: string;
   topicId: string;
   useCharacter?: boolean;
@@ -150,10 +130,6 @@ export interface DeleteIllustrationVersionRequest {
 export interface DeleteIllustrationUploadRequest {
   uploadId: string;
 }
-
-export type SelectIllustrationStyleReferenceRequest = IllustrationStyleReference & {
-  name?: string;
-};
 
 export interface UploadIllustrationRequest {
   fileData: Uint8Array;

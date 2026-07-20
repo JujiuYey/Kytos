@@ -6,7 +6,6 @@ import {
   ImagePlus,
   Images,
   Laugh,
-  Palette,
   Sparkles,
   UsersRound,
 } from '@lucide/vue';
@@ -32,12 +31,6 @@ export const menuGroups: MenuGroup[] = [
         key: 'characters',
         icon: UsersRound,
         path: '/characters',
-      },
-      {
-        title: '画风管理',
-        key: 'art-style',
-        icon: Palette,
-        path: '/art-style',
       },
       {
         title: '角色视觉',

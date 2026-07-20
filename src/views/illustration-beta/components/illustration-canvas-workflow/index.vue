@@ -27,7 +27,6 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import type {
-  ArtStyle,
   CharacterImageRecord,
   CharacterPortraitImage,
   CharacterPortraitResolution,
@@ -55,8 +54,6 @@ const emit = defineEmits<{
 
 const nodes = shallowRef<WorkflowNode[]>([]);
 const edges = shallowRef<Edge[]>([]);
-const artStyles = ref<ArtStyle[]>([]);
-const selectedArtStyleId = ref('');
 const assetOptions = ref<WorkflowAssetOption[]>([]);
 const selectedNodeId = ref('generator');
 const credentialStatus = ref<CredentialStatus | null>(null);
@@ -105,7 +102,6 @@ const generateDisabled = computed(() => {
     isSubmitting.value ||
     ACTIVE_STATUSES.includes(generator.data.status) ||
     !keyConfigured.value ||
-    !selectedArtStyleId.value ||
     connectedAssetCount.value < 1 ||
     connectedAssetCount.value > MAX_CHARACTER_SHEET_REFERENCE_IMAGES ||
     !resultNode ||
@@ -172,9 +168,6 @@ function initializeGraph(
   options: WorkflowAssetOption[],
 ): void {
   const latestSheet = workspace.sheetRecords.find(record => record.source === 'generated');
-  selectedArtStyleId.value = artStyles.value.some(style => style.id === latestSheet?.artStyleId)
-    ? (latestSheet?.artStyleId ?? '')
-    : '';
   const assetNodes: WorkflowNode[] = options.slice(0, 1).map((option, index) => ({
     ariaLabel: `参考图：${option.label}`,
     data: {
@@ -194,7 +187,7 @@ function initializeGraph(
     kind: 'generator',
     label: '图片生成',
     name: latestSheet?.name || '角色表',
-    prompt: latestSheet?.artStyleId ? latestSheet.prompt : buildSheetPrompt(),
+    prompt: latestSheet?.prompt || buildSheetPrompt(),
     progress: latestSheet?.progress || 0,
     resolution: latestSheet?.resolution || '1k',
     status: toRunStatus(latestSheet?.status),
@@ -427,21 +420,6 @@ function updateGeneratorResolution(value: CharacterPortraitResolution): void {
   nodes.value = [...nodes.value];
 }
 
-function updateArtStyle(styleId: string): void {
-  if (
-    isSubmitting.value ||
-    styleId === selectedArtStyleId.value ||
-    !artStyles.value.some(style => style.id === styleId)
-  ) {
-    return;
-  }
-  selectedArtStyleId.value = styleId;
-}
-
-function applyArtStyleWorkspace(workspace: { styles: ArtStyle[] }): void {
-  artStyles.value = workspace.styles;
-}
-
 function updateGeneratorStatus(
   generatorId: string,
   update: Partial<Omit<WorkflowGeneratorNodeData, 'kind'>>,
@@ -557,7 +535,6 @@ async function generateFromNode(generatorId = 'generator'): Promise<void> {
   });
   try {
     const record = await window.desktop.generateCharacterSheet({
-      artStyleId: selectedArtStyleId.value,
       name: generator.data.name.trim(),
       prompt: generator.data.prompt.trim(),
       referenceAssets,
@@ -583,13 +560,11 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   try {
-    const [workspace, status, artStyleWorkspace] = await Promise.all([
+    const [workspace, status] = await Promise.all([
       window.desktop.getCharacterPortraitWorkspace(),
       window.desktop.getCredentialStatus('apimart'),
-      window.desktop.getArtStyleWorkspace(),
     ]);
     credentialStatus.value = status;
-    applyArtStyleWorkspace(artStyleWorkspace);
     assetOptions.value = createAssetOptions(workspace);
     initializeGraph(workspace, assetOptions.value);
   } catch (initializationError: unknown) {
@@ -739,15 +714,11 @@ onBeforeUnmount(() => {
                   <SheetDescription>当前工作流节点属性</SheetDescription>
                 </SheetHeader>
                 <WorkflowInspector
-                  :art-style-disabled="isSubmitting"
-                  :art-styles="artStyles"
                   :asset-options="assetOptions"
                   :generate-disabled="generateDisabled"
                   :node="selectedNode"
                   :reference-count="connectedAssetCount"
-                  :selected-art-style-id="selectedArtStyleId"
                   @generate="generateFromNode()"
-                  @update-art-style="updateArtStyle"
                   @update-asset="updateAsset"
                   @update-name="updateGeneratorName"
                   @update-prompt="updatePrompt"
@@ -761,16 +732,12 @@ onBeforeUnmount(() => {
 
       <div class="hidden min-h-0 min-w-0 p-3 md:flex md:p-4">
         <WorkflowInspector
-          :art-style-disabled="isSubmitting"
-          :art-styles="artStyles"
           :asset-options="assetOptions"
           :generate-disabled="generateDisabled"
           :node="selectedNode"
           :reference-count="connectedAssetCount"
-          :selected-art-style-id="selectedArtStyleId"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @generate="generateFromNode()"
-          @update-art-style="updateArtStyle"
           @update-asset="updateAsset"
           @update-name="updateGeneratorName"
           @update-prompt="updatePrompt"

@@ -9,7 +9,6 @@ import { getWorkspaceDirectory } from './services/workspace';
 const APP_SCHEME = 'app';
 const APP_HOST = 'bundle';
 const WORKSPACE_IMAGE_DIRECTORIES = [
-  'art-styles',
   'character-expressions',
   'character-portraits',
   'character-sheets',

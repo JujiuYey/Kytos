@@ -15,23 +15,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { ArtStyle, CharacterPortraitResolution } from '@/types';
+import type { CharacterPortraitResolution } from '@/types';
 import { MAX_CHARACTER_SHEET_REFERENCE_IMAGES } from '@/types';
 import type { WorkflowAssetOption, WorkflowNode } from '../workflow-types';
 
 defineProps<{
-  artStyleDisabled: boolean;
-  artStyles: ArtStyle[];
   assetOptions: WorkflowAssetOption[];
   generateDisabled: boolean;
   node: WorkflowNode | null;
   referenceCount: number;
-  selectedArtStyleId: string;
 }>();
 
 const emit = defineEmits<{
   (event: 'generate'): void;
-  (event: 'update-art-style', value: string): void;
   (event: 'update-asset', value: string): void;
   (event: 'update-name', value: string): void;
   (event: 'update-prompt', value: string): void;
@@ -93,23 +89,6 @@ const emit = defineEmits<{
           <Badge variant="secondary">
             {{ referenceCount }} / {{ MAX_CHARACTER_SHEET_REFERENCE_IMAGES }}
           </Badge>
-        </div>
-        <div class="space-y-2">
-          <Label for="workflow-art-style">画风</Label>
-          <Select
-            :model-value="selectedArtStyleId"
-            :disabled="artStyleDisabled"
-            @update:model-value="emit('update-art-style', String($event))"
-          >
-            <SelectTrigger id="workflow-art-style" class="w-full">
-              <SelectValue placeholder="选择画风" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="style in artStyles" :key="style.id" :value="style.id">
-                {{ style.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
         </div>
         <div class="space-y-2">
           <Label for="workflow-name">图片名称</Label>

@@ -5,7 +5,6 @@ import {
   Clock3,
   Image as ImageIcon,
   ImagePlus,
-  Palette,
   PencilLine,
   Search,
   Sparkles,
@@ -28,7 +27,6 @@ import { SagPage } from '@/components/sag/sag-page';
 import type {
   CharacterPortraitImage,
   IllustrationTopic,
-  IllustrationStyleReference,
   IllustrationWorkspaceState,
   SaveFileRequest,
   SavedFileResult,
@@ -45,7 +43,6 @@ interface IllustrationLibraryItem {
   id: string;
   image: CharacterPortraitImage;
   source: IllustrationLibrarySource;
-  styleReference: IllustrationStyleReference;
   title: string;
   topicId: string | null;
   uploadId: string | null;
@@ -54,7 +51,6 @@ interface IllustrationLibraryItem {
 
 const router = useRouter();
 const workspace = ref<IllustrationWorkspaceState>({
-  artStyles: [],
   topics: [],
   uploads: [],
 });
@@ -65,7 +61,6 @@ const loadingError = ref('');
 const uploadDialogOpen = ref(false);
 const deleteTarget = ref<IllustrationLibraryItem | null>(null);
 const deletingItemId = ref('');
-const selectingStyleItemId = ref('');
 
 const libraryItems = computed<IllustrationLibraryItem[]>(() => {
   const generatedItems = workspace.value.topics.flatMap(topic => getGeneratedItems(topic));
@@ -132,12 +127,6 @@ function getGeneratedItems(topic: IllustrationTopic): IllustrationLibraryItem[] 
           id: `generated:${topic.id}:${version.id}:${image.fileName}`,
           image,
           source: 'generated' as const,
-          styleReference: {
-            fileName: image.fileName,
-            source: 'generated' as const,
-            topicId: topic.id,
-            versionId: version.id,
-          },
           title: `${topic.title} V${version.versionNumber}`,
           topicId: topic.id,
           uploadId: null,
@@ -154,11 +143,6 @@ function getUploadedItem(upload: UploadedIllustration): IllustrationLibraryItem 
     id: `uploaded:${upload.id}`,
     image: { fileName: upload.fileName, mimeType: upload.mimeType, url: upload.url },
     source: 'uploaded',
-    styleReference: {
-      fileName: upload.fileName,
-      source: 'uploaded',
-      uploadId: upload.id,
-    },
     title: removeFileExtension(upload.originalName),
     topicId: null,
     uploadId: upload.id,
@@ -216,24 +200,6 @@ function uploadIllustration(request: SaveFileRequest): Promise<SavedFileResult> 
 async function handleUploaded(): Promise<void> {
   await loadWorkspace();
   toast.success('插画已保存到作品工作区');
-}
-
-async function selectStyleReference(item: IllustrationLibraryItem): Promise<void> {
-  if (selectingStyleItemId.value) {
-    return;
-  }
-  selectingStyleItemId.value = item.id;
-  try {
-    workspace.value = await window.desktop.selectIllustrationStyleReference({
-      ...item.styleReference,
-      name: item.title,
-    });
-    toast.success('已导入画风管理');
-  } catch (error: unknown) {
-    toast.error(error instanceof Error ? error.message : String(error));
-  } finally {
-    selectingStyleItemId.value = '';
-  }
 }
 
 function reviseIllustration(item: IllustrationLibraryItem): void {
@@ -413,15 +379,6 @@ onMounted(() => {
                 >
                   <PencilLine class="size-4" />
                   继续修改
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  :disabled="Boolean(selectingStyleItemId)"
-                  @click="selectStyleReference(item)"
-                >
-                  <Palette class="size-4" />
-                  {{ selectingStyleItemId === item.id ? '导入中' : '导入画风' }}
                 </Button>
                 <TooltipProvider :delay-duration="300">
                   <Tooltip>

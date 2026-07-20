@@ -5,7 +5,7 @@ import type {
   CharacterPortraitSelection,
   CharacterPortraitTaskStatus,
 } from './character-portrait';
-import type { IllustrationSize, IllustrationStyleReference } from './illustration';
+import type { IllustrationSize } from './illustration';
 
 export const STORY_AGENT_ENDPOINT = 'app://bundle/api/story-agent';
 export const STORY_SHOT_LIMITS = { max: 6, min: 3 } as const;
@@ -40,8 +40,6 @@ export interface StoryVersionReference {
 }
 
 export interface StoryShotVersion {
-  artStyleId: string | null;
-  artStyleName: string | null;
   baseVersion: StoryVersionReference | null;
   continuityVersion: StoryVersionReference | null;
   createdAt: string;
@@ -52,7 +50,6 @@ export interface StoryShotVersion {
   prompt: string;
   referencePortrait: CharacterPortraitSelection | null;
   referenceSheet: CharacterPortraitSelection | null;
-  referenceStyle: IllustrationStyleReference | null;
   resolution: CharacterPortraitResolution;
   size: IllustrationSize;
   status: CharacterPortraitTaskStatus;
@@ -69,7 +66,6 @@ export interface StoryShot extends StoryShotContent {
 }
 
 export interface StoryProject {
-  artStyleId: string | null;
   createdAt: string;
   draft: StoryDraft;
   id: string;
@@ -145,7 +141,6 @@ export interface SaveStoryConversationRequest {
 }
 
 export interface UpdateStoryRequest {
-  artStyleId?: string | null;
   confirmStoryboard?: boolean;
   keyShotId?: string;
   resolution?: CharacterPortraitResolution;

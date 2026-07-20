@@ -343,7 +343,7 @@ onBeforeUnmount(() => {
 <template>
   <SagPage>
     <template #before-header>
-      <CharacterContextBar active-section="character" />
+      <CharacterContextBar />
     </template>
 
     <template #header>

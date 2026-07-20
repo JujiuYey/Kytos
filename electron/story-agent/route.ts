@@ -2,7 +2,6 @@ import { createAgentUIStreamResponse } from 'ai';
 import { DEFAULT_DEEPSEEK_MODEL } from '../../shared/character';
 import { loadCharacterDraft } from '../services/character-workspace';
 import { getCredentialValue } from '../services/credentials';
-import { getArtStyle } from '../services/art-style';
 import { getStory } from '../services/story';
 import { createStoryAgent } from './agent';
 
@@ -72,14 +71,11 @@ export async function handleStoryAgentRequest(request: Request): Promise<Respons
       loadCharacterDraft(),
       getStory(body.storyId),
     ]);
-    const artStyle = story.artStyleId ? await getArtStyle(story.artStyleId) : null;
     const agent = createStoryAgent({
       apiKey,
       characterDraft,
       model: resolveModel(body.model),
       story,
-      styleName: artStyle?.name ?? null,
-      stylePrompt: artStyle?.prompt ?? null,
     });
     return await createAgentUIStreamResponse({
       agent,

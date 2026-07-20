@@ -11,7 +11,6 @@ import type { GenerationTaskPollingState } from '@/components/sag/generation-pol
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagPage } from '@/components/sag/sag-page';
 import type {
-  ArtStyle,
   CharacterDraft,
   CharacterImageRecord,
   CharacterLibraryState,
@@ -44,8 +43,6 @@ const credentialStatus = ref<CredentialStatus | null>(null);
 const records = ref<CharacterPortraitRecord[]>([]);
 const sheetRecords = ref<CharacterSheetRecord[]>([]);
 const officialAssets = ref<CharacterVisualAssetSelection[]>([]);
-const artStyles = ref<ArtStyle[]>([]);
-const selectedArtStyleId = ref('');
 const prompt = ref('');
 const imageName = ref('定妆照');
 const size = ref<CharacterPortraitSize>('2:3');
@@ -116,7 +113,6 @@ const isGenerateDisabled = computed(
     isBusy.value ||
     !selectedCharacterId.value ||
     !keyConfigured.value ||
-    !selectedArtStyleId.value ||
     !imageName.value.trim() ||
     imageName.value.length > 80 ||
     !prompt.value.trim() ||
@@ -240,11 +236,6 @@ function applyCharacterWorkspace(
   size.value = latestGeneratedRecord?.size ?? '2:3';
   resolution.value = latestGeneratedRecord?.resolution ?? '1k';
   count.value = latestGeneratedRecord?.count ?? 2;
-  selectedArtStyleId.value = artStyles.value.some(
-    style => style.id === latestGeneratedRecord?.artStyleId,
-  )
-    ? (latestGeneratedRecord?.artStyleId ?? '')
-    : '';
 
   const unfinishedRecord = portraitWorkspace.records.find(record =>
     activeStatuses.includes(record.status),
@@ -302,14 +293,12 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   try {
-    const [characterLibrary, status, artStyleWorkspace] = await Promise.all([
+    const [characterLibrary, status] = await Promise.all([
       window.desktop.getCharacterLibrary(),
       window.desktop.getCredentialStatus('apimart'),
-      window.desktop.getArtStyleWorkspace(),
     ]);
     library.value = characterLibrary;
     credentialStatus.value = status;
-    artStyles.value = artStyleWorkspace.styles;
     selectedCharacterId.value = characterLibrary.activeCharacterId;
     await loadCharacterWorkspace(characterLibrary.activeCharacterId);
   } catch (initializationError: unknown) {
@@ -351,7 +340,6 @@ async function generatePortraits() {
   errorMessage.value = '';
   try {
     const record = await window.desktop.generateCharacterPortrait({
-      artStyleId: selectedArtStyleId.value,
       count: count.value,
       name: imageName.value.trim(),
       prompt: prompt.value.trim(),
@@ -637,12 +625,9 @@ onBeforeUnmount(() => {
           :busy="isBusy"
           :disabled="isGenerateDisabled"
           :draft="draft"
-          :art-style-id="selectedArtStyleId"
-          :art-styles="artStyles"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeGenerator"
           @generate="generatePortraits"
-          @update:art-style-id="selectedArtStyleId = $event"
         />
       </div>
     </div>

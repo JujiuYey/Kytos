@@ -28,7 +28,6 @@ import {
   MAX_CHARACTER_SHEET_REFERENCE_IMAGES,
 } from '../../shared/character-portrait';
 import type { SaveFileRequest, SavedFileResult } from '../../shared/desktop';
-import { getArtStyle, readArtStyleReference } from './art-style';
 import { getActiveCharacterDirectory, getCharacterDirectory } from './character-library';
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
@@ -50,7 +49,7 @@ interface StoredPortraitWorkspace {
   selectedImage: CharacterPortraitSelection | null;
   selectedSheet: CharacterPortraitSelection | null;
   sheetRecords: CharacterSheetRecord[];
-  version: 2;
+  version: 3;
 }
 
 interface ApiTaskImage {
@@ -140,8 +139,6 @@ function parsePortraitRecord(value: unknown): CharacterPortraitRecord | null {
     : [];
 
   return {
-    artStyleId: typeof value.artStyleId === 'string' ? value.artStyleId : null,
-    artStyleName: typeof value.artStyleName === 'string' ? value.artStyleName : null,
     count: value.count,
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     errorMessage: typeof value.errorMessage === 'string' ? value.errorMessage : null,
@@ -192,8 +189,6 @@ function parseSheetRecord(value: unknown): CharacterSheetRecord | null {
   const legacyReferenceImage = parseSelection(value.referenceImage);
 
   return {
-    artStyleId: typeof value.artStyleId === 'string' ? value.artStyleId : null,
-    artStyleName: typeof value.artStyleName === 'string' ? value.artStyleName : null,
     count: 1,
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     errorMessage: typeof value.errorMessage === 'string' ? value.errorMessage : null,
@@ -312,7 +307,8 @@ async function getPortraitStorePath(characterId?: string): Promise<string> {
 }
 
 async function loadPortraitStore(characterId?: string): Promise<StoredPortraitWorkspace> {
-  const value = await readJsonFile(await getPortraitStorePath(characterId));
+  const storePath = await getPortraitStorePath(characterId);
+  const value = await readJsonFile(storePath);
   if (!isRecord(value)) {
     return {
       officialAssets: [],
@@ -320,7 +316,7 @@ async function loadPortraitStore(characterId?: string): Promise<StoredPortraitWo
       selectedImage: null,
       selectedSheet: null,
       sheetRecords: [],
-      version: 2,
+      version: 3,
     };
   }
 
@@ -341,7 +337,7 @@ async function loadPortraitStore(characterId?: string): Promise<StoredPortraitWo
     selectedImage: parseSelection(value.selectedImage),
     selectedSheet: parseSelection(value.selectedSheet),
     sheetRecords: sheetRecords.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
-    version: 2,
+    version: 3,
   };
   store.officialAssets = store.officialAssets.filter(asset => {
     const recordList = asset.kind === 'portrait' ? store.records : store.sheetRecords;
@@ -350,6 +346,9 @@ async function loadPortraitStore(characterId?: string): Promise<StoredPortraitWo
       ?.images.some(image => image.fileName === asset.fileName);
   });
   syncLegacySelections(store);
+  if (value.version !== 3) {
+    await writeJsonFile(storePath, store);
+  }
   return store;
 }
 
@@ -367,8 +366,7 @@ function validateGenerateRequest(request: GenerateCharacterPortraitRequest): voi
     request.name.length > MAX_NAME_LENGTH ||
     typeof request.prompt !== 'string' ||
     !request.prompt.trim() ||
-    request.prompt.length > MAX_PROMPT_LENGTH ||
-    typeof request.artStyleId !== 'string'
+    request.prompt.length > MAX_PROMPT_LENGTH
   ) {
     throw new Error('角色视觉名称或提示词无效');
   }
@@ -662,8 +660,6 @@ export async function uploadCharacterPortrait(request: SaveFileRequest): Promise
   const { image, result, uploadId } = await saveUploadedImage(request, PORTRAIT_ASSET_DIRECTORY);
   const now = new Date().toISOString();
   const record: CharacterPortraitRecord = {
-    artStyleId: null,
-    artStyleName: null,
     count: 1,
     createdAt: now,
     errorMessage: null,
@@ -698,8 +694,6 @@ export async function uploadCharacterSheet(request: SaveFileRequest): Promise<Sa
   const { image, result, uploadId } = await saveUploadedImage(request, SHEET_ASSET_DIRECTORY);
   const now = new Date().toISOString();
   const record: CharacterSheetRecord = {
-    artStyleId: null,
-    artStyleName: null,
     count: 1,
     createdAt: now,
     errorMessage: null,
@@ -741,8 +735,6 @@ export async function uploadCharacterVisualAsset(
   const { image, result, uploadId } = await saveUploadedImage(request, PORTRAIT_ASSET_DIRECTORY);
   const now = new Date().toISOString();
   const record: CharacterPortraitRecord = {
-    artStyleId: null,
-    artStyleName: null,
     count: 1,
     createdAt: now,
     errorMessage: null,
@@ -889,23 +881,14 @@ export async function generateCharacterPortrait(
   request: GenerateCharacterPortraitRequest,
 ): Promise<CharacterPortraitRecord> {
   validateGenerateRequest(request);
-  const artStyle = await getArtStyle(request.artStyleId);
-  if (!artStyle) {
-    throw new Error('请选择有效的画风');
-  }
-  const prompt = [request.prompt.trim(), `所选画风：${artStyle.name}`, artStyle.prompt].join('\n');
-  const styleReferenceData = await readArtStyleReference(artStyle);
   const apiKey = await getCredentialValue('apimart');
   const body: Record<string, unknown> = {
     model: 'gpt-image-2',
     n: request.count,
-    prompt,
+    prompt: request.prompt.trim(),
     resolution: request.resolution,
     size: request.size,
   };
-  if (styleReferenceData) {
-    body.image_urls = [styleReferenceData];
-  }
   const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
     body: JSON.stringify(body),
     headers: {
@@ -917,11 +900,9 @@ export async function generateCharacterPortrait(
 
   const now = new Date().toISOString();
   const record: CharacterPortraitRecord = {
-    artStyleId: artStyle.id,
-    artStyleName: artStyle.name,
     count: request.count,
     name: request.name.trim(),
-    prompt,
+    prompt: request.prompt.trim(),
     createdAt: now,
     errorMessage: null,
     id: getSubmittedTaskId(payload),
@@ -999,7 +980,6 @@ export async function generateCharacterSheet(
     typeof request.prompt !== 'string' ||
     !request.prompt.trim() ||
     request.prompt.length > MAX_PROMPT_LENGTH ||
-    typeof request.artStyleId !== 'string' ||
     !Array.isArray(request.referenceAssets) ||
     request.referenceAssets.length < 1 ||
     request.referenceAssets.length > MAX_CHARACTER_SHEET_REFERENCE_IMAGES ||
@@ -1037,25 +1017,13 @@ export async function generateCharacterSheet(
       return `data:${image.mimeType};base64,${referenceData.toString('base64')}`;
     }),
   );
-  const artStyle = await getArtStyle(request.artStyleId);
-  if (!artStyle) {
-    throw new Error('请选择有效的画风');
-  }
-  const prompt = [request.prompt.trim(), `所选画风：${artStyle.name}`, artStyle.prompt].join('\n');
-  if (referenceImageUrls.length < MAX_CHARACTER_SHEET_REFERENCE_IMAGES) {
-    const styleReferenceData = await readArtStyleReference(artStyle);
-    if (styleReferenceData) {
-      referenceImageUrls.push(styleReferenceData);
-    }
-  }
-
   const apiKey = await getCredentialValue('apimart');
   const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
     body: JSON.stringify({
       image_urls: referenceImageUrls,
       model: 'gpt-image-2',
       n: 1,
-      prompt,
+      prompt: request.prompt.trim(),
       resolution: request.resolution,
       size: CHARACTER_SHEET_SIZE,
     }),
@@ -1068,8 +1036,6 @@ export async function generateCharacterSheet(
 
   const now = new Date().toISOString();
   const record: CharacterSheetRecord = {
-    artStyleId: artStyle.id,
-    artStyleName: artStyle.name,
     count: 1,
     createdAt: now,
     errorMessage: null,

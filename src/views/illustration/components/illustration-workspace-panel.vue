@@ -5,7 +5,6 @@ import {
   ImagePlus,
   Images,
   Image as ImageIcon,
-  Palette,
   PencilLine,
   Sparkles,
   Trash2,
@@ -17,13 +16,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -37,7 +29,6 @@ import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
   CharacterPortraitResolution,
   CharacterPortraitImage,
-  ArtStyle,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,
@@ -51,8 +42,6 @@ interface IllustrationCharacterReferencePreview {
 
 const props = defineProps<{
   apimartConfigured: boolean;
-  artStyle: ArtStyle | null;
-  artStyles: ArtStyle[];
   busy: boolean;
   characterReferences: IllustrationCharacterReferencePreview[];
   pollingStates: GenerationPollingStateMap;
@@ -60,29 +49,23 @@ const props = defineProps<{
   referencesReady: boolean;
   resolution: CharacterPortraitResolution;
   size: IllustrationSize;
-  styleReference: CharacterPortraitImage | null;
   topic: IllustrationTopic;
 }>();
 
 const emit = defineEmits<{
   (event: 'delete-version', version: IllustrationVersion): void;
   (event: 'generate'): void;
-  (event: 'manage-style'): void;
   (event: 'open-reference-picker'): void;
   (event: 'rename', title: string): void;
   (event: 'revise', version: IllustrationVersion): void;
   (event: 'update:prompt', value: string): void;
-  (event: 'update:artStyleId', value: string): void;
   (event: 'update:resolution', value: CharacterPortraitResolution): void;
   (event: 'update:size', value: IllustrationSize): void;
   (event: 'update:useCharacter', value: boolean): void;
 }>();
 
 const promptOpen = ref(false);
-const referenceAssets = computed(() => [
-  ...(props.topic.useCharacter ? props.characterReferences : []),
-  ...(props.artStyle ? [{ image: props.styleReference, label: props.artStyle.name }] : []),
-]);
+const referenceAssets = computed(() => (props.topic.useCharacter ? props.characterReferences : []));
 const activeStatuses = ['submitted', 'pending', 'processing'];
 const planFields = computed(() => [
   { label: '主体', value: props.topic.brief.subject },
@@ -99,7 +82,6 @@ const generateDisabled = computed(
     !props.topic.ready ||
     !props.prompt.trim() ||
     !props.apimartConfigured ||
-    !props.artStyle ||
     (props.topic.useCharacter && !props.referencesReady),
 );
 
@@ -150,24 +132,6 @@ function handleTitleChange(event: Event): void {
             />
           </div>
 
-          <div class="space-y-2">
-            <Label for="illustration-art-style">画风</Label>
-            <Select
-              :model-value="topic.artStyleId ?? undefined"
-              :disabled="busy"
-              @update:model-value="emit('update:artStyleId', String($event))"
-            >
-              <SelectTrigger id="illustration-art-style" class="w-full">
-                <SelectValue placeholder="选择画风" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="style in artStyles" :key="style.id" :value="style.id">
-                  {{ style.name }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           <div
             class="flex items-center justify-between gap-4 rounded-md border px-3 py-3 md:hidden"
           >
@@ -189,8 +153,8 @@ function handleTitleChange(event: Event): void {
         <section aria-labelledby="illustration-references-heading">
           <div class="mb-3 flex items-center justify-between gap-3">
             <h3 id="illustration-references-heading" class="text-sm font-medium">正式参考</h3>
-            <SagStatusBadge :tone="artStyle ? 'success' : 'info'">
-              {{ artStyle?.name || '未选择画风' }}
+            <SagStatusBadge :tone="topic.useCharacter && referencesReady ? 'success' : 'info'">
+              {{ topic.useCharacter ? `${characterReferences.length} 张角色参考` : '不使用角色' }}
             </SagStatusBadge>
           </div>
           <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -227,7 +191,7 @@ function handleTitleChange(event: Event): void {
               <p class="truncate border-t px-2 py-1.5 text-center text-xs">{{ asset.label }}</p>
             </div>
           </div>
-          <div :class="['mt-3 grid gap-2', topic.useCharacter && 'sm:grid-cols-2']">
+          <div v-if="topic.useCharacter" class="mt-3">
             <Button
               v-if="topic.useCharacter"
               variant="outline"
@@ -237,16 +201,12 @@ function handleTitleChange(event: Event): void {
               <Images class="size-4" />
               {{ characterReferences.length ? '更换角色参考' : '选择角色参考' }}
             </Button>
-            <Button variant="outline" size="sm" @click="emit('manage-style')">
-              <Palette class="size-4" />
-              管理画风
-            </Button>
           </div>
           <p class="mt-2 text-xs leading-5 text-muted-foreground">
             {{
               topic.useCharacter
-                ? '生成时使用已选角色参考和这张卡片选择的画风；已有版本可单独继续修改。'
-                : '生成时使用这张卡片选择的画风；已有版本可单独继续修改。'
+                ? '生成时使用已选角色参考；已有版本可单独继续修改。'
+                : '生成时不附加角色参考；已有版本可单独继续修改。'
             }}
           </p>
         </section>
@@ -321,9 +281,6 @@ function handleTitleChange(event: Event): void {
                       topic.versions.find(item => item.id === version.baseVersion?.versionId)
                         ?.versionNumber
                     }}
-                  </span>
-                  <span v-if="version.artStyleName" class="truncate text-muted-foreground">
-                    {{ version.artStyleName }}
                   </span>
                 </div>
                 <SagStatusBadge

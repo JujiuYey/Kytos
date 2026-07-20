@@ -78,16 +78,10 @@ export function createStoryAgent(options: {
   characterDraft: CharacterDraft;
   model: string;
   story: StoryProject;
-  styleName: string | null;
-  stylePrompt: string | null;
 }) {
   const deepSeek = createDeepSeekCompatibleProvider(options.apiKey);
   let currentDraft = options.story.draft;
   let currentShots = options.story.shots;
-  const artStyleContext =
-    options.styleName && options.stylePrompt
-      ? `已选择画风：${options.styleName}\n画风约束：\n${options.stylePrompt}`
-      : '这个故事尚未选择画风。不要自行指定画风，用户会在故事工作区中选择。';
 
   async function saveDraft(patch: Partial<StoryDraft> & { title?: string }, ready: boolean) {
     const result = await updateStoryDraft(options.story.id, patch, ready);
@@ -114,8 +108,6 @@ export function createStoryAgent(options: {
 
 当前角色档案：
 ${JSON.stringify(options.characterDraft, null, 2)}
-
-${artStyleContext}
 
 当前故事草稿：
 ${JSON.stringify(currentDraft, null, 2)}

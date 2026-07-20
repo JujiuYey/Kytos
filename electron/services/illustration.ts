@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { ArtStyle } from '../../shared/art-style';
 import type { CharacterExpressionReferenceSelection } from '../../shared/character-expression';
 import type { IllustrationAgentMessage } from '../../shared/illustration';
 import type {
@@ -13,13 +12,11 @@ import type {
   IllustrationBrief,
   IllustrationBriefUpdateResult,
   IllustrationSize,
-  IllustrationStyleReference,
   IllustrationTopic,
   IllustrationVersion,
   IllustrationVersionReference,
   IllustrationWorkspaceState,
   SaveIllustrationConversationRequest,
-  SelectIllustrationStyleReferenceRequest,
   UpdateIllustrationTopicRequest,
   UploadedIllustration,
   UploadIllustrationRequest,
@@ -36,7 +33,6 @@ import type {
   CharacterPortraitTaskStatus,
 } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
-import { getArtStyleWorkspace, importArtStyleReference, readArtStyleReference } from './art-style';
 import { getCharacterExpressionWorkspace } from './character-expression';
 import { getCharacterLibrary } from './character-library';
 import {
@@ -71,7 +67,7 @@ const BRIEF_FIELDS: (keyof IllustrationBrief)[] = [
 interface StoredIllustrationWorkspace {
   topics: IllustrationTopic[];
   uploads: UploadedIllustration[];
-  version: 3;
+  version: 4;
 }
 
 interface ApiTaskImage {
@@ -179,38 +175,6 @@ function parseVersionReference(value: unknown): IllustrationVersionReference | n
   return { fileName: value.fileName, versionId: value.versionId };
 }
 
-function parseStyleReference(value: unknown): IllustrationStyleReference | null {
-  if (
-    !isRecord(value) ||
-    typeof value.fileName !== 'string' ||
-    path.basename(value.fileName) !== value.fileName
-  ) {
-    return null;
-  }
-  if (
-    value.source === 'generated' &&
-    typeof value.topicId === 'string' &&
-    ID_PATTERN.test(value.topicId) &&
-    typeof value.versionId === 'string' &&
-    ID_PATTERN.test(value.versionId)
-  ) {
-    return {
-      fileName: value.fileName,
-      source: 'generated',
-      topicId: value.topicId,
-      versionId: value.versionId,
-    };
-  }
-  if (
-    value.source === 'uploaded' &&
-    typeof value.uploadId === 'string' &&
-    ID_PATTERN.test(value.uploadId)
-  ) {
-    return { fileName: value.fileName, source: 'uploaded', uploadId: value.uploadId };
-  }
-  return null;
-}
-
 function getAssetUrl(fileName: string): string {
   return `app://bundle/workspace-assets/${ASSET_DIRECTORY}/${encodeURIComponent(fileName)}`;
 }
@@ -275,8 +239,6 @@ function parseVersion(value: unknown): IllustrationVersion | null {
     return null;
   }
   return {
-    artStyleId: typeof value.artStyleId === 'string' ? value.artStyleId : null,
-    artStyleName: typeof value.artStyleName === 'string' ? value.artStyleName : null,
     baseVersion: parseVersionReference(value.baseVersion),
     characterReferences: Array.isArray(value.characterReferences)
       ? value.characterReferences
@@ -298,7 +260,6 @@ function parseVersion(value: unknown): IllustrationVersion | null {
     prompt: value.prompt,
     referencePortrait: parseSelection(value.referencePortrait),
     referenceSheet: parseSelection(value.referenceSheet),
-    referenceStyle: parseStyleReference(value.referenceStyle),
     resolution: value.resolution,
     size: value.size,
     status: value.status,
@@ -326,8 +287,6 @@ function parseTopic(value: unknown): IllustrationTopic | null {
         .sort((left, right) => right.versionNumber - left.versionNumber)
     : [];
   return {
-    artStyleId:
-      typeof value.artStyleId === 'string' ? value.artStyleId : (versions[0]?.artStyleId ?? null),
     brief: parseBrief(value.brief),
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     id: value.id,
@@ -348,7 +307,7 @@ async function loadStore(): Promise<StoredIllustrationWorkspace> {
   const storePath = await getStorePath();
   const value = await readJsonFile(storePath);
   if (!isRecord(value)) {
-    return { topics: [], uploads: [], version: 3 };
+    return { topics: [], uploads: [], version: 4 };
   }
   const topics = Array.isArray(value.topics)
     ? value.topics
@@ -362,24 +321,8 @@ async function loadStore(): Promise<StoredIllustrationWorkspace> {
         .filter((upload): upload is UploadedIllustration => Boolean(upload))
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     : [];
-  const store: StoredIllustrationWorkspace = { topics, uploads, version: 3 };
-  if (value.version !== 3 || 'selectedStyleReference' in value) {
-    const legacyStyleReference = parseStyleReference(value.selectedStyleReference);
-    const legacyImage = legacyStyleReference
-      ? resolveStyleReferenceImage(topics, uploads, legacyStyleReference)
-      : null;
-    if (legacyImage) {
-      await importArtStyleReference({
-        image: legacyImage,
-        name: '原正式画风',
-        sourcePath: path.join(
-          await getWorkspaceDirectory(),
-          'assets',
-          ASSET_DIRECTORY,
-          legacyImage.fileName,
-        ),
-      });
-    }
+  const store: StoredIllustrationWorkspace = { topics, uploads, version: 4 };
+  if (value.version !== 4 || 'selectedStyleReference' in value) {
     await writeJsonFile(storePath, store);
   }
   return store;
@@ -401,25 +344,6 @@ function replaceTopic(
   };
 }
 
-function resolveStyleReferenceImage(
-  topics: IllustrationTopic[],
-  uploads: UploadedIllustration[],
-  reference: IllustrationStyleReference,
-): CharacterPortraitImage | null {
-  if (reference.source === 'uploaded') {
-    const upload = uploads.find(
-      item => item.id === reference.uploadId && item.fileName === reference.fileName,
-    );
-    return upload
-      ? { fileName: upload.fileName, mimeType: upload.mimeType, url: upload.url }
-      : null;
-  }
-  const version = topics
-    .find(topic => topic.id === reference.topicId)
-    ?.versions.find(item => item.id === reference.versionId && item.status === 'completed');
-  return version?.images.find(image => image.fileName === reference.fileName) ?? null;
-}
-
 function requireTopic(store: StoredIllustrationWorkspace, topicId: string): IllustrationTopic {
   if (!ID_PATTERN.test(topicId)) {
     throw new Error('插画主题编号无效');
@@ -433,36 +357,7 @@ function requireTopic(store: StoredIllustrationWorkspace, topicId: string): Illu
 
 export async function getIllustrationWorkspace(): Promise<IllustrationWorkspaceState> {
   const store = await loadStore();
-  const artStyleWorkspace = await getArtStyleWorkspace();
   return {
-    artStyles: artStyleWorkspace.styles,
-    topics: store.topics,
-    uploads: store.uploads,
-  };
-}
-
-export async function selectIllustrationStyleReference(
-  request: SelectIllustrationStyleReferenceRequest,
-): Promise<IllustrationWorkspaceState> {
-  const reference = parseStyleReference(request);
-  if (!reference) {
-    throw new Error('画风参考选择无效');
-  }
-  const store = await loadStore();
-  const image = resolveStyleReferenceImage(store.topics, store.uploads, reference);
-  if (!image) {
-    throw new Error('未找到这张画风参考图');
-  }
-  const imported = await importArtStyleReference({
-    image,
-    name:
-      typeof request.name === 'string' && request.name.trim()
-        ? request.name.trim().slice(0, MAX_TITLE_LENGTH)
-        : image.name || '插画画风',
-    sourcePath: path.join(await getWorkspaceDirectory(), 'assets', ASSET_DIRECTORY, image.fileName),
-  });
-  return {
-    artStyles: imported.styles,
     topics: store.topics,
     uploads: store.uploads,
   };
@@ -480,7 +375,6 @@ export async function createIllustrationTopic(
   }
   const now = new Date().toISOString();
   const topic: IllustrationTopic = {
-    artStyleId: null,
     brief: createEmptyIllustrationBrief(),
     createdAt: now,
     id: `illustration_${randomUUID()}`,
@@ -512,24 +406,10 @@ export async function updateIllustrationTopic(
   if (request.useCharacter !== undefined && typeof request.useCharacter !== 'boolean') {
     throw new Error('角色参考设置无效');
   }
-  if (
-    request.artStyleId !== undefined &&
-    request.artStyleId !== null &&
-    (typeof request.artStyleId !== 'string' || !ID_PATTERN.test(request.artStyleId))
-  ) {
-    throw new Error('画风选择无效');
-  }
   const store = await loadStore();
   const topic = requireTopic(store, request.topicId);
-  if (request.artStyleId) {
-    const artStyleWorkspace = await getArtStyleWorkspace();
-    if (!artStyleWorkspace.styles.some(style => style.id === request.artStyleId)) {
-      throw new Error('未找到选择的画风');
-    }
-  }
   const updatedTopic: IllustrationTopic = {
     ...topic,
-    artStyleId: request.artStyleId === undefined ? topic.artStyleId : request.artStyleId,
     title: request.title?.trim() ?? topic.title,
     updatedAt: new Date().toISOString(),
     useCharacter: request.useCharacter ?? topic.useCharacter,
@@ -757,12 +637,7 @@ async function readReferenceImage(
   return `data:${image.mimeType};base64,${imageData.toString('base64')}`;
 }
 
-function buildPrompt(
-  prompt: string,
-  useCharacter: boolean,
-  artStyle: ArtStyle,
-  revisionPrompt: string,
-): string {
+function buildPrompt(prompt: string, useCharacter: boolean, revisionPrompt: string): string {
   const lines: string[] = [];
   if (useCharacter) {
     lines.push(
@@ -779,15 +654,11 @@ function buildPrompt(
       `本次修改要求：${revisionPrompt}`,
     );
   }
-  if (artStyle.referenceImage) {
-    lines.push('所选画风参考图只用于确认视觉语言，不要复制其中的具体人物动作、道具、环境或构图。');
-  }
-  lines.push(`所选画风：${artStyle.name}`, artStyle.prompt);
   if (!revisionPrompt) {
     lines.push('旧插画参考图只用于延续其构图、环境或情境。');
   }
   lines.push(
-    '如果旧插画与正式角色资产或所选画风冲突，以正式角色资产和所选画风为准。',
+    '如果旧插画与正式角色资产冲突，以正式角色资产为准。',
     '除少量风格化手写批注外，不要添加标题、大段文字、边框、Logo、水印、多格排版、重复人物或重复肢体。',
   );
   return lines.join('\n');
@@ -831,13 +702,6 @@ export async function generateIllustration(
   let characterReferences: CharacterExpressionReferenceSelection[] = [];
   let referencePortrait: CharacterPortraitSelection | null = null;
   let referenceSheet: CharacterPortraitSelection | null = null;
-  const artStyleWorkspace = await getArtStyleWorkspace();
-  const artStyle = topic.artStyleId
-    ? artStyleWorkspace.styles.find(style => style.id === topic.artStyleId)
-    : null;
-  if (!artStyle) {
-    throw new Error('请先为这张创作卡片选择画风');
-  }
   if (topic.useCharacter) {
     const characterLibrary = await getCharacterLibrary();
     const [portraitWorkspace, expressionWorkspace] = await Promise.all([
@@ -891,11 +755,6 @@ export async function generateIllustration(
     );
   }
 
-  const styleReferenceData = await readArtStyleReference(artStyle);
-  if (styleReferenceData) {
-    referenceImages.push(styleReferenceData);
-  }
-
   let baseVersion: IllustrationVersionReference | null = null;
   if (request.baseVersion) {
     const version = topic.versions.find(item => item.id === request.baseVersion?.versionId);
@@ -914,7 +773,6 @@ export async function generateIllustration(
   const prompt = buildPrompt(
     request.prompt,
     topic.useCharacter,
-    artStyle,
     request.revisionPrompt?.trim() ?? '',
   );
   const apiKey = await getCredentialValue('apimart');
@@ -939,8 +797,6 @@ export async function generateIllustration(
 
   const now = new Date().toISOString();
   const version: IllustrationVersion = {
-    artStyleId: artStyle.id,
-    artStyleName: artStyle.name,
     baseVersion,
     characterReferences,
     createdAt: now,
@@ -951,7 +807,6 @@ export async function generateIllustration(
     prompt,
     referencePortrait: referencePortrait ? { ...referencePortrait } : null,
     referenceSheet: referenceSheet ? { ...referenceSheet } : null,
-    referenceStyle: null,
     resolution: request.resolution,
     size: request.size,
     status: 'submitted',
@@ -1117,7 +972,6 @@ export async function deleteIllustrationUpload(
     }
   }
   return {
-    artStyles: (await getArtStyleWorkspace()).styles,
     topics: nextStore.topics,
     uploads: nextStore.uploads,
   };
@@ -1147,7 +1001,6 @@ export async function deleteIllustrationTopic(
     ),
   );
   return {
-    artStyles: (await getArtStyleWorkspace()).styles,
     topics: nextStore.topics,
     uploads: nextStore.uploads,
   };

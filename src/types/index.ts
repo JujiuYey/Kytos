@@ -1,12 +1,4 @@
 export type {
-  ArtStyle,
-  ArtStyleReferenceImage,
-  ArtStyleSource,
-  ArtStyleWorkspaceState,
-  DeleteArtStyleRequest,
-  SaveArtStyleRequest,
-} from '../../shared/art-style';
-export type {
   CredentialService,
   CredentialStatus,
   DesktopApi,
@@ -113,13 +105,11 @@ export type {
   IllustrationBrief,
   IllustrationBriefUpdateResult,
   IllustrationSize,
-  IllustrationStyleReference,
   IllustrationTopic,
   IllustrationVersion,
   IllustrationVersionReference,
   IllustrationWorkspaceState,
   SaveIllustrationConversationRequest,
-  SelectIllustrationStyleReferenceRequest,
   UpdateIllustrationTopicRequest,
   UploadedIllustration,
   UploadIllustrationRequest,

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { ArtStyle } from '../../shared/art-style';
 import type {
   CharacterPortraitImage,
   CharacterPortraitResolution,
@@ -9,7 +8,7 @@ import type {
   CharacterPortraitTaskStatus,
 } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
-import type { IllustrationSize, IllustrationStyleReference } from '../../shared/illustration';
+import type { IllustrationSize } from '../../shared/illustration';
 import { ILLUSTRATION_SIZES } from '../../shared/illustration';
 import type {
   CreateStoryRequest,
@@ -45,7 +44,6 @@ import {
   getOfficialCharacterVisualReferences,
 } from './character-portrait';
 import { getCredentialValue } from './credentials';
-import { getArtStyle, readArtStyleReference } from './art-style';
 import { readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 
@@ -90,7 +88,7 @@ const VISUAL_SHOT_FIELDS: (keyof StoryShotContent)[] = [
 
 interface StoredStoryWorkspace {
   stories: StoryProject[];
-  version: 2;
+  version: 3;
 }
 
 interface ApiTaskImage {
@@ -178,38 +176,6 @@ function parseSelection(value: unknown): CharacterPortraitSelection | null {
   return { fileName: value.fileName, taskId: value.taskId };
 }
 
-function parseStyleReference(value: unknown): IllustrationStyleReference | null {
-  if (
-    !isRecord(value) ||
-    typeof value.fileName !== 'string' ||
-    path.basename(value.fileName) !== value.fileName
-  ) {
-    return null;
-  }
-  if (
-    value.source === 'generated' &&
-    typeof value.topicId === 'string' &&
-    ID_PATTERN.test(value.topicId) &&
-    typeof value.versionId === 'string' &&
-    ID_PATTERN.test(value.versionId)
-  ) {
-    return {
-      fileName: value.fileName,
-      source: 'generated',
-      topicId: value.topicId,
-      versionId: value.versionId,
-    };
-  }
-  if (
-    value.source === 'uploaded' &&
-    typeof value.uploadId === 'string' &&
-    ID_PATTERN.test(value.uploadId)
-  ) {
-    return { fileName: value.fileName, source: 'uploaded', uploadId: value.uploadId };
-  }
-  return null;
-}
-
 function parseVersionReference(value: unknown): StoryVersionReference | null {
   if (
     !isRecord(value) ||
@@ -261,8 +227,6 @@ function parseVersion(value: unknown): StoryShotVersion | null {
     return null;
   }
   return {
-    artStyleId: typeof value.artStyleId === 'string' ? value.artStyleId : null,
-    artStyleName: typeof value.artStyleName === 'string' ? value.artStyleName : null,
     baseVersion: parseVersionReference(value.baseVersion),
     continuityVersion: parseVersionReference(value.continuityVersion),
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
@@ -277,7 +241,6 @@ function parseVersion(value: unknown): StoryShotVersion | null {
     prompt: value.prompt,
     referencePortrait: parseSelection(value.referencePortrait),
     referenceSheet: parseSelection(value.referenceSheet),
-    referenceStyle: parseStyleReference(value.referenceStyle),
     resolution: value.resolution,
     size: value.size,
     status: value.status,
@@ -374,12 +337,7 @@ function parseStory(value: unknown, migrateResolutionStale: boolean): StoryProje
     typeof value.keyShotId === 'string' && shots.some(shot => shot.id === value.keyShotId)
       ? value.keyShotId
       : (shots[0]?.id ?? null);
-  const latestVersion = shots
-    .flatMap(shot => shot.versions)
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
   return {
-    artStyleId:
-      typeof value.artStyleId === 'string' ? value.artStyleId : (latestVersion?.artStyleId ?? null),
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     draft: parseDraft(value.draft),
     id: value.id,
@@ -403,18 +361,22 @@ async function getStorePath(): Promise<string> {
 async function loadStore(): Promise<StoredStoryWorkspace> {
   const value = await readJsonFile(await getStorePath());
   if (!isRecord(value)) {
-    return { stories: [], version: 2 };
+    return { stories: [], version: 3 };
   }
-  const migrateResolutionStale = value.version !== 2;
-  return {
+  const migrateResolutionStale = value.version !== 2 && value.version !== 3;
+  const store: StoredStoryWorkspace = {
     stories: Array.isArray(value.stories)
       ? value.stories
           .map(story => parseStory(story, migrateResolutionStale))
           .filter((story): story is StoryProject => Boolean(story))
           .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
       : [],
-    version: 2,
+    version: 3,
   };
+  if (value.version !== 3) {
+    await writeJsonFile(await getStorePath(), store);
+  }
+  return store;
 }
 
 async function saveStore(store: StoredStoryWorkspace): Promise<void> {
@@ -464,7 +426,6 @@ export async function getStory(storyId: string): Promise<StoryProject> {
 export async function createStory(_request: CreateStoryRequest): Promise<StoryProject> {
   const now = new Date().toISOString();
   const story: StoryProject = {
-    artStyleId: null,
     createdAt: now,
     draft: createEmptyStoryDraft(),
     id: `story_${randomUUID()}`,
@@ -501,31 +462,17 @@ export async function updateStory(request: UpdateStoryRequest): Promise<StoryPro
   if (request.resolution !== undefined && !isResolution(request.resolution)) {
     throw new Error('故事图片清晰度无效');
   }
-  if (
-    request.artStyleId !== undefined &&
-    request.artStyleId !== null &&
-    typeof request.artStyleId !== 'string'
-  ) {
-    throw new Error('故事画风无效');
-  }
   if (request.confirmStoryboard !== undefined && typeof request.confirmStoryboard !== 'boolean') {
     throw new Error('分镜确认状态无效');
   }
   const store = await loadStore();
   const story = requireStory(store, request.storyId);
-  if (request.artStyleId && !(await getArtStyle(request.artStyleId))) {
-    throw new Error('未找到选择的画风');
-  }
   if (request.keyShotId !== undefined && !story.shots.some(shot => shot.id === request.keyShotId)) {
     throw new Error('关键帧选择无效');
   }
   const sizeChanged = request.size !== undefined && request.size !== story.size;
-  const artStyleChanged =
-    request.artStyleId !== undefined && request.artStyleId !== story.artStyleId;
   const outputSettingsChanged =
-    sizeChanged ||
-    artStyleChanged ||
-    (request.resolution !== undefined && request.resolution !== story.resolution);
+    sizeChanged || (request.resolution !== undefined && request.resolution !== story.resolution);
   if (request.confirmStoryboard && (!story.storyReady || !isStoryboardComplete(story.shots))) {
     throw new Error('故事和分镜完整后才能确认');
   }
@@ -546,13 +493,11 @@ export async function updateStory(request: UpdateStoryRequest): Promise<StoryPro
     return {
       ...shot,
       imageStale:
-        Boolean(shot.selectedVersionId) &&
-        (shot.imageStale || sizeChanged || artStyleChanged || dependsOnPreviousKey),
+        Boolean(shot.selectedVersionId) && (shot.imageStale || sizeChanged || dependsOnPreviousKey),
     };
   });
   const updatedStory: StoryProject = {
     ...story,
-    artStyleId: request.artStyleId === undefined ? story.artStyleId : request.artStyleId,
     keyShotId: request.keyShotId ?? story.keyShotId,
     resolution: request.resolution ?? story.resolution,
     shots,
@@ -1000,12 +945,7 @@ function resolveContinuityReference(
   return null;
 }
 
-function buildPrompt(
-  story: StoryProject,
-  shot: StoryShot,
-  prompt: string,
-  artStyle: ArtStyle,
-): string {
+function buildPrompt(story: StoryProject, shot: StoryShot, prompt: string): string {
   return [
     '你正在创作同一个短篇故事中的一幅连续叙事插画。',
     `故事梗概：${story.draft.summary}`,
@@ -1013,11 +953,6 @@ function buildPrompt(
     `本镜连续性：${shot.continuity || '保持与前后画面中的角色、场景和时间一致。'}`,
     '参考图中的角色是故事主角。必须保持角色身份、脸型、五官、发型、身材比例、服装、鞋履、配饰和颜色一致，不要重新设计角色。',
     prompt.trim(),
-    artStyle.referenceImage
-      ? '所选画风参考图只用于确认视觉语言，不要复制其中的具体人物动作、道具、环境或构图。'
-      : '',
-    `所选画风：${artStyle.name}`,
-    artStyle.prompt,
     '故事连续性参考图只用于延续角色状态、场景、时间和关键道具，不要照搬上一镜的景别或构图。',
     '只生成一个画面。不要添加标题、大段文字、边框、Logo、水印、漫画格、多格排版、重复人物或重复肢体。',
   ].join('\n');
@@ -1062,21 +997,11 @@ export async function generateStoryShot(
   const referencePortrait = characterReferences[0]!.selection;
   const referenceSheet = characterReferences[1]?.selection ?? null;
 
-  const artStyle = story.artStyleId ? await getArtStyle(story.artStyleId) : null;
-  if (!artStyle) {
-    throw new Error('请先为这个故事选择画风');
-  }
-
   const referenceImages = await Promise.all(
     characterReferences.map(reference =>
       readReferenceImage(reference.directoryName, reference.image),
     ),
   );
-  const styleReferenceData = await readArtStyleReference(artStyle);
-  if (styleReferenceData) {
-    referenceImages.push(styleReferenceData);
-  }
-
   let continuityVersion = resolveContinuityReference(story, shot);
   if (continuityVersion) {
     const image = resolveVersionImage(story, continuityVersion);
@@ -1099,7 +1024,7 @@ export async function generateStoryShot(
     }
   }
 
-  const prompt = buildPrompt(story, shot, request.prompt, artStyle);
+  const prompt = buildPrompt(story, shot, request.prompt);
   const apiKey = await getCredentialValue('apimart');
   const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
     body: JSON.stringify({
@@ -1119,8 +1044,6 @@ export async function generateStoryShot(
 
   const now = new Date().toISOString();
   const version: StoryShotVersion = {
-    artStyleId: artStyle.id,
-    artStyleName: artStyle.name,
     baseVersion,
     continuityVersion,
     createdAt: now,
@@ -1131,7 +1054,6 @@ export async function generateStoryShot(
     prompt,
     referencePortrait: { ...referencePortrait },
     referenceSheet: referenceSheet ? { ...referenceSheet } : null,
-    referenceStyle: null,
     resolution: story.resolution,
     size: story.size,
     status: 'submitted',
