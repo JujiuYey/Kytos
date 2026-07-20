@@ -142,14 +142,13 @@ function buildPortraitPrompt(character: CharacterDraft): string {
     character.detailDensity && `细节密度：${character.detailDensity}`,
     character.backgroundRules && `背景规则：${character.backgroundRules}`,
     character.textRules && `文字规则：${character.textRules}`,
-    character.mustKeep && `必须保持：${character.mustKeep}`,
-    character.forbiddenElements && `禁止出现：${character.forbiddenElements}`,
+    character.exclusions && `排除项：${character.exclusions}`,
   ].filter((item): item is string => Boolean(item));
 
   return [
     '根据以下已经确认的角色视觉定义绘制一张专业定妆照。',
     ...characterDetails,
-    '严格保持人物形象锚点和一致性规则，不要根据性格、动机或故事背景重新推断和设计长相。',
+    '严格保持已经确认的人物形象锚点，不要根据性格、动机或故事背景重新推断和设计长相。',
     '画面要求：单一角色，全身正面站立，自然中性姿态，完整展示头部到鞋底；人物居中，比例准确，轮廓清晰。遵循已经确认的默认服装、角色配色和视觉表现规则。',
     '禁止：裁切人物、多人、多视角拼贴、设定表排版、文字、标注、Logo、水印。',
   ].join('\n');

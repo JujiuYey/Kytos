@@ -21,17 +21,14 @@ const fieldGroups: Array<{
   label: string;
 }> = [
   {
-    label: '角色内核',
+    label: '人物种子',
     fields: [
       { field: 'name', label: '姓名', placeholder: '尚未命名' },
-      { field: 'rolePositioning', label: '角色定位', placeholder: '一句话说明这个人物是谁' },
       {
-        field: 'behavioralContradiction',
-        label: '行为矛盾',
-        placeholder: '最有辨识度的内在组合',
+        field: 'characterSeed',
+        label: '人物种子',
+        placeholder: '一句话说明人物大概是谁',
       },
-      { field: 'dailyContext', label: '日常处境', placeholder: '通常生活、工作和行动的环境' },
-      { field: 'narrativeNotes', label: '叙事备注', placeholder: '需要保留的经历、关系或表达习惯' },
     ],
   },
   {
@@ -64,26 +61,10 @@ const fieldGroups: Array<{
         placeholder: '留白、环境线条或完整场景的处理',
       },
       { field: 'textRules', label: '文字规则', placeholder: '手写文字、注释和漫画符号的使用规则' },
-    ],
-  },
-  {
-    label: '一致性规则',
-    fields: [
-      { field: 'mustKeep', label: '必须保持', placeholder: '每次生成都不能改变的身份特征' },
       {
-        field: 'allowedChanges',
-        label: '允许变化',
-        placeholder: '可以随情绪、剧情和场景调整的内容',
-      },
-      {
-        field: 'forbiddenElements',
-        label: '禁止出现',
-        placeholder: '会造成角色或视觉表现漂移的特征',
-      },
-      {
-        field: 'referenceImageNotes',
-        label: '参考形象说明',
-        placeholder: '已认可参考图中需要继承的部分',
+        field: 'exclusions',
+        label: '排除项',
+        placeholder: '明确不希望出现的形象或画面特征',
       },
     ],
   },

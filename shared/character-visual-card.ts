@@ -1,4 +1,3 @@
-import type { ArtStyle } from './art-style';
 import type { CharacterDraft } from './character';
 import type { CharacterPortraitImage, CharacterPortraitTaskStatus } from './character-portrait';
 
@@ -23,7 +22,6 @@ export interface CharacterVisualCard extends CharacterVisualHypothesis {
 }
 
 export interface CharacterVisualCardDraw {
-  artStyle: Pick<ArtStyle, 'id' | 'name'>;
   cards: CharacterVisualCard[];
   createdAt: string;
   draftSnapshot: CharacterDraft;
@@ -37,7 +35,6 @@ export interface CharacterVisualCardWorkspaceState {
 }
 
 export interface GenerateCharacterVisualCardsRequest {
-  artStyleId: string;
   guidance?: string;
   model: string;
 }

@@ -3,13 +3,7 @@ import type { UIMessage } from 'ai';
 export const CHARACTER_AGENT_ENDPOINT = 'app://bundle/api/character-agent';
 export const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-pro';
 
-export const CHARACTER_ROLE_CORE_FIELDS = [
-  'name',
-  'rolePositioning',
-  'behavioralContradiction',
-  'dailyContext',
-  'narrativeNotes',
-] as const;
+export const CHARACTER_SEED_FIELDS = ['name', 'characterSeed'] as const;
 
 export const CHARACTER_VISUAL_ANCHOR_FIELDS = [
   'visualSummary',
@@ -29,20 +23,13 @@ export const CHARACTER_VISUAL_PRESENTATION_FIELDS = [
   'detailDensity',
   'backgroundRules',
   'textRules',
-] as const;
-
-export const CHARACTER_CONSISTENCY_FIELDS = [
-  'mustKeep',
-  'allowedChanges',
-  'forbiddenElements',
-  'referenceImageNotes',
+  'exclusions',
 ] as const;
 
 export const CHARACTER_DRAFT_FIELDS = [
-  ...CHARACTER_ROLE_CORE_FIELDS,
+  ...CHARACTER_SEED_FIELDS,
   ...CHARACTER_VISUAL_ANCHOR_FIELDS,
   ...CHARACTER_VISUAL_PRESENTATION_FIELDS,
-  ...CHARACTER_CONSISTENCY_FIELDS,
 ] as const;
 
 export type CharacterDraftField = (typeof CHARACTER_DRAFT_FIELDS)[number];
@@ -51,7 +38,7 @@ export type CharacterDraft = Record<CharacterDraftField, string>;
 
 export const CHARACTER_CORE_FIELDS = [
   'name',
-  'rolePositioning',
+  'characterSeed',
   'visualSummary',
   'ageAndBuild',
   'faceAnchor',
@@ -60,9 +47,6 @@ export const CHARACTER_CORE_FIELDS = [
   'visualMedium',
   'colorRules',
   'backgroundRules',
-  'mustKeep',
-  'allowedChanges',
-  'forbiddenElements',
 ] as const satisfies readonly CharacterDraftField[];
 
 export type CharacterDraftPatch = Partial<CharacterDraft>;
@@ -74,27 +58,11 @@ export interface CharacterDraftUpdateResult {
   updatedFields: CharacterDraftField[];
 }
 
-export interface CharacterProfileProposalResult {
-  draft: CharacterDraft;
-  markdown: string;
-  ready: boolean;
-  missingFields: CharacterDraftField[];
-}
-
 export interface CharacterWorkspaceState {
   draft: CharacterDraft;
-  profileMarkdown: string | null;
-}
-
-export interface SaveCharacterProfileRequest {
-  markdown: string;
 }
 
 type CharacterAgentTools = {
-  completeCharacterProfile: {
-    input: { markdown: string };
-    output: CharacterProfileProposalResult;
-  };
   updateCharacterDraft: {
     input: CharacterDraftPatch;
     output: CharacterDraftUpdateResult;
@@ -122,35 +90,16 @@ export function normalizeCharacterDraft(value: unknown): CharacterDraft {
 
   const legacyMappings: Array<[CharacterDraftField, string]> = [
     ['name', 'name'],
-    ['rolePositioning', 'concept'],
-    ['behavioralContradiction', 'personality'],
-    ['dailyContext', 'background'],
+    ['characterSeed', 'rolePositioning'],
+    ['characterSeed', 'concept'],
+    ['exclusions', 'forbiddenElements'],
   ];
   for (const [field, legacyField] of legacyMappings) {
     if (!draft[field] && typeof record[legacyField] === 'string') {
       draft[field] = record[legacyField].trim();
     }
   }
-
-  if (!draft.narrativeNotes) {
-    const legacyNotes = [
-      ['动机', record.motivation],
-      ['关系', record.relationships],
-      ['说话方式', record.speechStyle],
-    ]
-      .filter(
-        (entry): entry is [string, string] =>
-          typeof entry[1] === 'string' && Boolean(entry[1].trim()),
-      )
-      .map(([label, content]) => `${label}：${content.trim()}`);
-    draft.narrativeNotes = legacyNotes.join('\n');
-  }
-
   return draft;
-}
-
-export function isCharacterDraftReady(draft: CharacterDraft): boolean {
-  return CHARACTER_CORE_FIELDS.every(field => draft[field].trim());
 }
 
 export function getCharacterDraftProgress(draft: CharacterDraft): {

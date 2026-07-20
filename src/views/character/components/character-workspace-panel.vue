@@ -1,36 +1,49 @@
 <script setup lang="ts">
-import { watch, ref } from 'vue';
-import { FileText, ListTree, Sparkles, X } from '@lucide/vue';
+import { ref, watch } from 'vue';
+import { Images, ListTree, Sparkles, X } from '@lucide/vue';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import type { CharacterDraft } from '@/types';
+import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
+import type { CharacterDraft, CharacterVisualCard, CharacterVisualCardDraw } from '@/types';
 import CharacterDraftPanel from './character-draft-panel.vue';
-import ChatSummaryPreview from './chat-summary-preview.vue';
+import CharacterVisualCardResults from './character-visual-card-results.vue';
 
 const props = defineProps<{
-  canSave: boolean;
   canDrawVisual: boolean;
   drawBusy: boolean;
   drawDisabledReason: string;
   draft: CharacterDraft;
-  isSaving: boolean;
-  profileMarkdown: string;
-  saved: boolean;
+  pollingStates: GenerationPollingStateMap;
+  visualDraws: CharacterVisualCardDraw[];
 }>();
 
 const emit = defineEmits<{
   (event: 'close'): void;
+  (event: 'continue-visual', card: CharacterVisualCard): void;
   (event: 'draw-visual'): void;
-  (event: 'save'): void;
+  (event: 'redraw-visual', draw: CharacterVisualCardDraw): void;
+  (
+    event: 'refine-visual',
+    payload: { card: CharacterVisualCard; draw: CharacterVisualCardDraw },
+  ): void;
 }>();
 
 const activeTab = ref('draft');
 
 watch(
-  () => props.canSave,
-  canSave => {
-    if (canSave) {
-      activeTab.value = 'profile';
+  () => props.drawBusy,
+  drawBusy => {
+    if (drawBusy) {
+      activeTab.value = 'visual';
+    }
+  },
+);
+
+watch(
+  () => props.visualDraws[0]?.id,
+  (drawId, previousDrawId) => {
+    if (drawId && drawId !== previousDrawId) {
+      activeTab.value = 'visual';
     }
   },
 );
@@ -44,9 +57,9 @@ watch(
           <ListTree class="size-3.5" />
           结构化草稿
         </TabsTrigger>
-        <TabsTrigger value="profile">
-          <FileText class="size-3.5" />
-          完成稿
+        <TabsTrigger value="visual">
+          <Images class="size-3.5" />
+          抽卡结果
         </TabsTrigger>
       </TabsList>
       <Button variant="ghost" size="icon" aria-label="关闭角色档案面板" @click="emit('close')">
@@ -57,13 +70,14 @@ watch(
     <TabsContent value="draft" class="flex min-h-0 flex-col data-[state=inactive]:hidden">
       <CharacterDraftPanel :draft="draft" />
     </TabsContent>
-    <TabsContent value="profile" class="flex min-h-0 flex-col data-[state=inactive]:hidden">
-      <ChatSummaryPreview
-        :can-save="canSave"
-        :is-saving="isSaving"
-        :markdown="profileMarkdown"
-        :saved="saved"
-        @save="emit('save')"
+    <TabsContent value="visual" class="flex min-h-0 flex-col data-[state=inactive]:hidden">
+      <CharacterVisualCardResults
+        :busy="drawBusy"
+        :draws="visualDraws"
+        :polling-states="pollingStates"
+        @continue="emit('continue-visual', $event)"
+        @redraw="emit('redraw-visual', $event)"
+        @refine="emit('refine-visual', $event)"
       />
     </TabsContent>
 

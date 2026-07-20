@@ -1,4 +1,4 @@
-import type { CharacterWorkspaceState, SaveCharacterProfileRequest } from './character';
+import type { CharacterWorkspaceState } from './character';
 import type {
   CharacterVisualCardDraw,
   CharacterVisualCardWorkspaceState,
@@ -187,7 +187,6 @@ export interface DesktopApi {
   selectDirectory: () => Promise<string | null>;
   saveFile: (request: SaveFileRequest) => Promise<SavedFileResult>;
   saveArtStyle: (request: SaveArtStyleRequest) => Promise<ArtStyleWorkspaceState>;
-  saveCharacterProfile: (request: SaveCharacterProfileRequest) => Promise<void>;
   saveIllustrationConversation: (
     request: SaveIllustrationConversationRequest,
   ) => Promise<IllustrationTopic>;

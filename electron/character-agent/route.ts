@@ -1,4 +1,4 @@
-import { createAgentUIStreamResponse } from 'ai';
+import { APICallError, createAgentUIStreamResponse } from 'ai';
 import { DEFAULT_DEEPSEEK_MODEL } from '../../shared/character';
 import { loadCharacterDraft } from '../services/character-workspace';
 import { getCredentialValue } from '../services/credentials';
@@ -49,6 +49,19 @@ function errorResponse(error: unknown): Response {
   });
 }
 
+function getStreamErrorMessage(error: unknown): string {
+  const message = APICallError.isInstance(error)
+    ? error.message
+    : error instanceof Error
+      ? error.message
+      : '';
+  const status = APICallError.isInstance(error) && error.statusCode ? ` (${error.statusCode})` : '';
+  if (!message || /authorization|api[_-]?key|bearer|data:image/i.test(message)) {
+    return `DeepSeek 多模态请求失败${status}`;
+  }
+  return `DeepSeek 请求失败${status}：${message.slice(0, 300)}`;
+}
+
 export async function handleCharacterAgentRequest(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -78,6 +91,7 @@ export async function handleCharacterAgentRequest(request: Request): Promise<Res
       uiMessages: body.messages,
       abortSignal: request.signal,
       headers: corsHeaders,
+      onError: getStreamErrorMessage,
     });
   } catch (error: unknown) {
     return errorResponse(error);

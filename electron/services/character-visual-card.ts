@@ -3,7 +3,6 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { generateText } from 'ai';
 import { z } from 'zod';
-import type { ArtStyle } from '../../shared/art-style';
 import type { CharacterDraft } from '../../shared/character';
 import {
   CHARACTER_DRAFT_FIELDS,
@@ -22,7 +21,6 @@ import type {
   GetCharacterVisualCardTaskRequest,
 } from '../../shared/character-visual-card';
 import { CHARACTER_VISUAL_CARD_COUNT } from '../../shared/character-visual-card';
-import { getArtStyle, readArtStyleReference } from './art-style';
 import { getActiveCharacterDirectory } from './character-library';
 import { loadCharacterDraft } from './character-workspace';
 import { getCredentialValue } from './credentials';
@@ -144,9 +142,6 @@ function parseDraw(value: unknown): CharacterVisualCardDraw | null {
     !isRecord(value) ||
     typeof value.id !== 'string' ||
     !DRAW_ID_PATTERN.test(value.id) ||
-    !isRecord(value.artStyle) ||
-    typeof value.artStyle.id !== 'string' ||
-    typeof value.artStyle.name !== 'string' ||
     !Array.isArray(value.cards) ||
     typeof value.createdAt !== 'string' ||
     typeof value.updatedAt !== 'string'
@@ -160,7 +155,6 @@ function parseDraw(value: unknown): CharacterVisualCardDraw | null {
     return null;
   }
   return {
-    artStyle: { id: value.artStyle.id, name: value.artStyle.name },
     cards,
     createdAt: value.createdAt,
     draftSnapshot: parseDraft(value.draftSnapshot),
@@ -284,14 +278,14 @@ async function generateVisualHypotheses(
       guidance ? `\n\n本轮用户反馈：\n${guidance}` : ''
     }`,
     providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
-    system: `你是角色视觉概念设计师。输入是一份包含角色内核、形象锚点、视觉表现和一致性规则的结构化草稿。请生成 3 个可以被图片模型直接执行的完整形象方向。
+    system: `你是角色视觉概念设计师。输入是一份包含人物种子、形象锚点和视觉表现的结构化草稿。请生成 3 个可以被图片模型直接执行的完整形象方向。
 
 工作边界：
-1. 草稿中已经填写的形象锚点、视觉表现、必须保持和禁止出现内容都是硬约束，不能在三张卡之间随机改变。
-2. 角色内核只用于理解人物的行为表现，不能覆盖或重新推断已经明确的脸部、发型、体态、服装和配色。
+1. 草稿中已经填写的形象锚点和视觉表现都是硬约束，不能在三张卡之间随机改变；exclusions 中的内容不能出现。
+2. 人物种子只提供最少的创作上下文，不能覆盖或重新推断已经明确的脸部、发型、体态、服装和配色。
 3. 草稿中仍为空白的视觉字段可以作为本轮可撤回的探索变量，并让三张卡形成有意义的差异。
 4. 三个方向必须是内部协调的完整组合，不要拆成互不相关的发型卡、五官卡或服装卡，也不能只换颜色。
-5. prompt 使用简短分段，依次写：主体、形象锚点、视觉表现、姿态与视线、构图、一致性禁止项。只写画面中能看见的内容。
+5. prompt 使用简短分段，依次写：主体、形象锚点、视觉表现、姿态与视线、构图、排除项。只写画面中能看见的内容。
 6. 每个 summary 用一句中文解释本卡探索了哪些未确定变量；tags 只放 3 到 6 个具体可见标签。
 7. 只输出 JSON，不要 Markdown、解释或代码围栏。
 
@@ -305,8 +299,6 @@ function validateGenerateRequest(request: GenerateCharacterVisualCardsRequest): 
   if (
     !request ||
     typeof request !== 'object' ||
-    typeof request.artStyleId !== 'string' ||
-    !request.artStyleId.trim() ||
     typeof request.model !== 'string' ||
     (request.guidance !== undefined &&
       (typeof request.guidance !== 'string' || request.guidance.length > MAX_GUIDANCE_LENGTH))
@@ -431,27 +423,23 @@ async function downloadTaskImage(
   return { fileName, mimeType, url: getAssetUrl(fileName) };
 }
 
-function buildImagePrompt(hypothesis: { prompt: string }, artStyle: ArtStyle): string {
+function buildImagePrompt(hypothesis: { prompt: string }): string {
   return [
     '用途：原创角色视觉探索卡，用于讨论角色外形方向，不是最终设定。',
-    '背景：干净、克制的浅色背景，不添加叙事场景。',
     hypothesis.prompt.trim(),
+    '严格遵守上述视觉媒介、线条、色彩、细节、背景和文字规则，不额外套用其他画风。',
     '人物完整入镜，头部到鞋底可见；采用符合这一视觉假设的自然站姿或轻动作，不使用僵硬证件照姿势。单一角色，主体清楚，比例自然。',
-    `画风：${artStyle.name}`,
-    artStyle.prompt,
-    '禁止：文字、标签、Logo、水印、多人、多视角拼贴、设定表排版、裁切脚部、额外肢体。',
+    '禁止：Logo、水印、多人、多视角拼贴、设定表排版、裁切脚部、额外肢体。',
   ].join('\n');
 }
 
 async function submitCard(
   hypothesis: { prompt: string; summary: string; tags: string[]; title: string },
-  artStyle: ArtStyle,
   apiKey: string,
-  styleReferenceData: string | null,
   now: string,
 ): Promise<CharacterVisualCard> {
   const cardId = `card_${randomUUID()}`;
-  const prompt = buildImagePrompt(hypothesis, artStyle);
+  const prompt = buildImagePrompt(hypothesis);
   try {
     const body: Record<string, unknown> = {
       model: 'gpt-image-2',
@@ -460,9 +448,6 @@ async function submitCard(
       resolution: '1k',
       size: '2:3',
     };
-    if (styleReferenceData) {
-      body.image_urls = [styleReferenceData];
-    }
     const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
       body: JSON.stringify(body),
       headers: {
@@ -521,25 +506,17 @@ export async function generateCharacterVisualCards(
 ): Promise<CharacterVisualCardDraw> {
   validateGenerateRequest(request);
   const storePath = await getStorePath();
-  const artStyle = await getArtStyle(request.artStyleId);
-  if (!artStyle) {
-    throw new Error('请选择有效的画风');
-  }
   const draft = await loadCharacterDraft();
   if (!CHARACTER_DRAFT_FIELDS.some(field => draft[field].trim())) {
     throw new Error('先聊出一点角色信息，再开始视觉抽卡');
   }
   const hypotheses = await generateVisualHypotheses(draft, request);
-  const [apiKey, styleReferenceData] = await Promise.all([
-    getCredentialValue('apimart'),
-    readArtStyleReference(artStyle),
-  ]);
+  const apiKey = await getCredentialValue('apimart');
   const now = new Date().toISOString();
   const cards = await Promise.all(
-    hypotheses.map(hypothesis => submitCard(hypothesis, artStyle, apiKey, styleReferenceData, now)),
+    hypotheses.map(hypothesis => submitCard(hypothesis, apiKey, now)),
   );
   const draw: CharacterVisualCardDraw = {
-    artStyle: { id: artStyle.id, name: artStyle.name },
     cards,
     createdAt: now,
     draftSnapshot: draft,

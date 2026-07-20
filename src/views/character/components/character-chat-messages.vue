@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { ChatStatus } from 'ai';
-import { Bot, Check, FileText, PencilLine } from '@lucide/vue';
+import { Bot, PencilLine } from '@lucide/vue';
 import {
   Conversation,
   ConversationContent,
@@ -15,50 +14,29 @@ import { Message, MessageContent, MessageResponse } from '@/components/ai-elemen
 import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion';
 import { Tool, ToolContent, ToolHeader } from '@/components/ai-elements/tool';
 import type { CharacterAgentMessage, CharacterDraftField } from '@/types';
-import type { CharacterVisualCard, CharacterVisualCardDraw } from '@/types';
-import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
-import CharacterVisualCardDrawMessage from './character-visual-card-draw.vue';
 
-const props = defineProps<{
-  busy: boolean;
+defineProps<{
   messages: CharacterAgentMessage[];
-  pollingStates: GenerationPollingStateMap;
-  preparingVisual: boolean;
   status: ChatStatus;
-  visualDraws: CharacterVisualCardDraw[];
 }>();
 
 const emit = defineEmits<{
-  (event: 'continue-visual', card: CharacterVisualCard): void;
-  (event: 'redraw-visual', draw: CharacterVisualCardDraw): void;
-  (
-    event: 'refine-visual',
-    payload: { card: CharacterVisualCard; draw: CharacterVisualCardDraw },
-  ): void;
   (event: 'suggest', text: string): void;
 }>();
 
-const chronologicalVisualDraws = computed(() => [...props.visualDraws].reverse());
-
 const fieldLabels: Record<CharacterDraftField, string> = {
   ageAndBuild: '年龄与体态',
-  allowedChanges: '允许变化',
   backgroundRules: '背景规则',
-  behavioralContradiction: '行为矛盾',
   characterPalette: '角色配色',
+  characterSeed: '人物种子',
   colorRules: '色彩规则',
-  dailyContext: '日常处境',
   defaultOutfit: '默认服装',
   detailDensity: '细节密度',
+  exclusions: '排除项',
   faceAnchor: '脸部锚点',
-  forbiddenElements: '禁止出现',
   hairAnchor: '发型锚点',
   lineAndShape: '线条与造型',
-  mustKeep: '必须保持',
   name: '姓名',
-  narrativeNotes: '叙事备注',
-  referenceImageNotes: '参考形象说明',
-  rolePositioning: '角色定位',
   signatureItems: '标志物',
   silhouetteMarkers: '轮廓识别点',
   textRules: '文字规则',
@@ -69,7 +47,7 @@ const fieldLabels: Record<CharacterDraftField, string> = {
 const startingSuggestions = [
   '我有一个角色想法，帮我逐步完善',
   '从零开始问我问题，创建一个新角色',
-  '我想先确定角色定位和人物形象',
+  '我想先说一个人物种子，再探索具体形象',
 ];
 
 function getMessageAttachments(message: CharacterAgentMessage): AttachmentData[] {
@@ -90,7 +68,7 @@ function getMessageAttachments(message: CharacterAgentMessage): AttachmentData[]
   <Conversation class="scrollbar-subtle min-h-0 flex-1">
     <ConversationContent class="mx-auto w-full max-w-3xl gap-6 px-4 py-6 sm:px-6">
       <ConversationEmptyState
-        v-if="messages.length === 0 && visualDraws.length === 0"
+        v-if="messages.length === 0"
         title="从一个念头开始"
         description="Agent 会边聊边整理角色草稿。"
         class="min-h-[22rem]"
@@ -141,47 +119,9 @@ function getMessageAttachments(message: CharacterAgentMessage): AttachmentData[]
                 </div>
               </ToolContent>
             </Tool>
-
-            <Tool v-else-if="part.type === 'tool-completeCharacterProfile'" class="mb-0">
-              <ToolHeader :type="part.type" :state="part.state" title="生成角色完成稿" />
-              <ToolContent>
-                <div
-                  class="flex items-start gap-2 border-t px-3 py-3 text-sm text-muted-foreground"
-                >
-                  <Check
-                    v-if="part.state === 'output-available' && part.output.ready"
-                    class="mt-0.5 size-4 shrink-0"
-                  />
-                  <FileText v-else class="mt-0.5 size-4 shrink-0" />
-                  <span v-if="part.state === 'output-available' && part.output.ready">
-                    完成稿已放到右侧，等待确认保存
-                  </span>
-                  <span v-else-if="part.state === 'output-available'">
-                    当前信息还不够，Agent 会继续确认关键设定
-                  </span>
-                  <span v-else>正在组织角色档案</span>
-                </div>
-              </ToolContent>
-            </Tool>
           </template>
         </MessageContent>
       </Message>
-
-      <CharacterVisualCardDrawMessage
-        v-for="draw in chronologicalVisualDraws"
-        :key="draw.id"
-        :busy="busy"
-        :draw="draw"
-        :polling-states="pollingStates"
-        @continue="emit('continue-visual', $event)"
-        @redraw="emit('redraw-visual', $event)"
-        @refine="emit('refine-visual', $event)"
-      />
-
-      <div v-if="preparingVisual" class="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader />
-        正在把角色草稿转成 3 个具体视觉假设
-      </div>
 
       <div
         v-if="status === 'submitted'"
