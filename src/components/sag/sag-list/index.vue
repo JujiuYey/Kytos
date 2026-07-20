@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { Input } from '@/components/ui/input';
-import { Search, Box } from 'lucide-vue-next';
+import { Search, Box } from '@lucide/vue';
 
 const props = withDefaults(
   defineProps<{

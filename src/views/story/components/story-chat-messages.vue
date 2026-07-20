@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ChatStatus } from 'ai';
-import { BookOpen, Bot, Check, Clapperboard, PencilLine } from 'lucide-vue-next';
+import { BookOpen, Bot, Check, Clapperboard, PencilLine } from '@lucide/vue';
 import {
   Conversation,
   ConversationContent,

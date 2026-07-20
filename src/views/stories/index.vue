@@ -10,7 +10,7 @@ import {
   Plus,
   Search,
   Trash2,
-} from 'lucide-vue-next';
+} from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';

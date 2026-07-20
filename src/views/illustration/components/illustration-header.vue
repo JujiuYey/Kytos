@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ImagePlus, Images, MessageSquare, Plus, Trash2 } from 'lucide-vue-next';
+import { ImagePlus, Images, MessageSquare, Plus, Trash2 } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {

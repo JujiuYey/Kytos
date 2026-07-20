@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import type { AcceptableValue } from 'reka-ui';
-import { X } from 'lucide-vue-next';
+import { X } from '@lucide/vue';
 import { isNil } from 'es-toolkit';
 import { computed } from 'vue';
 

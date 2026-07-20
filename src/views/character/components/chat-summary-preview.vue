@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, FileCheck2, Loader2, Save } from 'lucide-vue-next';
+import { Check, FileCheck2, Loader2, Save } from '@lucide/vue';
 import { MessageResponse } from '@/components/ai-elements/message';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';

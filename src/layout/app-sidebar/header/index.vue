@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { GalleryVerticalEnd } from 'lucide-vue-next';
+import { GalleryVerticalEnd } from '@lucide/vue';
 import { SidebarHeader, SidebarMenuButton } from '@/components/ui/sidebar';
 </script>
 

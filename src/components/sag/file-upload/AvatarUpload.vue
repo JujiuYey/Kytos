@@ -1,24 +1,27 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { UploadIcon } from 'lucide-vue-next';
+import { UploadIcon } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import FileUpload from './FileUpload.vue';
 import type { UploadResult } from './types';
 
 // 头像专用配置
-const props = withDefaults(defineProps<{
-  modelValue?: string;
-  size?: 'sm' | 'md' | 'lg';
-  showMaskButton?: boolean;
-  showUploadButton?: boolean;
-  showUploadText?: boolean;
-}>(), {
-  size: 'md',
-  showMaskButton: true,
-  showUploadButton: false,
-  showUploadText: false,
-});
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string;
+    size?: 'sm' | 'md' | 'lg';
+    showMaskButton?: boolean;
+    showUploadButton?: boolean;
+    showUploadText?: boolean;
+  }>(),
+  {
+    size: 'md',
+    showMaskButton: true,
+    showUploadButton: false,
+    showUploadText: false,
+  },
+);
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void;

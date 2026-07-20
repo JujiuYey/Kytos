@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { WandSparkles, X } from 'lucide-vue-next';
+import { WandSparkles, X } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';

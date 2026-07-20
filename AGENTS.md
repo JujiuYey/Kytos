@@ -27,7 +27,7 @@
 3. 需要调整外观时，通过现有组件的 props、variant、slot 和 `class` 组合实现。不要复制组件源码到业务目录后修改。
 4. 确实缺少通用能力时，先判断它属于 `ui`、`ai-elements` 还是当前 feature。通用能力补到相应组件目录；业务组合留在 feature 目录。
 5. 修改 `src/components/ui/` 或 `src/components/ai-elements/` 前，先检查所有调用方，避免为一个页面破坏共享行为。
-6. 图标使用 `lucide-vue-next`。存在对应图标时，不手写 SVG，不用文字按钮代替明确的常见图标操作；不熟悉的图标按钮提供 Tooltip 或可访问名称。
+6. 图标使用 `@lucide/vue`。存在对应图标时，不手写 SVG，不用文字按钮代替明确的常见图标操作；不熟悉的图标按钮提供 Tooltip 或可访问名称。
 7. 普通的 `<div>`、`<section>`、`<header>`、`<main>` 等语义和布局标签可以直接使用。本规则限制的是重复造交互组件，不是禁止原生 HTML。
 
 ### 组件导入

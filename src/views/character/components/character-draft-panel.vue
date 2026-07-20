@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { CircleDashed } from 'lucide-vue-next';
+import { CircleDashed } from '@lucide/vue';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { CharacterDraft, CharacterDraftField } from '@/types';

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { AlertCircle, FolderOpen, HardDrive, Loader2, ShieldCheck } from 'lucide-vue-next';
+import { AlertCircle, FolderOpen, HardDrive, Loader2, ShieldCheck } from '@lucide/vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/app';

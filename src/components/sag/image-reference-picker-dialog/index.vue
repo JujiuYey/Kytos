@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Check, Images } from 'lucide-vue-next';
+import { Check, Images } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ArrowLeftToLine, ArrowRightToLine, Settings } from 'lucide-vue-next';
+import { ArrowLeftToLine, ArrowRightToLine, Settings } from '@lucide/vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   SidebarFooter,

@@ -9,7 +9,7 @@ import {
   Palette,
   Sparkles,
   UsersRound,
-} from 'lucide-vue-next';
+} from '@lucide/vue';
 
 export interface MenuItem {
   title: string;

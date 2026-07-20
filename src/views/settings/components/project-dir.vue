@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
-import { CheckCircle2, ExternalLink, FolderOpen, Loader2 } from 'lucide-vue-next';
+import { CheckCircle2, ExternalLink, FolderOpen, Loader2 } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

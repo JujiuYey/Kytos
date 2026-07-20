@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue';
 import type { FormProps } from '../types';
-import { Save, RotateCcw } from 'lucide-vue-next';
+import { Save, RotateCcw } from '@lucide/vue';
 import FormField from './components/form-field.vue';
 import { useFormButton } from './hooks/use-form-button';
 import { useFormLayout } from './hooks/use-form-layout';
@@ -45,12 +45,8 @@ const { validate, errors, isFieldRequired } = useFormValidation(props, formData)
 const { isFieldVisible } = useFieldVisible(formData);
 
 // 表单按钮
-const {
-  submitButtonText,
-  submitButtonShow,
-  resetButtonText,
-  resetButtonShow,
-} = useFormButton(props);
+const { submitButtonText, submitButtonShow, resetButtonText, resetButtonShow } =
+  useFormButton(props);
 
 // 表单布局
 const { gridStyle, getFieldGridStyle } = useFormLayout(props);
@@ -132,21 +128,11 @@ defineExpose({
     </div>
 
     <div class="flex justify-end space-x-2">
-      <Button
-        v-if="resetButtonShow"
-        type="button"
-        variant="outline"
-        @click="resetFormData"
-      >
+      <Button v-if="resetButtonShow" type="button" variant="outline" @click="resetFormData">
         <RotateCcw class="h-4 w-4 mr-2" />
         {{ resetButtonText }}
       </Button>
-      <Button
-        v-if="submitButtonShow"
-        type="button"
-        :disabled="loading"
-        @click="handleSubmit"
-      >
+      <Button v-if="submitButtonShow" type="button" :disabled="loading" @click="handleSubmit">
         <Save class="h-4 w-4 mr-2" />
         {{ submitButtonText }}
       </Button>

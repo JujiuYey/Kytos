@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { MessageCircle, RefreshCw, Sparkles } from 'lucide-vue-next';
+import { MessageCircle, RefreshCw, Sparkles } from '@lucide/vue';
 import { Message, MessageContent } from '@/components/ai-elements/message';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Badge } from '@/components/ui/badge';

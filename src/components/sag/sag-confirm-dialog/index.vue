@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle } from 'lucide-vue-next';
+import { AlertTriangle } from '@lucide/vue';
 
 interface Props {
   /**

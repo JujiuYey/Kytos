@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import type { Connection, Edge, NodeMouseEvent, ValidConnectionFunc } from '@vue-flow/core';
 import { MarkerType, useVueFlow } from '@vue-flow/core';
-import { AlertCircle, ImageOff, PanelRight, Plus, RotateCcw } from 'lucide-vue-next';
+import { AlertCircle, ImageOff, PanelRight, Plus, RotateCcw } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Canvas } from '@/components/ai-elements/canvas';
 import { Controls } from '@/components/ai-elements/controls';

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bot, FileText, MessageSquare, RotateCcw } from 'lucide-vue-next';
+import { Bot, FileText, MessageSquare, RotateCcw } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import SagStatusBadge from '@/components/sag/status-badge.vue';

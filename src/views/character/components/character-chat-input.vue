@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ChatStatus } from 'ai';
-import { Sparkles } from 'lucide-vue-next';
+import { Sparkles } from '@lucide/vue';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import {
   PromptInput,

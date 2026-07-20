@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Camera, Images, SlidersHorizontal, Upload, WandSparkles, Workflow } from 'lucide-vue-next';
+import { Camera, Images, SlidersHorizontal, Upload, WandSparkles, Workflow } from '@lucide/vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {

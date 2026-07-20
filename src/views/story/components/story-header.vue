@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BookMarked, BookOpen, Images, MessageSquare, Plus, Trash2 } from 'lucide-vue-next';
+import { BookMarked, BookOpen, Images, MessageSquare, Plus, Trash2 } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import {
   Select,

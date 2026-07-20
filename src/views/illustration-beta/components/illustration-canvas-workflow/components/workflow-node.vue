@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Image as ImageIcon, Images, Trash2, WandSparkles } from 'lucide-vue-next';
+import { Image as ImageIcon, Images, Trash2, WandSparkles } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import {
   Node as AiNode,

@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import {
-  Check,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Trash2,
-  UserRound,
-  UsersRound,
-} from 'lucide-vue-next';
+import { Check, MoreHorizontal, Pencil, Plus, Trash2, UserRound, UsersRound } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';

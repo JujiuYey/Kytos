@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Image as ImageIcon, Images, WandSparkles } from 'lucide-vue-next';
+import { Image as ImageIcon, Images, WandSparkles } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { ImageOutputSettings } from '@/components/sag/image-output-settings';
 import { Badge } from '@/components/ui/badge';

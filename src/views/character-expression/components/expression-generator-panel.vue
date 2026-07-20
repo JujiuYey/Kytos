@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Images, Sparkles, WandSparkles, X } from 'lucide-vue-next';
+import { Images, Sparkles, WandSparkles, X } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { ImageOutputSettings } from '@/components/sag/image-output-settings';

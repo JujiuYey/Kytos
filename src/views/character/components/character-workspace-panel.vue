@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { watch, ref } from 'vue';
-import { FileText, ListTree, Sparkles, X } from 'lucide-vue-next';
+import { FileText, ListTree, Sparkles, X } from '@lucide/vue';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import type { CharacterDraft } from '@/types';

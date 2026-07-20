@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { ImageOff, LoaderCircle, Maximize2, Minus, Plus } from 'lucide-vue-next';
+import { ImageOff, LoaderCircle, Maximize2, Minus, Plus } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

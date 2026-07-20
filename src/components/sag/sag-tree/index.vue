@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-vue-next';
+import { Search } from '@lucide/vue';
 import TreeNodeItem from './tree-node-item.vue';
 import type { TreeNode } from './types';
 
-const props = withDefaults(defineProps<{
-  list?: TreeNode[];
-  current?: string;
-}>(), {
-  list: () => [],
-  current: '',
-});
+const props = withDefaults(
+  defineProps<{
+    list?: TreeNode[];
+    current?: string;
+  }>(),
+  {
+    list: () => [],
+    current: '',
+  },
+);
 
 const emit = defineEmits<{
   (e: 'select', typeId: string): void;
@@ -44,9 +47,13 @@ function initExpandedNodes() {
 }
 
 // 监听列表变化，重新初始化展开节点
-watch(() => props.list, () => {
-  initExpandedNodes();
-}, { immediate: true });
+watch(
+  () => props.list,
+  () => {
+    initExpandedNodes();
+  },
+  { immediate: true },
+);
 
 // 直接使用嵌套的树形结构，添加排序功能
 function sortTree(nodes: TreeNode[]): TreeNode[] {
@@ -106,12 +113,7 @@ function handleSelect(typeId: string) {
     <div class="mb-4">
       <div class="relative">
         <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          v-model="searchQuery"
-          type="search"
-          placeholder="搜索..."
-          class="w-full pl-8"
-        />
+        <Input v-model="searchQuery" type="search" placeholder="搜索..." class="w-full pl-8" />
       </div>
     </div>
 

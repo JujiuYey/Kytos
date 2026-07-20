@@ -9,7 +9,7 @@ import {
   PencilLine,
   Sparkles,
   Trash2,
-} from 'lucide-vue-next';
+} from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

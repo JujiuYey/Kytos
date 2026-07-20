@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ChatStatus } from 'ai';
-import { Bot, Check, FileText, PencilLine } from 'lucide-vue-next';
+import { Bot, Check, FileText, PencilLine } from '@lucide/vue';
 import {
   Conversation,
   ConversationContent,

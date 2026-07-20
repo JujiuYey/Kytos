@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-vue-next';
+import { ChevronRight, ChevronDown, Folder, FolderOpen } from '@lucide/vue';
 import type { TreeNode } from './types';
 
-const props = withDefaults(defineProps<{
-  node: TreeNode;
-  current?: string;
-  level?: number;
-  expandedNodes: Set<string>;
-}>(), {
-  current: '',
-  level: 0,
-});
+const props = withDefaults(
+  defineProps<{
+    node: TreeNode;
+    current?: string;
+    level?: number;
+    expandedNodes: Set<string>;
+  }>(),
+  {
+    current: '',
+    level: 0,
+  },
+);
 
 const emit = defineEmits<{
   (e: 'toggle', nodeId: string): void;
@@ -51,7 +54,7 @@ function handleSelect() {
       <div v-else class="w-5 mr-1" />
 
       <component
-        :is="hasChildren ? isExpanded ? FolderOpen : Folder : Folder"
+        :is="hasChildren ? (isExpanded ? FolderOpen : Folder) : Folder"
         class="h-4 w-4 mr-2 text-muted-foreground"
       />
       <span class="text-sm">{{ node.name }}</span>

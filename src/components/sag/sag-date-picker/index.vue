@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DateValue } from '@internationalized/date';
 import { DateFormatter, getLocalTimeZone, parseDate } from '@internationalized/date';
-import { Calendar as CalendarIcon } from 'lucide-vue-next';
+import { Calendar as CalendarIcon } from '@lucide/vue';
 
 import { computed } from 'vue';
 import { cn } from '@/lib/utils';
@@ -52,13 +52,10 @@ const value = computed({
     <PopoverTrigger as-child>
       <Button
         variant="outline"
-        :class="cn(
-          'justify-start text-left font-normal',
-          !value && 'text-muted-foreground',
-        )"
+        :class="cn('justify-start text-left font-normal', !value && 'text-muted-foreground')"
       >
         <CalendarIcon class="mr-2 h-4 w-4" />
-        {{ value ? df.format(value.toDate(getLocalTimeZone())) : "请选择日期" }}
+        {{ value ? df.format(value.toDate(getLocalTimeZone())) : '请选择日期' }}
       </Button>
     </PopoverTrigger>
     <PopoverContent class="w-auto p-0">
