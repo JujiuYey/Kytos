@@ -7,6 +7,7 @@ import {
   Images,
   Laugh,
   Palette,
+  Sparkles,
   UsersRound,
 } from 'lucide-vue-next';
 
@@ -66,6 +67,12 @@ export const menuGroups: MenuGroup[] = [
         key: 'illustration',
         icon: ImagePlus,
         path: '/illustration',
+      },
+      {
+        title: '插画创作 Beta',
+        key: 'illustration-beta',
+        icon: Sparkles,
+        path: '/illustration-beta',
       },
       {
         title: '故事管理',

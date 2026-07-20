@@ -23,6 +23,8 @@ const desktopApi: DesktopApi = {
   generateCharacterExpressionPrompt: request =>
     ipcRenderer.invoke('character-expression:generate-prompt', request),
   generateCharacterPortrait: request => ipcRenderer.invoke('character-portrait:generate', request),
+  generateCharacterVisualCards: request =>
+    ipcRenderer.invoke('character-visual-card:generate', request),
   generateCharacterSheet: request => ipcRenderer.invoke('character-sheet:generate', request),
   generateIllustration: request => ipcRenderer.invoke('illustration:generate', request),
   generateStoryShot: request => ipcRenderer.invoke('story:generate-shot', request),
@@ -35,6 +37,9 @@ const desktopApi: DesktopApi = {
   getCharacterPortraitTask: taskId => ipcRenderer.invoke('character-portrait:get-task', taskId),
   getCharacterPortraitWorkspace: request =>
     ipcRenderer.invoke('character-portrait:get-workspace', request),
+  getCharacterVisualCardTask: request =>
+    ipcRenderer.invoke('character-visual-card:get-task', request),
+  getCharacterVisualCardWorkspace: () => ipcRenderer.invoke('character-visual-card:get-workspace'),
   getCharacterSheetTask: taskId => ipcRenderer.invoke('character-sheet:get-task', taskId),
   getCharacterWorkspace: () => ipcRenderer.invoke('character:get-workspace'),
   getIllustrationTask: taskId => ipcRenderer.invoke('illustration:get-task', taskId),

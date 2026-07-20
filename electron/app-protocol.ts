@@ -13,6 +13,7 @@ const WORKSPACE_IMAGE_DIRECTORIES = [
   'character-expressions',
   'character-portraits',
   'character-sheets',
+  'character-visual-cards',
   'illustrations',
   'story-frames',
 ] as const;
@@ -22,11 +23,11 @@ export function registerAppScheme(): void {
     {
       scheme: APP_SCHEME,
       privileges: {
-        standard: true,        // 当成标准协议,URL 解析更严格
-        secure: true,          // 标记为 https 同级,允许 Service Worker 等
+        standard: true, // 当成标准协议,URL 解析更严格
+        secure: true, // 标记为 https 同级,允许 Service Worker 等
         supportFetchAPI: true, // 允许 fetch()
-        corsEnabled: true,     // 允许跨域请求
-        stream: true,          // 支持流式响应
+        corsEnabled: true, // 允许跨域请求
+        stream: true, // 支持流式响应
       },
     },
   ]);

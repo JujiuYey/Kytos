@@ -1,5 +1,11 @@
 import type { CharacterWorkspaceState, SaveCharacterProfileRequest } from './character';
 import type {
+  CharacterVisualCardDraw,
+  CharacterVisualCardWorkspaceState,
+  GenerateCharacterVisualCardsRequest,
+  GetCharacterVisualCardTaskRequest,
+} from './character-visual-card';
+import type {
   ArtStyleWorkspaceState,
   DeleteArtStyleRequest,
   SaveArtStyleRequest,
@@ -140,6 +146,9 @@ export interface DesktopApi {
   generateCharacterPortrait: (
     request: GenerateCharacterPortraitRequest,
   ) => Promise<CharacterPortraitRecord>;
+  generateCharacterVisualCards: (
+    request: GenerateCharacterVisualCardsRequest,
+  ) => Promise<CharacterVisualCardDraw>;
   generateCharacterSheet: (request: GenerateCharacterSheetRequest) => Promise<CharacterSheetRecord>;
   generateIllustration: (request: GenerateIllustrationRequest) => Promise<IllustrationVersion>;
   generateStoryShot: (request: GenerateStoryShotRequest) => Promise<StoryShotVersion>;
@@ -155,6 +164,10 @@ export interface DesktopApi {
   getCharacterPortraitWorkspace: (
     request?: CharacterScopeRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
+  getCharacterVisualCardTask: (
+    request: GetCharacterVisualCardTaskRequest,
+  ) => Promise<CharacterVisualCardDraw>;
+  getCharacterVisualCardWorkspace: () => Promise<CharacterVisualCardWorkspaceState>;
   getCharacterSheetTask: (taskId: string) => Promise<CharacterSheetRecord>;
   getCharacterWorkspace: () => Promise<CharacterWorkspaceState>;
   getIllustrationTask: (taskId: string) => Promise<IllustrationVersion>;

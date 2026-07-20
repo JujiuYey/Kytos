@@ -78,6 +78,15 @@ export type {
   SetCharacterVisualAssetOfficialRequest,
   UploadCharacterVisualAssetRequest,
 } from '../../shared/character-portrait';
+export type {
+  CharacterVisualCard,
+  CharacterVisualCardDraw,
+  CharacterVisualCardWorkspaceState,
+  CharacterVisualHypothesis,
+  GenerateCharacterVisualCardsRequest,
+  GetCharacterVisualCardTaskRequest,
+} from '../../shared/character-visual-card';
+export { CHARACTER_VISUAL_CARD_COUNT } from '../../shared/character-visual-card';
 export {
   CHARACTER_AGENT_ENDPOINT,
   CHARACTER_CORE_FIELDS,

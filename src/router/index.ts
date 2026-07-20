@@ -56,6 +56,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '插画创作' },
       },
       {
+        path: '/illustration-beta',
+        name: 'illustration-beta',
+        component: () => import('@/views/illustration-beta/index.vue'),
+        meta: { title: '插画创作 Beta' },
+      },
+      {
         path: '/illustration-library',
         name: 'illustration-library',
         component: () => import('@/views/illustration-library/index.vue'),

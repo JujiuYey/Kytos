@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { ChatStatus } from 'ai';
 import { Bot, Check, FileText, PencilLine } from 'lucide-vue-next';
 import {
@@ -12,15 +13,30 @@ import { Message, MessageContent, MessageResponse } from '@/components/ai-elemen
 import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion';
 import { Tool, ToolContent, ToolHeader } from '@/components/ai-elements/tool';
 import type { CharacterAgentMessage, CharacterDraftField } from '@/types';
+import type { CharacterVisualCard, CharacterVisualCardDraw } from '@/types';
+import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
+import CharacterVisualCardDrawMessage from './character-visual-card-draw.vue';
 
-defineProps<{
+const props = defineProps<{
+  busy: boolean;
   messages: CharacterAgentMessage[];
+  pollingStates: GenerationPollingStateMap;
+  preparingVisual: boolean;
   status: ChatStatus;
+  visualDraws: CharacterVisualCardDraw[];
 }>();
 
 const emit = defineEmits<{
+  (event: 'continue-visual', card: CharacterVisualCard): void;
+  (event: 'redraw-visual', draw: CharacterVisualCardDraw): void;
+  (
+    event: 'refine-visual',
+    payload: { card: CharacterVisualCard; draw: CharacterVisualCardDraw },
+  ): void;
   (event: 'suggest', text: string): void;
 }>();
+
+const chronologicalVisualDraws = computed(() => [...props.visualDraws].reverse());
 
 const fieldLabels: Record<CharacterDraftField, string> = {
   background: '背景',
@@ -43,7 +59,7 @@ const startingSuggestions = [
   <Conversation class="scrollbar-subtle min-h-0 flex-1">
     <ConversationContent class="mx-auto w-full max-w-3xl gap-6 px-4 py-6 sm:px-6">
       <ConversationEmptyState
-        v-if="messages.length === 0"
+        v-if="messages.length === 0 && visualDraws.length === 0"
         title="从一个念头开始"
         description="Agent 会边聊边整理角色草稿。"
         class="min-h-[22rem]"
@@ -106,6 +122,22 @@ const startingSuggestions = [
           </template>
         </MessageContent>
       </Message>
+
+      <CharacterVisualCardDrawMessage
+        v-for="draw in chronologicalVisualDraws"
+        :key="draw.id"
+        :busy="busy"
+        :draw="draw"
+        :polling-states="pollingStates"
+        @continue="emit('continue-visual', $event)"
+        @redraw="emit('redraw-visual', $event)"
+        @refine="emit('refine-visual', $event)"
+      />
+
+      <div v-if="preparingVisual" class="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader />
+        正在把角色草稿转成 3 个具体视觉假设
+      </div>
 
       <div
         v-if="status === 'submitted'"

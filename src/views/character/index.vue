@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { DefaultChatTransport } from 'ai';
 import type { ChatStatus } from 'ai';
 import { useChat } from '@ai-sdk/vue';
@@ -18,43 +17,63 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/app';
 import { SagPage } from '@/components/sag/sag-page';
+import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
 import CharacterContextBar from '@/components/sag/character-context-bar.vue';
 import type {
+  ArtStyle,
   CharacterAgentMessage,
   CharacterDraft,
   CharacterDraftUpdateResult,
   CharacterProfileProposalResult,
+  CharacterVisualCard,
+  CharacterVisualCardDraw,
   CredentialStatus,
 } from '@/types';
 import {
   CHARACTER_AGENT_ENDPOINT,
   DEFAULT_DEEPSEEK_MODEL,
   createEmptyCharacterDraft,
-  isCharacterDraftReady,
 } from '@/types';
 import CharacterChatHeader from './components/character-chat-header.vue';
 import CharacterChatInput from './components/character-chat-input.vue';
 import CharacterChatMessages from './components/character-chat-messages.vue';
+import CharacterVisualCardDialog from './components/character-visual-card-dialog.vue';
 import CharacterWorkspacePanel from './components/character-workspace-panel.vue';
 
 const appStore = useAppStore();
-const router = useRouter();
 const draft = ref<CharacterDraft>(createEmptyCharacterDraft());
+const artStyles = ref<ArtStyle[]>([]);
+const visualDraws = ref<CharacterVisualCardDraw[]>([]);
+const pollingStates = ref<GenerationPollingStateMap>({});
 const savedProfileMarkdown = ref('');
 const proposedProfileMarkdown = ref('');
 const credentialStatus = ref<CredentialStatus | null>(null);
+const imageCredentialStatus = ref<CredentialStatus | null>(null);
 const initializationError = ref('');
 const isInitializing = ref(true);
+const isDrawing = ref(false);
+const isVisualCardDialogOpen = ref(false);
 const isResetDialogOpen = ref(false);
 const isSaving = ref(false);
 const isProfileSaved = ref(false);
 const workspaceOpen = ref(true);
 const mobilePane = ref<'chat' | 'draft'>('chat');
+const selectedArtStyleId = ref('');
+const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
+let disposed = false;
 
 const model = computed(() => appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL);
 const profileMarkdown = computed(() => proposedProfileMarkdown.value || savedProfileMarkdown.value);
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
-const canCreateVisual = computed(() => isCharacterDraftReady(draft.value));
+const imageKeyConfigured = computed(() => Boolean(imageCredentialStatus.value?.configured));
+const hasCharacterSeed = computed(() =>
+  [
+    draft.value.concept,
+    draft.value.personality,
+    draft.value.motivation,
+    draft.value.background,
+  ].some(value => Boolean(value.trim())),
+);
 
 const transport = new DefaultChatTransport<CharacterAgentMessage>({
   api: CHARACTER_AGENT_ENDPOINT,
@@ -78,6 +97,31 @@ const isInputDisabled = computed(
   () => isInitializing.value || !keyConfigured.value || chatStatus.value === 'error',
 );
 const errorMessage = computed(() => initializationError.value || error.value?.message || '');
+const drawDisabledReason = computed(() => {
+  if (isInitializing.value) {
+    return '正在载入角色工作区';
+  }
+  if (isBusy.value) {
+    return '等待 Agent 回复完成后再抽卡';
+  }
+  if (isDrawing.value) {
+    return '正在准备新一组视觉卡';
+  }
+  if (!keyConfigured.value) {
+    return '请先配置 DeepSeek API Key';
+  }
+  if (!imageKeyConfigured.value) {
+    return '请先配置 APIMart API Key';
+  }
+  if (!artStyles.value.length) {
+    return '请先准备至少一种画风';
+  }
+  if (!hasCharacterSeed.value) {
+    return '先聊出核心概念、性格、动机或背景中的至少一项';
+  }
+  return '';
+});
+const canDrawVisual = computed(() => !drawDisabledReason.value);
 
 function isDraftUpdateResult(value: unknown): value is CharacterDraftUpdateResult {
   return Boolean(value && typeof value === 'object' && 'draft' in value);
@@ -125,14 +169,25 @@ async function initialize() {
   isInitializing.value = true;
   initializationError.value = '';
   try {
-    const [workspace, statusResult] = await Promise.all([
-      window.desktop.getCharacterWorkspace(),
-      window.desktop.getCredentialStatus('deepseek'),
-    ]);
+    const [workspace, statusResult, imageStatusResult, artStyleWorkspace, visualCardWorkspace] =
+      await Promise.all([
+        window.desktop.getCharacterWorkspace(),
+        window.desktop.getCredentialStatus('deepseek'),
+        window.desktop.getCredentialStatus('apimart'),
+        window.desktop.getArtStyleWorkspace(),
+        window.desktop.getCharacterVisualCardWorkspace(),
+      ]);
     draft.value = workspace.draft;
     savedProfileMarkdown.value = workspace.profileMarkdown ?? '';
     isProfileSaved.value = Boolean(workspace.profileMarkdown);
     credentialStatus.value = statusResult;
+    imageCredentialStatus.value = imageStatusResult;
+    artStyles.value = artStyleWorkspace.styles;
+    visualDraws.value = visualCardWorkspace.draws;
+    selectedArtStyleId.value = artStyleWorkspace.styles[0]?.id ?? '';
+    for (const draw of visualCardWorkspace.draws) {
+      scheduleDrawPolling(draw);
+    }
   } catch (initializationFailure: unknown) {
     initializationError.value =
       initializationFailure instanceof Error
@@ -141,6 +196,147 @@ async function initialize() {
   } finally {
     isInitializing.value = false;
   }
+}
+
+function replaceVisualDraw(draw: CharacterVisualCardDraw): void {
+  visualDraws.value = [draw, ...visualDraws.value.filter(item => item.id !== draw.id)].sort(
+    (left, right) => right.createdAt.localeCompare(left.createdAt),
+  );
+}
+
+function clearPollingState(cardId: string): void {
+  const nextStates = { ...pollingStates.value };
+  delete nextStates[cardId];
+  pollingStates.value = nextStates;
+}
+
+function schedulePoll(drawId: string, cardId: string): void {
+  const currentTimer = pollTimers.get(cardId);
+  if (currentTimer) {
+    clearTimeout(currentTimer);
+  }
+  const previousState = pollingStates.value[cardId];
+  pollingStates.value = {
+    ...pollingStates.value,
+    [cardId]: { attempt: previousState?.attempt ?? 0, phase: 'waiting' },
+  };
+  pollTimers.set(
+    cardId,
+    setTimeout(() => {
+      void pollVisualCard(drawId, cardId);
+    }, 2500),
+  );
+}
+
+function scheduleDrawPolling(draw: CharacterVisualCardDraw): void {
+  for (const card of draw.cards) {
+    if (card.taskId && ['submitted', 'pending', 'processing'].includes(card.status)) {
+      schedulePoll(draw.id, card.id);
+    }
+  }
+}
+
+async function pollVisualCard(drawId: string, cardId: string): Promise<void> {
+  if (disposed) {
+    return;
+  }
+  const previousState = pollingStates.value[cardId];
+  pollingStates.value = {
+    ...pollingStates.value,
+    [cardId]: { attempt: (previousState?.attempt ?? 0) + 1, phase: 'requesting' },
+  };
+  try {
+    const draw = await window.desktop.getCharacterVisualCardTask({ cardId, drawId });
+    if (disposed) {
+      return;
+    }
+    replaceVisualDraw(draw);
+    const card = draw.cards.find(item => item.id === cardId);
+    if (card && ['submitted', 'pending', 'processing'].includes(card.status)) {
+      schedulePoll(drawId, cardId);
+      return;
+    }
+    pollTimers.delete(cardId);
+    clearPollingState(cardId);
+  } catch (pollError: unknown) {
+    pollTimers.delete(cardId);
+    pollingStates.value = {
+      ...pollingStates.value,
+      [cardId]: {
+        attempt: pollingStates.value[cardId]?.attempt ?? 1,
+        phase: 'paused',
+      },
+    };
+    toast.error(pollError instanceof Error ? pollError.message : String(pollError));
+  }
+}
+
+function openVisualCardDialog(): void {
+  if (!canDrawVisual.value) {
+    return;
+  }
+  if (!artStyles.value.some(style => style.id === selectedArtStyleId.value)) {
+    selectedArtStyleId.value = artStyles.value[0]?.id ?? '';
+  }
+  isVisualCardDialogOpen.value = true;
+}
+
+async function generateVisualCards(options?: {
+  artStyleId?: string;
+  guidance?: string;
+}): Promise<void> {
+  if (!canDrawVisual.value) {
+    if (drawDisabledReason.value) {
+      toast.error(drawDisabledReason.value);
+    }
+    return;
+  }
+  const artStyleId = options?.artStyleId ?? selectedArtStyleId.value;
+  if (!artStyleId) {
+    return;
+  }
+  isVisualCardDialogOpen.value = false;
+  isDrawing.value = true;
+  mobilePane.value = 'chat';
+  try {
+    const draw = await window.desktop.generateCharacterVisualCards({
+      artStyleId,
+      guidance: options?.guidance,
+      model: model.value,
+    });
+    selectedArtStyleId.value = artStyleId;
+    replaceVisualDraw(draw);
+    scheduleDrawPolling(draw);
+    if (draw.cards.every(card => card.status === 'failed')) {
+      toast.error('视觉简报已生成，但图片任务都没有提交成功');
+    } else {
+      toast.success('视觉卡已提交生成');
+    }
+  } catch (drawError: unknown) {
+    toast.error(drawError instanceof Error ? drawError.message : String(drawError));
+  } finally {
+    isDrawing.value = false;
+  }
+}
+
+function redrawVisualCards(draw: CharacterVisualCardDraw): void {
+  void generateVisualCards({ artStyleId: draw.artStyle.id });
+}
+
+function refineVisualCard(payload: {
+  card: CharacterVisualCard;
+  draw: CharacterVisualCardDraw;
+}): void {
+  void generateVisualCards({
+    artStyleId: payload.draw.artStyle.id,
+    guidance: `保留这个视觉方向并生成三个相近但有明确差异的变体：${payload.card.summary}\n可见特征：${payload.card.tags.join('、')}`,
+  });
+}
+
+function continueVisualDirection(card: CharacterVisualCard): void {
+  void send(
+    `我更喜欢视觉卡「${card.title}」的方向：${card.summary}。可见特征是${card.tags.join('、')}。我们继续聊这个方向，但先不要把这些外观假设写入角色档案。`,
+  );
 }
 
 async function send(text: string) {
@@ -195,13 +391,18 @@ function openWorkspace(): void {
   mobilePane.value = 'draft';
 }
 
-function openCharacterVisual(): void {
-  void router.push('/character-portrait');
-}
-
 watch(messages, messageList => applyToolOutputs(messageList));
 onMounted(() => {
   void initialize();
+});
+
+onBeforeUnmount(() => {
+  disposed = true;
+  for (const timer of pollTimers.values()) {
+    clearTimeout(timer);
+  }
+  pollTimers.clear();
+  pollingStates.value = {};
 });
 </script>
 
@@ -247,10 +448,25 @@ onMounted(() => {
         ]"
         aria-label="角色共创对话"
       >
-        <CharacterChatMessages :messages="messages" :status="chatStatus" @suggest="send" />
+        <CharacterChatMessages
+          :busy="isBusy || isDrawing"
+          :messages="messages"
+          :polling-states="pollingStates"
+          :preparing-visual="isDrawing"
+          :status="chatStatus"
+          :visual-draws="visualDraws"
+          @continue-visual="continueVisualDirection"
+          @redraw-visual="redrawVisualCards"
+          @refine-visual="refineVisualCard"
+          @suggest="send"
+        />
         <CharacterChatInput
           :disabled="isInputDisabled"
+          :draw-busy="isDrawing"
+          :draw-disabled="!canDrawVisual"
+          :draw-disabled-reason="drawDisabledReason"
           :status="chatStatus"
+          @draw="openVisualCardDialog"
           @send="send"
           @stop="stop"
         />
@@ -265,15 +481,17 @@ onMounted(() => {
         aria-label="角色档案"
       >
         <CharacterWorkspacePanel
-          :can-create-visual="canCreateVisual"
+          :can-draw-visual="canDrawVisual"
           :can-save="Boolean(proposedProfileMarkdown) && !isProfileSaved"
+          :draw-busy="isDrawing"
+          :draw-disabled-reason="drawDisabledReason"
           :draft="draft"
           :is-saving="isSaving"
           :profile-markdown="profileMarkdown"
           :saved="isProfileSaved"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeWorkspace"
-          @create-visual="openCharacterVisual"
+          @draw-visual="openVisualCardDialog"
           @save="saveProfile"
         />
       </aside>
@@ -293,5 +511,13 @@ onMounted(() => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <CharacterVisualCardDialog
+      v-model:open="isVisualCardDialogOpen"
+      v-model:selected-art-style-id="selectedArtStyleId"
+      :art-styles="artStyles"
+      :busy="isDrawing"
+      @generate="generateVisualCards()"
+    />
   </SagPage>
 </template>
