@@ -21,14 +21,24 @@ import type {
 
 type AssetKind = 'portrait' | 'sheet';
 
-interface GalleryEntry {
-  image: CharacterPortraitImage | null;
+interface GalleryEntryBase {
   imageIndex: number;
   key: string;
   kind: AssetKind;
   record: CharacterImageRecord;
-  type: 'image' | 'task';
 }
+
+interface GalleryImageEntry extends GalleryEntryBase {
+  image: CharacterPortraitImage;
+  type: 'image';
+}
+
+interface GalleryTaskEntry extends GalleryEntryBase {
+  image: null;
+  type: 'task';
+}
+
+type GalleryEntry = GalleryImageEntry | GalleryTaskEntry;
 
 const props = defineProps<{
   deletingFileName: string;
@@ -85,14 +95,16 @@ function createEntries(kind: AssetKind, records: CharacterImageRecord[]): Galler
       ];
     }
 
-    return record.images.map((image, imageIndex) => ({
-      image,
-      imageIndex,
-      key: `${kind}:${record.id}:${image.fileName}`,
-      kind,
-      record,
-      type: 'image' as const,
-    }));
+    return record.images.map(
+      (image, imageIndex): GalleryImageEntry => ({
+        image,
+        imageIndex,
+        key: `${kind}:${record.id}:${image.fileName}`,
+        kind,
+        record,
+        type: 'image',
+      }),
+    );
   });
 }
 
@@ -205,7 +217,7 @@ function formatDate(value: string): string {
             </div>
           </template>
 
-          <template v-else-if="entry.image">
+          <template v-else-if="entry.type === 'image'">
             <ImageViewer
               :alt="`${getImageName(entry)}预览`"
               :src="entry.image.url"

@@ -12,12 +12,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { ImageOutputSettings } from '@/components/sag/image-output-settings';
 import type {
   ArtStyle,
   CharacterDraft,
   CharacterPortraitResolution,
   CharacterPortraitSize,
 } from '@/types';
+import { CHARACTER_PORTRAIT_SIZES } from '@/types';
 
 defineProps<{
   artStyleId: string;
@@ -132,65 +134,17 @@ const emit = defineEmits<{
           />
         </section>
 
-        <section aria-labelledby="portrait-settings-heading">
-          <h2 id="portrait-settings-heading" class="mb-3 text-sm font-medium">输出规格</h2>
-          <div class="grid grid-cols-3 gap-3">
-            <div class="min-w-0 space-y-2">
-              <Label for="portrait-size">比例</Label>
-              <Select
-                :model-value="size"
-                @update:model-value="emit('update:size', $event as CharacterPortraitSize)"
-              >
-                <SelectTrigger id="portrait-size" class="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2:3">2:3</SelectItem>
-                  <SelectItem value="3:4">3:4</SelectItem>
-                  <SelectItem value="4:5">4:5</SelectItem>
-                  <SelectItem value="1:1">1:1</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="min-w-0 space-y-2">
-              <Label for="portrait-resolution">清晰度</Label>
-              <Select
-                :model-value="resolution"
-                @update:model-value="
-                  emit('update:resolution', $event as CharacterPortraitResolution)
-                "
-              >
-                <SelectTrigger id="portrait-resolution" class="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1k">1K</SelectItem>
-                  <SelectItem value="2k">2K</SelectItem>
-                  <SelectItem value="4k">4K</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="min-w-0 space-y-2">
-              <Label for="portrait-count">张数</Label>
-              <Select
-                :model-value="String(count)"
-                @update:model-value="emit('update:count', Number($event))"
-              >
-                <SelectTrigger id="portrait-count" class="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 张</SelectItem>
-                  <SelectItem value="2">2 张</SelectItem>
-                  <SelectItem value="3">3 张</SelectItem>
-                  <SelectItem value="4">4 张</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </section>
+        <ImageOutputSettings
+          id-prefix="portrait"
+          :count="count"
+          :disabled="busy"
+          :resolution="resolution"
+          :size="size"
+          :size-options="CHARACTER_PORTRAIT_SIZES"
+          @update:count="emit('update:count', $event)"
+          @update:resolution="emit('update:resolution', $event)"
+          @update:size="emit('update:size', $event as CharacterPortraitSize)"
+        />
       </div>
     </ScrollArea>
 

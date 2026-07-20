@@ -19,6 +19,7 @@ import {
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { ImageViewer } from '@/components/sag/image-viewer';
+import { ImageOutputSettings } from '@/components/sag/image-output-settings';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,7 @@ import type {
   StoryShotVersion,
   StoryVersionReference,
 } from '@/types';
-import { STORY_SHOT_LIMITS } from '@/types';
+import { ILLUSTRATION_SIZES, STORY_SHOT_LIMITS } from '@/types';
 
 const props = defineProps<{
   apimartConfigured: boolean;
@@ -304,44 +305,15 @@ function handleTitleChange(event: Event): void {
                   </Button>
                 </div>
               </div>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="space-y-2">
-                  <Label for="story-size">比例</Label>
-                  <Select
-                    :model-value="story.size"
-                    :disabled="structureLocked"
-                    @update:model-value="emit('update:size', $event as IllustrationSize)"
-                  >
-                    <SelectTrigger id="story-size" class="w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1:1">1:1</SelectItem>
-                      <SelectItem value="3:4">3:4</SelectItem>
-                      <SelectItem value="4:5">4:5</SelectItem>
-                      <SelectItem value="16:9">16:9</SelectItem>
-                      <SelectItem value="9:16">9:16</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div class="space-y-2">
-                  <Label for="story-resolution">清晰度</Label>
-                  <Select
-                    :model-value="story.resolution"
-                    :disabled="structureLocked"
-                    @update:model-value="
-                      emit('update:resolution', $event as CharacterPortraitResolution)
-                    "
-                  >
-                    <SelectTrigger id="story-resolution" class="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1k">1K</SelectItem>
-                      <SelectItem value="2k">2K</SelectItem>
-                      <SelectItem value="4k">4K</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              <ImageOutputSettings
+                id-prefix="story"
+                :disabled="structureLocked"
+                :resolution="story.resolution"
+                :size="story.size"
+                :size-options="ILLUSTRATION_SIZES"
+                @update:resolution="emit('update:resolution', $event)"
+                @update:size="emit('update:size', $event as IllustrationSize)"
+              />
               <Button
                 v-if="!characterAssetsReady"
                 variant="outline"

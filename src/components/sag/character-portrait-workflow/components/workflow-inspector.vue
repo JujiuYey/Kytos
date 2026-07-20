@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Image as ImageIcon, Images, WandSparkles } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
+import { ImageOutputSettings } from '@/components/sag/image-output-settings';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -134,28 +135,13 @@ const emit = defineEmits<{
             @update:model-value="emit('update-prompt', String($event))"
           />
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-2">
-            <Label>比例</Label>
-            <div class="flex h-9 items-center rounded-md border bg-muted/30 px-3 text-sm">16:9</div>
-          </div>
-          <div class="space-y-2">
-            <Label for="workflow-resolution">清晰度</Label>
-            <Select
-              :model-value="node.data.resolution"
-              @update:model-value="emit('update-resolution', $event as CharacterPortraitResolution)"
-            >
-              <SelectTrigger id="workflow-resolution" class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1k">1K</SelectItem>
-                <SelectItem value="2k">2K</SelectItem>
-                <SelectItem value="4k">4K</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <ImageOutputSettings
+          fixed-size="16:9"
+          id-prefix="workflow"
+          :resolution="node.data.resolution"
+          :title="null"
+          @update:resolution="emit('update-resolution', $event)"
+        />
       </div>
 
       <div v-else class="space-y-4 p-4">

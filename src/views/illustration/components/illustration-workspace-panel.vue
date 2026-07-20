@@ -30,6 +30,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ImageViewer } from '@/components/sag/image-viewer';
+import { ImageOutputSettings } from '@/components/sag/image-output-settings';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type {
   CharacterPortraitResolution,
@@ -39,6 +40,7 @@ import type {
   IllustrationTopic,
   IllustrationVersion,
 } from '@/types';
+import { ILLUSTRATION_SIZES } from '@/types';
 
 interface IllustrationCharacterReferencePreview {
   image: CharacterPortraitImage;
@@ -286,45 +288,15 @@ function handleTitleChange(event: Event): void {
           </CollapsibleContent>
         </Collapsible>
 
-        <section aria-labelledby="illustration-output-heading">
-          <h3 id="illustration-output-heading" class="mb-3 text-sm font-medium">输出规格</h3>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-2">
-              <Label for="illustration-size">比例</Label>
-              <Select
-                :model-value="size"
-                @update:model-value="emit('update:size', $event as IllustrationSize)"
-              >
-                <SelectTrigger id="illustration-size" class="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1:1">1:1</SelectItem>
-                  <SelectItem value="3:4">3:4</SelectItem>
-                  <SelectItem value="4:5">4:5</SelectItem>
-                  <SelectItem value="16:9">16:9</SelectItem>
-                  <SelectItem value="9:16">9:16</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div class="space-y-2">
-              <Label for="illustration-resolution">清晰度</Label>
-              <Select
-                :model-value="resolution"
-                @update:model-value="
-                  emit('update:resolution', $event as CharacterPortraitResolution)
-                "
-              >
-                <SelectTrigger id="illustration-resolution" class="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1k">1K</SelectItem>
-                  <SelectItem value="2k">2K</SelectItem>
-                  <SelectItem value="4k">4K</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </section>
+        <ImageOutputSettings
+          id-prefix="illustration"
+          :disabled="busy"
+          :resolution="resolution"
+          :size="size"
+          :size-options="ILLUSTRATION_SIZES"
+          @update:resolution="emit('update:resolution', $event)"
+          @update:size="emit('update:size', $event as IllustrationSize)"
+        />
 
         <section aria-labelledby="illustration-versions-heading">
           <div class="mb-3 flex items-center justify-between gap-3">

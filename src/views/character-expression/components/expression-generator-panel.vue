@@ -2,19 +2,14 @@
 import { Images, Sparkles, WandSparkles, X } from 'lucide-vue-next';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
+import { ImageOutputSettings } from '@/components/sag/image-output-settings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { CharacterExpressionSize, CharacterPortraitResolution } from '@/types';
+import { CHARACTER_EXPRESSION_SIZES } from '@/types';
 import type { ExpressionReferenceOption } from '../expression-reference';
 
 defineProps<{
@@ -148,64 +143,17 @@ const emit = defineEmits<{
           </div>
         </section>
 
-        <section aria-labelledby="expression-settings-heading">
-          <h2 id="expression-settings-heading" class="mb-3 text-sm font-medium">输出规格</h2>
-          <div class="grid grid-cols-3 gap-3">
-            <div class="min-w-0 space-y-2">
-              <Label for="expression-size">比例</Label>
-              <Select
-                :model-value="size"
-                @update:model-value="emit('update:size', $event as CharacterExpressionSize)"
-              >
-                <SelectTrigger id="expression-size" class="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1:1">1:1</SelectItem>
-                  <SelectItem value="3:4">3:4</SelectItem>
-                  <SelectItem value="4:5">4:5</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="min-w-0 space-y-2">
-              <Label for="expression-resolution">清晰度</Label>
-              <Select
-                :model-value="resolution"
-                @update:model-value="
-                  emit('update:resolution', $event as CharacterPortraitResolution)
-                "
-              >
-                <SelectTrigger id="expression-resolution" class="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1k">1K</SelectItem>
-                  <SelectItem value="2k">2K</SelectItem>
-                  <SelectItem value="4k">4K</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="min-w-0 space-y-2">
-              <Label for="expression-count">数量</Label>
-              <Select
-                :model-value="String(count)"
-                @update:model-value="emit('update:count', Number($event))"
-              >
-                <SelectTrigger id="expression-count" class="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 张</SelectItem>
-                  <SelectItem value="2">2 张</SelectItem>
-                  <SelectItem value="3">3 张</SelectItem>
-                  <SelectItem value="4">4 张</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </section>
+        <ImageOutputSettings
+          id-prefix="expression"
+          :count="count"
+          :disabled="busy"
+          :resolution="resolution"
+          :size="size"
+          :size-options="CHARACTER_EXPRESSION_SIZES"
+          @update:count="emit('update:count', $event)"
+          @update:resolution="emit('update:resolution', $event)"
+          @update:size="emit('update:size', $event as CharacterExpressionSize)"
+        />
       </div>
     </ScrollArea>
 
