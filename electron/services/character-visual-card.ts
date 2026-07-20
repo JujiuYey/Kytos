@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createDeepSeek } from '@ai-sdk/deepseek';
-import type { DeepSeekLanguageModelChatOptions } from '@ai-sdk/deepseek';
 import { generateText } from 'ai';
 import { z } from 'zod';
 import type { ArtStyle } from '../../shared/art-style';
 import type { CharacterDraft } from '../../shared/character';
-import { CHARACTER_DRAFT_FIELDS, DEFAULT_DEEPSEEK_MODEL } from '../../shared/character';
+import {
+  CHARACTER_DRAFT_FIELDS,
+  DEFAULT_DEEPSEEK_MODEL,
+  normalizeCharacterDraft,
+} from '../../shared/character';
 import type {
   CharacterPortraitImage,
   CharacterPortraitTaskStatus,
@@ -24,6 +26,7 @@ import { getArtStyle, readArtStyleReference } from './art-style';
 import { getActiveCharacterDirectory } from './character-library';
 import { loadCharacterDraft } from './character-workspace';
 import { getCredentialValue } from './credentials';
+import { createDeepSeekCompatibleProvider, DEEPSEEK_PROVIDER_OPTIONS } from './deepseek-provider';
 import { readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 
@@ -98,11 +101,7 @@ function parseImage(value: unknown): CharacterPortraitImage | null {
 }
 
 function parseDraft(value: unknown): CharacterDraft {
-  const draft = {} as CharacterDraft;
-  for (const field of CHARACTER_DRAFT_FIELDS) {
-    draft[field] = isRecord(value) && typeof value[field] === 'string' ? value[field] : '';
-  }
-  return draft;
+  return normalizeCharacterDraft(value);
 }
 
 function parseCard(value: unknown): CharacterVisualCard | null {
@@ -276,30 +275,25 @@ async function generateVisualHypotheses(
   request: GenerateCharacterVisualCardsRequest,
 ) {
   const apiKey = await getCredentialValue('deepseek');
-  const deepSeek = createDeepSeek({ apiKey });
+  const deepSeek = createDeepSeekCompatibleProvider(apiKey);
   const guidance = request.guidance?.trim();
   const { text } = await generateText({
     maxOutputTokens: 2_400,
     model: deepSeek(resolveDeepSeekModel(request.model)),
-    prompt: `角色叙事草稿：\n${JSON.stringify(draft, null, 2)}${
+    prompt: `角色结构化草稿：\n${JSON.stringify(draft, null, 2)}${
       guidance ? `\n\n本轮用户反馈：\n${guidance}` : ''
     }`,
-    providerOptions: {
-      deepseek: {
-        thinking: { type: 'disabled' },
-      } satisfies DeepSeekLanguageModelChatOptions,
-    },
-    system: `你是角色视觉概念设计师。输入是一份叙事角色草稿，不是外观规格书。请生成 3 个差异明确、可以被图片模型直接执行的视觉假设。
+    providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
+    system: `你是角色视觉概念设计师。输入是一份包含角色内核、形象锚点、视觉表现和一致性规则的结构化草稿。请生成 3 个可以被图片模型直接执行的完整形象方向。
 
 工作边界：
-1. 不要把“核心概念、性格、动机、经历、关系、说话方式”等原文直接复制到图片提示词。
-2. 只把叙事信息转译成可观察的脸部状态、发型、轮廓、体态、姿态、基础造型、道具和整体气质。
-3. 未确认的年龄、性别表达、族裔和外貌不能冒充角色事实；它们可以作为本轮可撤回的视觉假设，并让三张卡有意识地形成差异。
-4. 三个方案必须在人物轮廓或视觉重心上明显不同，不能只换颜色。
-5. prompt 使用简短分段，依次写：主体、可见特征、姿态与视线、构图、禁止项。只写画面中能看见的内容。
-6. 每个 summary 用一句中文解释这张卡选择了什么视觉方向；tags 只放 3 到 6 个具体可见标签。
-7. 不写画风，画风会由系统另外附加。
-8. 只输出 JSON，不要 Markdown、解释或代码围栏。
+1. 草稿中已经填写的形象锚点、视觉表现、必须保持和禁止出现内容都是硬约束，不能在三张卡之间随机改变。
+2. 角色内核只用于理解人物的行为表现，不能覆盖或重新推断已经明确的脸部、发型、体态、服装和配色。
+3. 草稿中仍为空白的视觉字段可以作为本轮可撤回的探索变量，并让三张卡形成有意义的差异。
+4. 三个方向必须是内部协调的完整组合，不要拆成互不相关的发型卡、五官卡或服装卡，也不能只换颜色。
+5. prompt 使用简短分段，依次写：主体、形象锚点、视觉表现、姿态与视线、构图、一致性禁止项。只写画面中能看见的内容。
+6. 每个 summary 用一句中文解释本卡探索了哪些未确定变量；tags 只放 3 到 6 个具体可见标签。
+7. 只输出 JSON，不要 Markdown、解释或代码围栏。
 
 JSON 结构：
 {"cards":[{"title":"方案名","summary":"一句话视觉假设","tags":["标签"],"prompt":"可直接生图的中文提示词"}]}`,

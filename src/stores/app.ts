@@ -11,7 +11,11 @@ const defaultSettings: AppSettings = {
 
 function migrateDeepSeekModel(model: string | undefined): string {
   const normalizedModel = model?.trim() ?? '';
-  if (normalizedModel === 'deepseek-chat' || normalizedModel === 'deepseek-reasoner') {
+  if (
+    normalizedModel === 'deepseek-chat' ||
+    normalizedModel === 'deepseek-reasoner' ||
+    normalizedModel === 'deepseek-v4-flash'
+  ) {
     return DEFAULT_DEEPSEEK_MODEL;
   }
   return normalizedModel;

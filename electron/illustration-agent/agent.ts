@@ -1,10 +1,12 @@
-import { createDeepSeek } from '@ai-sdk/deepseek';
-import type { DeepSeekLanguageModelChatOptions } from '@ai-sdk/deepseek';
 import { ToolLoopAgent, isStepCount, tool } from 'ai';
 import { z } from 'zod';
 import type { CharacterDraft } from '../../shared/character';
 import type { IllustrationBrief, IllustrationTopic } from '../../shared/illustration';
 import { updateIllustrationBrief } from '../services/illustration';
+import {
+  createDeepSeekCompatibleProvider,
+  DEEPSEEK_PROVIDER_OPTIONS,
+} from '../services/deepseek-provider';
 
 const briefFields = {
   action: z.string().max(20_000).optional(),
@@ -42,7 +44,7 @@ export function createIllustrationAgent(options: {
   stylePrompt: string | null;
   topic: IllustrationTopic;
 }) {
-  const deepSeek = createDeepSeek({ apiKey: options.apiKey });
+  const deepSeek = createDeepSeekCompatibleProvider(options.apiKey);
   let currentBrief = options.topic.brief;
 
   async function saveBrief(patch: Partial<IllustrationBrief> & { title?: string }, ready: boolean) {
@@ -61,11 +63,7 @@ export function createIllustrationAgent(options: {
 
   return new ToolLoopAgent({
     model: deepSeek(options.model),
-    providerOptions: {
-      deepseek: {
-        thinking: { type: 'disabled' },
-      } satisfies DeepSeekLanguageModelChatOptions,
-    },
+    providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
     instructions: `你是一个插画共创 Agent。你通过自然对话帮助用户把模糊想法整理成可直接生图的画面方案。
 
 工作规则：

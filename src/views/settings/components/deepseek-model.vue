@@ -30,7 +30,7 @@ const deepseekModel = computed({
         id="deepseek-model"
         v-model="deepseekModel"
         class="font-mono"
-        placeholder="例如 deepseek-v4-flash"
+        placeholder="例如 deepseek-v4-pro"
       />
     </div>
   </div>

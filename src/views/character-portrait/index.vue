@@ -128,19 +128,29 @@ const uploadDescription = '填写图片名称后上传。上传完成后可按�
 function buildPortraitPrompt(character: CharacterDraft): string {
   const characterDetails = [
     character.name && `角色姓名：${character.name}`,
-    character.concept && `核心概念：${character.concept}`,
-    character.personality && `性格气质：${character.personality}`,
-    character.motivation && `内在动机：${character.motivation}`,
-    character.background && `背景经历：${character.background}`,
-    character.relationships && `人物关系：${character.relationships}`,
-    character.speechStyle && `表达方式：${character.speechStyle}`,
+    character.visualSummary && `视觉总述：${character.visualSummary}`,
+    character.ageAndBuild && `年龄与体态：${character.ageAndBuild}`,
+    character.faceAnchor && `脸部锚点：${character.faceAnchor}`,
+    character.hairAnchor && `发型锚点：${character.hairAnchor}`,
+    character.defaultOutfit && `默认服装：${character.defaultOutfit}`,
+    character.characterPalette && `角色配色：${character.characterPalette}`,
+    character.signatureItems && `标志物：${character.signatureItems}`,
+    character.silhouetteMarkers && `轮廓识别点：${character.silhouetteMarkers}`,
+    character.visualMedium && `表现形式：${character.visualMedium}`,
+    character.lineAndShape && `线条与造型：${character.lineAndShape}`,
+    character.colorRules && `色彩规则：${character.colorRules}`,
+    character.detailDensity && `细节密度：${character.detailDensity}`,
+    character.backgroundRules && `背景规则：${character.backgroundRules}`,
+    character.textRules && `文字规则：${character.textRules}`,
+    character.mustKeep && `必须保持：${character.mustKeep}`,
+    character.forbiddenElements && `禁止出现：${character.forbiddenElements}`,
   ].filter((item): item is string => Boolean(item));
 
   return [
-    '根据以下人物设定探索原创角色的视觉形象，并绘制一张专业定妆照。',
+    '根据以下已经确认的角色视觉定义绘制一张专业定妆照。',
     ...characterDetails,
-    '把人物的核心概念、性格、动机与经历转译成具有辨识度且内外一致的脸部特征、发型、体态和整体气质。',
-    '画面要求：单一角色，全身正面站立，自然中性姿态，完整展示头部到鞋底；人物居中，比例准确，轮廓清晰。选择符合人物处境的基础造型，但不要把服装或配饰作为唯一身份识别。只生成人物，不包含任何背景，多余物品',
+    '严格保持人物形象锚点和一致性规则，不要根据性格、动机或故事背景重新推断和设计长相。',
+    '画面要求：单一角色，全身正面站立，自然中性姿态，完整展示头部到鞋底；人物居中，比例准确，轮廓清晰。遵循已经确认的默认服装、角色配色和视觉表现规则。',
     '禁止：裁切人物、多人、多视角拼贴、设定表排版、文字、标注、Logo、水印。',
   ].join('\n');
 }

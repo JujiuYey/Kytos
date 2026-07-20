@@ -89,12 +89,17 @@ export type {
 export { CHARACTER_VISUAL_CARD_COUNT } from '../../shared/character-visual-card';
 export {
   CHARACTER_AGENT_ENDPOINT,
+  CHARACTER_CONSISTENCY_FIELDS,
   CHARACTER_CORE_FIELDS,
   CHARACTER_DRAFT_FIELDS,
+  CHARACTER_ROLE_CORE_FIELDS,
+  CHARACTER_VISUAL_ANCHOR_FIELDS,
+  CHARACTER_VISUAL_PRESENTATION_FIELDS,
   DEFAULT_DEEPSEEK_MODEL,
   createEmptyCharacterDraft,
   getCharacterDraftProgress,
   isCharacterDraftReady,
+  normalizeCharacterDraft,
 } from '../../shared/character';
 export {
   CHARACTER_PORTRAIT_RESOLUTIONS,

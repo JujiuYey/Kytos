@@ -5,7 +5,7 @@ import type {
   CharacterWorkspaceState,
   SaveCharacterProfileRequest,
 } from '../../shared/character';
-import { CHARACTER_DRAFT_FIELDS, createEmptyCharacterDraft } from '../../shared/character';
+import { normalizeCharacterDraft } from '../../shared/character';
 import { getActiveCharacterDirectory, updateActiveCharacterName } from './character-library';
 import { isNodeError, readJsonFile, writeJsonFile, writeTextFile } from './json-store';
 
@@ -13,19 +13,7 @@ const DRAFT_FILE_NAME = 'character-draft.json';
 const PROFILE_FILE_NAME = 'ip.md';
 
 function parseCharacterDraft(value: unknown): CharacterDraft {
-  const draft = createEmptyCharacterDraft();
-  if (!value || typeof value !== 'object') {
-    return draft;
-  }
-
-  const record = value as Record<string, unknown>;
-  for (const field of CHARACTER_DRAFT_FIELDS) {
-    const fieldValue = record[field];
-    if (typeof fieldValue === 'string') {
-      draft[field] = fieldValue;
-    }
-  }
-  return draft;
+  return normalizeCharacterDraft(value);
 }
 
 async function readOptionalTextFile(filePath: string): Promise<string | null> {

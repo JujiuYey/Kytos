@@ -97,21 +97,21 @@ const emit = defineEmits<{
               <dd class="break-words">{{ draft.name || '尚未命名' }}</dd>
             </div>
             <div class="grid grid-cols-[72px_minmax(0,1fr)] gap-3 py-3">
-              <dt class="text-muted-foreground">核心概念</dt>
+              <dt class="text-muted-foreground">视觉总述</dt>
               <dd class="line-clamp-4 whitespace-pre-wrap break-words">
-                {{ draft.concept || '角色共创尚未整理核心概念' }}
+                {{ draft.visualSummary || '角色共创尚未整理视觉总述' }}
               </dd>
             </div>
             <div class="grid grid-cols-[72px_minmax(0,1fr)] gap-3 py-3">
-              <dt class="text-muted-foreground">人物性格</dt>
+              <dt class="text-muted-foreground">形象锚点</dt>
               <dd class="line-clamp-4 whitespace-pre-wrap break-words">
-                {{ draft.personality || '角色共创尚未整理人物性格' }}
+                {{ draft.faceAnchor || draft.hairAnchor || '角色共创尚未整理脸部与发型锚点' }}
               </dd>
             </div>
             <div class="grid grid-cols-[72px_minmax(0,1fr)] gap-3 py-3">
-              <dt class="text-muted-foreground">人物动机</dt>
+              <dt class="text-muted-foreground">视觉表现</dt>
               <dd class="line-clamp-4 whitespace-pre-wrap break-words">
-                {{ draft.motivation || '角色共创尚未整理人物动机' }}
+                {{ draft.visualMedium || draft.lineAndShape || '角色共创尚未整理视觉表现' }}
               </dd>
             </div>
           </dl>

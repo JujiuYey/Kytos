@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createDeepSeek } from '@ai-sdk/deepseek';
-import type { DeepSeekLanguageModelChatOptions } from '@ai-sdk/deepseek';
 import { generateText } from 'ai';
 import { DEFAULT_DEEPSEEK_MODEL } from '../../shared/character';
 import type {
@@ -33,6 +31,7 @@ import type { SavedFileResult } from '../../shared/desktop';
 import { getCharacterDirectory } from './character-library';
 import { getCharacterPortraitWorkspace } from './character-portrait';
 import { getCredentialValue } from './credentials';
+import { createDeepSeekCompatibleProvider, DEEPSEEK_PROVIDER_OPTIONS } from './deepseek-provider';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 
@@ -309,16 +308,12 @@ export async function generateCharacterExpressionPrompt(
     throw new Error('请先填写有效的表情名称');
   }
   const apiKey = await getCredentialValue('deepseek');
-  const deepSeek = createDeepSeek({ apiKey });
+  const deepSeek = createDeepSeekCompatibleProvider(apiKey);
   const { text } = await generateText({
     maxOutputTokens: 600,
     model: deepSeek(resolveDeepSeekModel(request.model)),
     prompt: `表情名称：${request.name.trim()}`,
-    providerOptions: {
-      deepseek: {
-        thinking: { type: 'disabled' },
-      } satisfies DeepSeekLanguageModelChatOptions,
-    },
+    providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
     system: `你负责为角色表情图生图编写中文提示词。根据用户给出的表情名称，输出一段可直接编辑和用于生图的表情描述。
 
 要求：

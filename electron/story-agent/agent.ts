@@ -1,5 +1,3 @@
-import { createDeepSeek } from '@ai-sdk/deepseek';
-import type { DeepSeekLanguageModelChatOptions } from '@ai-sdk/deepseek';
 import { ToolLoopAgent, isStepCount, tool } from 'ai';
 import { z } from 'zod';
 import type { CharacterDraft } from '../../shared/character';
@@ -11,6 +9,10 @@ import {
   presentStoryboard,
   updateStoryDraft,
 } from '../services/story';
+import {
+  createDeepSeekCompatibleProvider,
+  DEEPSEEK_PROVIDER_OPTIONS,
+} from '../services/deepseek-provider';
 
 const draftFields = {
   conflict: z.string().max(20_000).optional(),
@@ -79,7 +81,7 @@ export function createStoryAgent(options: {
   styleName: string | null;
   stylePrompt: string | null;
 }) {
-  const deepSeek = createDeepSeek({ apiKey: options.apiKey });
+  const deepSeek = createDeepSeekCompatibleProvider(options.apiKey);
   let currentDraft = options.story.draft;
   let currentShots = options.story.shots;
   const artStyleContext =
@@ -95,11 +97,7 @@ export function createStoryAgent(options: {
 
   return new ToolLoopAgent({
     model: deepSeek(options.model),
-    providerOptions: {
-      deepseek: {
-        thinking: { type: 'disabled' },
-      } satisfies DeepSeekLanguageModelChatOptions,
-    },
+    providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
     instructions: `你是一个短篇图文故事共创 Agent。你通过自然对话，把用户的想法整理成一段围绕当前角色展开、最终可拆成 3 至 6 幅连续插画的短故事。
 
 工作规则：

@@ -8,6 +8,8 @@ import {
   ConversationEmptyState,
   ConversationScrollButton,
 } from '@/components/ai-elements/conversation';
+import type { AttachmentData } from '@/components/ai-elements/attachments';
+import { Attachment, AttachmentPreview, Attachments } from '@/components/ai-elements/attachments';
 import { Loader } from '@/components/ai-elements/loader';
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
 import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion';
@@ -39,20 +41,49 @@ const emit = defineEmits<{
 const chronologicalVisualDraws = computed(() => [...props.visualDraws].reverse());
 
 const fieldLabels: Record<CharacterDraftField, string> = {
-  background: '背景',
-  concept: '核心概念',
-  motivation: '动机',
+  ageAndBuild: '年龄与体态',
+  allowedChanges: '允许变化',
+  backgroundRules: '背景规则',
+  behavioralContradiction: '行为矛盾',
+  characterPalette: '角色配色',
+  colorRules: '色彩规则',
+  dailyContext: '日常处境',
+  defaultOutfit: '默认服装',
+  detailDensity: '细节密度',
+  faceAnchor: '脸部锚点',
+  forbiddenElements: '禁止出现',
+  hairAnchor: '发型锚点',
+  lineAndShape: '线条与造型',
+  mustKeep: '必须保持',
   name: '姓名',
-  personality: '性格',
-  relationships: '关系',
-  speechStyle: '说话方式',
+  narrativeNotes: '叙事备注',
+  referenceImageNotes: '参考形象说明',
+  rolePositioning: '角色定位',
+  signatureItems: '标志物',
+  silhouetteMarkers: '轮廓识别点',
+  textRules: '文字规则',
+  visualMedium: '表现形式',
+  visualSummary: '视觉总述',
 };
 
 const startingSuggestions = [
   '我有一个角色想法，帮我逐步完善',
   '从零开始问我问题，创建一个新角色',
-  '我想先确定角色的核心概念',
+  '我想先确定角色定位和人物形象',
 ];
+
+function getMessageAttachments(message: CharacterAgentMessage): AttachmentData[] {
+  return message.parts.flatMap((part, index) =>
+    part.type === 'file'
+      ? [
+          {
+            ...part,
+            id: `${message.id}-${index}`,
+          },
+        ]
+      : [],
+  );
+}
 </script>
 
 <template>
@@ -79,6 +110,19 @@ const startingSuggestions = [
 
       <Message v-for="message in messages" :key="message.id" :from="message.role">
         <MessageContent class="w-full">
+          <Attachments
+            v-if="getMessageAttachments(message).length"
+            variant="grid"
+            class="mb-2 ml-0 w-full"
+          >
+            <Attachment
+              v-for="attachment in getMessageAttachments(message)"
+              :key="attachment.id"
+              :data="attachment"
+            >
+              <AttachmentPreview />
+            </Attachment>
+          </Attachments>
           <template v-for="(part, index) in message.parts" :key="`${message.id}-${index}`">
             <MessageResponse v-if="part.type === 'text'" :content="part.text" />
 

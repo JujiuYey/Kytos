@@ -9,6 +9,8 @@ interface CharacterAgentRequestBody {
   model?: string;
 }
 
+const MAX_CHARACTER_CHAT_REQUEST_BYTES = 64 * 1024 * 1024;
+
 function resolveModel(model: string | undefined): string {
   if (!model || model === 'deepseek-chat' || model === 'deepseek-reasoner') {
     return DEFAULT_DEEPSEEK_MODEL;
@@ -57,7 +59,7 @@ export async function handleCharacterAgentRequest(request: Request): Promise<Res
 
   try {
     const contentLength = Number(request.headers.get('content-length') ?? 0);
-    if (contentLength > 2_000_000) {
+    if (contentLength > MAX_CHARACTER_CHAT_REQUEST_BYTES) {
       throw new Error('对话请求过大');
     }
     const body = parseRequestBody(await request.json());

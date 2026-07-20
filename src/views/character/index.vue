@@ -39,6 +39,7 @@ import CharacterChatInput from './components/character-chat-input.vue';
 import CharacterChatMessages from './components/character-chat-messages.vue';
 import CharacterVisualCardDialog from './components/character-visual-card-dialog.vue';
 import CharacterWorkspacePanel from './components/character-workspace-panel.vue';
+import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 
 const appStore = useAppStore();
 const draft = ref<CharacterDraft>(createEmptyCharacterDraft());
@@ -68,10 +69,11 @@ const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured)
 const imageKeyConfigured = computed(() => Boolean(imageCredentialStatus.value?.configured));
 const hasCharacterSeed = computed(() =>
   [
-    draft.value.concept,
-    draft.value.personality,
-    draft.value.motivation,
-    draft.value.background,
+    draft.value.rolePositioning,
+    draft.value.visualSummary,
+    draft.value.ageAndBuild,
+    draft.value.faceAnchor,
+    draft.value.visualMedium,
   ].some(value => Boolean(value.trim())),
 );
 
@@ -117,7 +119,7 @@ const drawDisabledReason = computed(() => {
     return '请先准备至少一种画风';
   }
   if (!hasCharacterSeed.value) {
-    return '先聊出核心概念、性格、动机或背景中的至少一项';
+    return '先聊出人物种子或一个明确的形象方向';
   }
   return '';
 });
@@ -339,11 +341,13 @@ function continueVisualDirection(card: CharacterVisualCard): void {
   );
 }
 
-async function send(text: string) {
-  if (!text.trim() || isInputDisabled.value || isBusy.value) {
+async function send(message: string | PromptInputMessage) {
+  const text = typeof message === 'string' ? message.trim() : message.text.trim();
+  const files = typeof message === 'string' ? [] : message.files;
+  if ((!text && files.length === 0) || isInputDisabled.value || isBusy.value) {
     return;
   }
-  await sendMessage({ text: text.trim() });
+  await sendMessage({ files, text });
 }
 
 async function retry() {
