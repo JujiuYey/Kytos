@@ -17,7 +17,6 @@ export type FieldType
     | 'datetime'
     | 'time'
     | 'file-upload'
-    | 'avatar-upload'
     | 'tags-input'
     | 'divider';
 

@@ -36,7 +36,6 @@ export function usePlaceholder(label: string, type: FieldType): string {
       return `请选择${label}时间`;
 
     case 'file-upload':
-    case 'avatar-upload':
       return `请上传${label}`;
 
     case 'tags-input':

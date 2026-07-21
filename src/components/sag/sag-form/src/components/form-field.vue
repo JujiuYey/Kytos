@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 
-import { AvatarUpload, FileUpload } from '@/components/sag/file-upload';
+import { FileUpload } from '@/components/sag/file-upload';
 import { TagsInput, TagsInputInput, TagsInputItem, TagsInputItemDelete, TagsInputItemText } from '@/components/ui/tags-input';
 import DatePicker from '@/components/sag/sag-date-picker/index.vue';
 import SagSelect from '@/components/sag/sag-select/index.vue';
@@ -76,22 +76,6 @@ const fileUploadProps = computed(() => {
     'accept': fieldProps?.accept || '',
     'multiple': fieldProps?.multiple || false,
     'maxFileSize': fieldProps?.maxFileSize,
-    'uploadParams': fieldProps?.uploadParams || {},
-    'uploadHeaders': fieldProps?.uploadHeaders || {},
-  };
-});
-
-// 计算头像上传组件的属性
-const avatarUploadProps = computed(() => {
-  const { props: fieldProps } = props.field;
-
-  return {
-    'modelValue': props.modelValue,
-    'placeholder': props.field.placeholder || usePlaceholder(props.field.label, props.field.type),
-    'disabled': props.field.disabled || props.field.readonly,
-    'onUpdate:modelValue': handleUpdate,
-    // 确保有默认的上传URL，或者从fieldProps中获取
-    'uploadUrl': fieldProps?.uploadUrl || '/file/upload',
     'uploadParams': fieldProps?.uploadParams || {},
     'uploadHeaders': fieldProps?.uploadHeaders || {},
   };
@@ -169,12 +153,6 @@ const tagsValue = computed({
     <FileUpload
       v-else-if="field.type === 'file-upload'"
       v-bind="fileUploadProps"
-    />
-
-    <!-- 头像上传 -->
-    <AvatarUpload
-      v-else-if="field.type === 'avatar-upload'"
-      v-bind="avatarUploadProps"
     />
 
     <!-- 标签输入 -->
