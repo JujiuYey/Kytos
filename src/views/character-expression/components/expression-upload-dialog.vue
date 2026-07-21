@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import {
   Dialog,
   DialogContent,
@@ -7,8 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { FileUpload } from '@/components/sag/file-upload';
 import type { SaveFileRequest, SavedFileResult } from '@/types';
 
@@ -22,25 +20,23 @@ const emit = defineEmits<{
   (event: 'update:open', value: boolean): void;
 }>();
 
-const name = ref('');
 const uploadKey = ref(0);
-const normalizedName = computed(() => name.value.trim());
 
 watch(
   () => props.open,
   open => {
     if (open) {
-      name.value = '';
       uploadKey.value += 1;
     }
   },
 );
 
 function upload(request: SaveFileRequest): Promise<SavedFileResult> {
-  if (!normalizedName.value) {
-    return Promise.reject(new Error('请先填写表情名称'));
-  }
-  return props.uploadHandler(normalizedName.value, request);
+  const extensionIndex = request.fileName.lastIndexOf('.');
+  const fileNameWithoutExtension =
+    extensionIndex > 0 ? request.fileName.slice(0, extensionIndex) : request.fileName;
+  const expressionName = fileNameWithoutExtension.trim().slice(0, 80).trim() || '未命名表情';
+  return props.uploadHandler(expressionName, request);
 }
 
 function handleUploaded(result: SavedFileResult) {
@@ -54,26 +50,12 @@ function handleUploaded(result: SavedFileResult) {
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
         <DialogTitle>上传表情</DialogTitle>
-        <DialogDescription
-          >填写名称并上传一张已有表情，图片会保存到当前作品工作区。</DialogDescription
-        >
+        <DialogDescription>
+          上传一张已有表情，文件名会自动作为表情名称并保存到当前作品工作区。
+        </DialogDescription>
       </DialogHeader>
 
-      <div class="space-y-2">
-        <div class="flex items-center justify-between gap-3">
-          <Label for="upload-expression-name">表情名称</Label>
-          <span class="text-xs tabular-nums text-muted-foreground">{{ name.length }} / 80</span>
-        </div>
-        <Input
-          id="upload-expression-name"
-          v-model="name"
-          maxlength="80"
-          placeholder="例如：开心、委屈、震惊"
-        />
-      </div>
-
       <FileUpload
-        v-if="normalizedName"
         :key="uploadKey"
         accept="image/png,image/jpeg,image/webp,image/avif"
         :max-file-size="20 * 1024 * 1024"
@@ -83,12 +65,6 @@ function handleUploaded(result: SavedFileResult) {
         :upload-handler="upload"
         @upload-success="handleUploaded"
       />
-      <div
-        v-else
-        class="flex min-h-36 items-center justify-center rounded-md border border-dashed px-6 text-center text-sm text-muted-foreground"
-      >
-        填写表情名称后即可选择图片
-      </div>
     </DialogContent>
   </Dialog>
 </template>
