@@ -1,0 +1,1 @@
+export { default as SagStatusBadge } from './index.vue';

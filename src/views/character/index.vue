@@ -15,9 +15,9 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
-import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
+import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
-import SagStatusBadge from '@/components/sag/status-badge.vue';
+import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { CharacterImageSize, CharacterLibraryState, CharacterSummary } from '@/types';
 
 const router = useRouter();

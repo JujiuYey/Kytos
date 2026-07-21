@@ -7,7 +7,7 @@ import { useChat } from '@ai-sdk/vue';
 import { toast } from 'vue-sonner';
 import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
-import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
+import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {

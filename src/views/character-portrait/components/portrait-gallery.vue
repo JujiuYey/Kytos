@@ -12,7 +12,7 @@ import {
   type GenerationTaskPollingState,
 } from '@/components/sag/generation-polling-status';
 import { ImageViewer } from '@/components/sag/image-viewer';
-import SagStatusBadge from '@/components/sag/status-badge.vue';
+import { SagStatusBadge } from '@/components/sag/status-badge';
 import type {
   CharacterImageRecord,
   CharacterPortraitImage,

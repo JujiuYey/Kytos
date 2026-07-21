@@ -4,8 +4,8 @@ import { toast } from 'vue-sonner';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { ImageReferencePickerDialog } from '@/components/sag/image-reference-picker-dialog';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
-import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
-import SagMissingPrerequisiteAlert from '@/components/sag/sag-missing-prerequisite-alert.vue';
+import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
+import { SagMissingPrerequisiteAlert } from '@/components/sag/missing-prerequisite-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {

@@ -22,7 +22,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
-import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
+import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import type {
   CharacterPortraitImage,

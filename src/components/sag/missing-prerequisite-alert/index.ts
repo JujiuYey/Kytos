@@ -1,0 +1,1 @@
+export { default as SagMissingPrerequisiteAlert } from './index.vue';

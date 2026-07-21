@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import SagStatusBadge from '@/components/sag/status-badge.vue';
+import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { CredentialService, CredentialStatus } from '@/types';
 
 interface Props {

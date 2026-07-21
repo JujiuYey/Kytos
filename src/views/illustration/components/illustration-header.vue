@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import SagStatusBadge from '@/components/sag/status-badge.vue';
+import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { IllustrationTopic } from '@/types';
 
 defineProps<{

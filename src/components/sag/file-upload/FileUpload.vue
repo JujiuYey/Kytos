@@ -12,7 +12,7 @@ import {
 } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import SagStatusBadge from '@/components/sag/status-badge.vue';
+import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { UploadResult } from './types';
 import { useAppStore } from '@/stores/app';
 import type { SaveFileRequest } from '@/types';

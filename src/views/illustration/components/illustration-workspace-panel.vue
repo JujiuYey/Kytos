@@ -25,7 +25,7 @@ import {
 } from '@/components/sag/generation-polling-status';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { ImageOutputSettings } from '@/components/sag/image-output-settings';
-import SagStatusBadge from '@/components/sag/status-badge.vue';
+import { SagStatusBadge } from '@/components/sag/status-badge';
 import type {
   CharacterPortraitResolution,
   CharacterPortraitImage,

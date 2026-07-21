@@ -20,9 +20,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
-import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
+import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
-import SagStatusBadge from '@/components/sag/status-badge.vue';
+import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { CharacterPortraitImage, StoryProject } from '@/types';
 
 type StoryStatusTone = 'error' | 'info' | 'neutral' | 'success' | 'warning';

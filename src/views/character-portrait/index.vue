@@ -8,7 +8,7 @@ import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upl
 import { CharacterPortraitWorkflow } from '@/components/sag/character-portrait-workflow';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
-import SagMissingPrerequisiteAlert from '@/components/sag/sag-missing-prerequisite-alert.vue';
+import { SagMissingPrerequisiteAlert } from '@/components/sag/missing-prerequisite-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import type {
   CharacterDraft,

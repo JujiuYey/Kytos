@@ -11,7 +11,7 @@ import {
   type ImageReferencePickerOption,
 } from '@/components/sag/image-reference-picker-dialog';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
-import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
+import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import { useCredentialStatus } from '@/composables/use-credential-status';
 import { useGenerationPolling } from '@/composables/use-generation-polling';
