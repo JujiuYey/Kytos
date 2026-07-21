@@ -22,10 +22,10 @@ defineProps<{
       <slot>
         <div class="flex justify-center gap-2">
           <Button variant="outline" @click="$router.back()">
-            Go Back
+            返回上一页
           </Button>
           <Button @click="$router.push('/')">
-            Back to Home
+            返回首页
           </Button>
         </div>
       </slot>

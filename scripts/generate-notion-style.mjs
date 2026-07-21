@@ -5,15 +5,18 @@ import { fileURLToPath } from 'node:url';
 const API_BASE_URL = 'https://api.apimart.ai';
 const apiKey = process.env.APIMART_API_KEY;
 
-const prompt = `现代互联网产品高对比撞色线性人物插画，清晰、活泼，有强烈的产品插画辨识度。
+const characterDescription = '20-30 岁的年轻男性，穿着卫衣与长裤。';
 
-只表现一个用户设定的单人角色，全身入镜。人物比例采用风格化的产品插画语言：头部适度简化，身体轮廓由几何曲线组成，四肢可以略微修长，动作自然且有轻微叙事感。年龄、性别、脸部、发型、服装、配饰和动作完全以用户设定为准，不自行补充具体人物细节。
+const prompt = `现代极简产品人物插画，纯粹克制的单线矢量风格。
 
-背景为纯白色，保留大量留白。使用清晰有力、粗细稳定的深色轮廓线和高纯度纯色平涂，形成明确的高对比视觉节奏。颜色优先使用用户明确指定的颜色；如果用户没有指定颜色，才使用深海军蓝、青绿色、亮黄色和钴蓝色作为默认撞色组合。完全不使用渐变、写实光影、纹理或体积光。
+只表现用户设定的一个单人角色，全身入镜，人物的年龄、性别、发型、服装、配饰和动作完全以人物设定为准，不自行补充具体外貌或穿着。人物比例简洁自然，可以有轻微的友好感，但不要夸张大头或卡通化变形。
 
-整体像现代互联网产品的功能插画和空状态插画，造型大胆、色块清楚、人物动作有叙事感。1:1 方形构图，人物居中，全身完整可见，高清。不要添加用户未提及的场景和物件，不要出现多人、文字、Logo 或水印。
+背景保持纯白或接近白色，保留大量留白。使用稳定、连续、圆润的单色轮廓线，线条粗细基本一致，内部细节克制，像现代互联网产品中的角色动作插画。颜色使用黑色描绘线条。
+发型使用黑色填充
 
-最终优先级：人物设定和配色字段最高；风格要求只负责表现技法。若两者冲突，必须使用人物设定和配色字段，不能用风格默认值覆盖用户明确指定的内容。`;
+人物设定：${characterDescription}
+
+1:1 方形构图，人物居中，全身完整可见，高清。不要添加人物设定未提及的场景和物件，不要使用渐变、写实光影、纹理或摄影质感，不要出现多人、文字、Logo 或水印。`;
 
 if (!apiKey) {
   throw new Error('请先设置 APIMART_API_KEY');
@@ -57,8 +60,7 @@ let imageUrl = '';
 for (let attempt = 1; attempt <= 100; attempt += 1) {
   await new Promise(resolve => setTimeout(resolve, 3000));
   const task = await request(`${API_BASE_URL}/v1/tasks/${encodeURIComponent(taskId)}?language=zh`);
-  const { error, progress, result, status } = task.data ?? {};
-  console.log(`生成状态：${status ?? 'unknown'} ${progress ?? 0}%`);
+  const { error, result, status } = task.data ?? {};
   console.log(`第${attempt}次尝试，taskId ${taskId}%`);
 
   if (status === 'completed') {
