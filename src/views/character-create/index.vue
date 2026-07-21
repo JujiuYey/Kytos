@@ -195,7 +195,7 @@ async function saveUploadedAsOfficial(): Promise<void> {
   if (!file || isSaving.value) return;
   isSaving.value = true;
   try {
-    const result = await window.desktop.saveCharacterVisualAsset({
+    const result = await window.desktop.character.visual.saveCharacterVisualAsset({
       characterId:
         isEditing.value && typeof route.query.characterId === 'string'
           ? route.query.characterId
@@ -230,7 +230,7 @@ async function generateImage(): Promise<void> {
   isSaved.value = false;
   generationCount.value += 1;
   try {
-    activeGeneration.value = await window.desktop.generateCharacterVisual({
+    activeGeneration.value = await window.desktop.character.visual.generateCharacterVisual({
       prompt: prompt.value,
       referenceImage: sourceImageFile.value
         ? {
@@ -249,7 +249,7 @@ async function generateImage(): Promise<void> {
 
 async function pollGeneration(generationId: string): Promise<void> {
   try {
-    const generation = await window.desktop.getCharacterVisualGeneration({ generationId });
+    const generation = await window.desktop.character.visual.getCharacterVisualGeneration({ generationId });
     activeGeneration.value = generation;
     if (['submitted', 'pending', 'processing'].includes(generation.status)) {
       generationTimer = setTimeout(() => void pollGeneration(generationId), 2500);
@@ -273,7 +273,7 @@ async function saveImage(): Promise<void> {
   isSaving.value = true;
   try {
     if (!activeGeneration.value?.image) throw new Error('未找到当前生成结果');
-    const result = await window.desktop.saveCharacterVisual({
+    const result = await window.desktop.character.visual.saveCharacterVisual({
       characterId:
         isEditing.value && typeof route.query.characterId === 'string'
           ? route.query.characterId

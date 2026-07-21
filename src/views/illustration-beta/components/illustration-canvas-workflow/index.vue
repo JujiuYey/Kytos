@@ -463,7 +463,7 @@ async function pollTask(taskId: string): Promise<void> {
     return;
   }
   try {
-    const record = await window.desktop.getCharacterSheetTask(taskId);
+    const record = await window.desktop.character.portrait.getCharacterSheetTask(taskId);
     updateGeneratorStatus('generator', {
       errorMessage: record.errorMessage || '',
       progress: record.progress,
@@ -534,7 +534,7 @@ async function generateFromNode(generatorId = 'generator'): Promise<void> {
     status: 'submitted',
   });
   try {
-    const record = await window.desktop.generateCharacterSheet({
+    const record = await window.desktop.character.portrait.generateCharacterSheet({
       name: generator.data.name.trim(),
       prompt: generator.data.prompt.trim(),
       referenceAssets,
@@ -561,8 +561,8 @@ async function initialize(): Promise<void> {
   errorMessage.value = '';
   try {
     const [workspace, status] = await Promise.all([
-      window.desktop.getCharacterPortraitWorkspace(),
-      window.desktop.getCredentialStatus('apimart'),
+      window.desktop.character.portrait.getCharacterPortraitWorkspace(),
+      window.desktop.settings.getCredentialStatus('apimart'),
     ]);
     credentialStatus.value = status;
     assetOptions.value = createAssetOptions(workspace);

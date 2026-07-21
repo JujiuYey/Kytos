@@ -50,7 +50,7 @@ async function loadLibrary(): Promise<void> {
   loading.value = true;
   errorMessage.value = '';
   try {
-    library.value = await window.desktop.getCharacterLibrary();
+    library.value = await window.desktop.character.library.getCharacterLibrary();
   } catch (error: unknown) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -68,7 +68,7 @@ async function editCharacter(character: CharacterSummary): Promise<void> {
   }
   busy.value = true;
   try {
-    library.value = await window.desktop.selectCharacter({ characterId: character.id });
+    library.value = await window.desktop.character.library.selectCharacter({ characterId: character.id });
     await router.push({
       name: 'character-create',
       query: { characterId: character.id, mode: 'edit' },
@@ -87,7 +87,7 @@ async function confirmDelete(): Promise<void> {
   }
   busy.value = true;
   try {
-    library.value = await window.desktop.deleteCharacter({ characterId: target.id });
+    library.value = await window.desktop.character.library.deleteCharacter({ characterId: target.id });
     deleteTarget.value = null;
     toast.success('角色已移除');
   } catch (error: unknown) {

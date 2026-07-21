@@ -58,7 +58,7 @@ async function refreshStatus() {
   isLoading.value = true;
   errorMessage.value = '';
   try {
-    status.value = await window.desktop.getCredentialStatus(props.service);
+    status.value = await window.desktop.settings.getCredentialStatus(props.service);
   } catch (error: unknown) {
     errorMessage.value = getErrorMessage(error);
   } finally {
@@ -74,7 +74,7 @@ async function saveCredential() {
   isSaving.value = true;
   errorMessage.value = '';
   try {
-    status.value = await window.desktop.setCredential({
+    status.value = await window.desktop.settings.setCredential({
       service: props.service,
       value: apiKey.value.trim(),
     });
@@ -92,7 +92,7 @@ async function clearCredential() {
   isClearing.value = true;
   errorMessage.value = '';
   try {
-    status.value = await window.desktop.deleteCredential(props.service);
+    status.value = await window.desktop.settings.deleteCredential(props.service);
     isClearDialogOpen.value = false;
     toast.success(`${props.title} 已清除`);
   } catch (error: unknown) {

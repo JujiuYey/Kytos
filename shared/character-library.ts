@@ -56,3 +56,13 @@ export interface CharacterScopeRequest {
   // 角色ID
   characterId: string;
 }
+
+// 角色库 API
+export interface CharacterLibraryApi {
+  // 删除角色
+  deleteCharacter: (request: DeleteCharacterRequest) => Promise<CharacterLibraryState>;
+  // 查询角色库
+  getCharacterLibrary: () => Promise<CharacterLibraryState>;
+  // 选中角色
+  selectCharacter: (request: SelectCharacterRequest) => Promise<CharacterLibraryState>;
+}

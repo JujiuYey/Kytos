@@ -301,13 +301,13 @@ async function initialize(): Promise<void> {
   initializationError.value = '';
   try {
     const [workspace, deepseek, apimart, portraits, library] = await Promise.all([
-      window.desktop.getIllustrationWorkspace(),
-      window.desktop.getCredentialStatus('deepseek'),
-      window.desktop.getCredentialStatus('apimart'),
-      window.desktop.getCharacterPortraitWorkspace(),
-      window.desktop.getCharacterLibrary(),
+      window.desktop.illustration.getIllustrationWorkspace(),
+      window.desktop.settings.getCredentialStatus('deepseek'),
+      window.desktop.settings.getCredentialStatus('apimart'),
+      window.desktop.character.portrait.getCharacterPortraitWorkspace(),
+      window.desktop.character.library.getCharacterLibrary(),
     ]);
-    const expressions = await window.desktop.getCharacterExpressionWorkspace({
+    const expressions = await window.desktop.character.expression.getCharacterExpressionWorkspace({
       characterId: library.activeCharacterId,
     });
     topics.value = workspace.topics;
@@ -324,7 +324,7 @@ async function initialize(): Promise<void> {
         : undefined;
     topic ??= topics.value[0];
     if (!topic) {
-      topic = await window.desktop.createIllustrationTopic({ useCharacter: true });
+      topic = await window.desktop.illustration.createIllustrationTopic({ useCharacter: true });
       topics.value = [topic];
     }
     applyTopic(topic);
@@ -353,7 +353,7 @@ async function persistFinishedConversation(): Promise<void> {
     return;
   }
   try {
-    const updatedTopic = await window.desktop.saveIllustrationConversation({
+    const updatedTopic = await window.desktop.illustration.saveIllustrationConversation({
       messages: cloneJsonData(messages.value),
       topicId,
     });
@@ -384,7 +384,7 @@ async function createTopic(): Promise<void> {
     return;
   }
   try {
-    const topic = await window.desktop.createIllustrationTopic({ useCharacter: true });
+    const topic = await window.desktop.illustration.createIllustrationTopic({ useCharacter: true });
     replaceTopic(topic);
     applyTopic(topic);
   } catch (createError: unknown) {
@@ -407,7 +407,7 @@ async function updateUseCharacter(value: boolean): Promise<void> {
   }
   try {
     replaceTopic(
-      await window.desktop.updateIllustrationTopic({ topicId: topic.id, useCharacter: value }),
+      await window.desktop.illustration.updateIllustrationTopic({ topicId: topic.id, useCharacter: value }),
     );
   } catch (updateError: unknown) {
     toast.error(updateError instanceof Error ? updateError.message : String(updateError));
@@ -420,7 +420,7 @@ async function renameTopic(title: string): Promise<void> {
     return;
   }
   try {
-    replaceTopic(await window.desktop.updateIllustrationTopic({ title, topicId: topic.id }));
+    replaceTopic(await window.desktop.illustration.updateIllustrationTopic({ title, topicId: topic.id }));
   } catch (renameError: unknown) {
     toast.error(renameError instanceof Error ? renameError.message : String(renameError));
   }
@@ -454,7 +454,7 @@ async function pollTask(taskId: string): Promise<void> {
     [taskId]: { attempt: (previousState?.attempt ?? 0) + 1, phase: 'requesting' },
   };
   try {
-    const version = await window.desktop.getIllustrationTask(taskId);
+    const version = await window.desktop.illustration.getIllustrationTask(taskId);
     replaceVersion(version);
     generationError.value = '';
     if (['submitted', 'pending', 'processing'].includes(version.status)) {
@@ -508,7 +508,7 @@ async function generate(
     if (characterReferences.length < selectedCharacterReferences.value.length) {
       toast.info('修改版本会额外使用原插画，已将总参考图控制在 16 张以内');
     }
-    const version = await window.desktop.generateIllustration({
+    const version = await window.desktop.illustration.generateIllustration({
       baseVersion: options.baseVersion,
       characterReferences,
       prompt: prompt.value.trim(),
@@ -567,12 +567,12 @@ async function confirmDeleteTopic(): Promise<void> {
   }
   isDeleting.value = true;
   try {
-    const workspace = await window.desktop.deleteIllustrationTopic({ topicId: topic.id });
+    const workspace = await window.desktop.illustration.deleteIllustrationTopic({ topicId: topic.id });
     topics.value = workspace.topics;
     deleteTopicDialogOpen.value = false;
     let nextTopic = topics.value[0];
     if (!nextTopic) {
-      nextTopic = await window.desktop.createIllustrationTopic({ useCharacter: true });
+      nextTopic = await window.desktop.illustration.createIllustrationTopic({ useCharacter: true });
       topics.value = [nextTopic];
     }
     applyTopic(nextTopic);
@@ -591,7 +591,7 @@ async function confirmDeleteVersion(): Promise<void> {
   }
   isDeleting.value = true;
   try {
-    const updatedTopic = await window.desktop.deleteIllustrationVersion({
+    const updatedTopic = await window.desktop.illustration.deleteIllustrationVersion({
       topicId: topic.id,
       versionId: version.id,
     });

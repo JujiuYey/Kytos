@@ -241,3 +241,37 @@ export function createEmptyIllustrationBrief(): IllustrationBrief {
     subject: '',
   };
 }
+
+// 插画 API
+export interface IllustrationApi {
+  // 创建插画主题
+  createIllustrationTopic: (
+    request: CreateIllustrationTopicRequest,
+  ) => Promise<IllustrationTopic>;
+  // 删除插画主题
+  deleteIllustrationTopic: (
+    request: DeleteIllustrationTopicRequest,
+  ) => Promise<IllustrationWorkspaceState>;
+  // 删除插画版本
+  deleteIllustrationVersion: (
+    request: DeleteIllustrationVersionRequest,
+  ) => Promise<IllustrationTopic>;
+  // 删除已上传插画
+  deleteIllustrationUpload: (
+    request: DeleteIllustrationUploadRequest,
+  ) => Promise<IllustrationWorkspaceState>;
+  // 生成插画
+  generateIllustration: (request: GenerateIllustrationRequest) => Promise<IllustrationVersion>;
+  // 查询插画任务
+  getIllustrationTask: (taskId: string) => Promise<IllustrationVersion>;
+  // 查询插画工作区
+  getIllustrationWorkspace: () => Promise<IllustrationWorkspaceState>;
+  // 保存插画会话
+  saveIllustrationConversation: (
+    request: SaveIllustrationConversationRequest,
+  ) => Promise<IllustrationTopic>;
+  // 更新插画主题
+  updateIllustrationTopic: (request: UpdateIllustrationTopicRequest) => Promise<IllustrationTopic>;
+  // 上传插画
+  uploadIllustration: (request: UploadIllustrationRequest) => Promise<UploadedIllustration>;
+}

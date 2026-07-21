@@ -199,7 +199,7 @@ async function pollPortraitTask(taskId: string) {
     taskId,
   };
   try {
-    const record = await window.desktop.getCharacterPortraitTask(taskId);
+    const record = await window.desktop.character.portrait.getCharacterPortraitTask(taskId);
     records.value = replaceRecord(records.value, record);
     errorMessage.value = '';
     if (activeStatuses.includes(record.status)) {
@@ -267,8 +267,8 @@ async function loadCharacterWorkspace(characterId: string): Promise<void> {
   officialAssets.value = [];
   try {
     const [characterWorkspace, portraitWorkspace] = await Promise.all([
-      window.desktop.getCharacterWorkspace(),
-      window.desktop.getCharacterPortraitWorkspace({ characterId }),
+      window.desktop.character.portrait.getCharacterWorkspace(),
+      window.desktop.character.portrait.getCharacterPortraitWorkspace({ characterId }),
     ]);
     if (requestId !== loadRequestId || selectedCharacterId.value !== characterId) {
       return;
@@ -294,8 +294,8 @@ async function initialize(): Promise<void> {
   errorMessage.value = '';
   try {
     const [characterLibrary, status] = await Promise.all([
-      window.desktop.getCharacterLibrary(),
-      window.desktop.getCredentialStatus('apimart'),
+      window.desktop.character.library.getCharacterLibrary(),
+      window.desktop.settings.getCredentialStatus('apimart'),
     ]);
     library.value = characterLibrary;
     credentialStatus.value = status;
@@ -322,7 +322,7 @@ async function selectCharacter(characterId: string): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   try {
-    library.value = await window.desktop.selectCharacter({ characterId });
+    library.value = await window.desktop.character.library.selectCharacter({ characterId });
     selectedCharacterId.value = characterId;
     await loadCharacterWorkspace(characterId);
   } catch (selectionError: unknown) {
@@ -339,7 +339,7 @@ async function generatePortraits() {
   isSubmitting.value = true;
   errorMessage.value = '';
   try {
-    const record = await window.desktop.generateCharacterPortrait({
+    const record = await window.desktop.character.portrait.generateCharacterPortrait({
       count: count.value,
       name: imageName.value.trim(),
       prompt: prompt.value.trim(),
@@ -388,7 +388,7 @@ function openGenerator(stage: CreationTarget): void {
 async function refreshPortraitWorkspace(): Promise<void> {
   try {
     applyWorkspace(
-      await window.desktop.getCharacterPortraitWorkspace({
+      await window.desktop.character.portrait.getCharacterPortraitWorkspace({
         characterId: selectedCharacterId.value,
       }),
     );
@@ -409,7 +409,7 @@ async function selectAsset(
   }
   selectingFileName.value = image.fileName;
   try {
-    const workspace = await window.desktop.setCharacterVisualAssetOfficial({
+    const workspace = await window.desktop.character.portrait.setCharacterVisualAssetOfficial({
       fileName: image.fileName,
       kind,
       official,
@@ -446,8 +446,8 @@ async function deleteAsset() {
     const request = { fileName: image.fileName, taskId: record.id };
     const workspace =
       kind === 'portrait'
-        ? await window.desktop.deleteCharacterPortrait(request)
-        : await window.desktop.deleteCharacterSheet(request);
+        ? await window.desktop.character.portrait.deleteCharacterPortrait(request)
+        : await window.desktop.character.portrait.deleteCharacterSheet(request);
     applyWorkspace(workspace);
     deleteDialogOpen.value = false;
     deleteTarget.value = null;
@@ -470,13 +470,13 @@ function uploadVisualAsset(request: UploadCharacterVisualAssetRequest): Promise<
   if (!selectedCharacterId.value) {
     return Promise.reject(new Error('请先选择角色'));
   }
-  return window.desktop.uploadCharacterVisualAsset(request);
+  return window.desktop.character.portrait.uploadCharacterVisualAsset(request);
 }
 
 async function handleUploaded() {
   try {
     applyWorkspace(
-      await window.desktop.getCharacterPortraitWorkspace({
+      await window.desktop.character.portrait.getCharacterPortraitWorkspace({
         characterId: selectedCharacterId.value,
       }),
     );
@@ -507,7 +507,7 @@ async function renameAsset(name: string): Promise<void> {
   renamingFileName.value = target.image.fileName;
   try {
     applyWorkspace(
-      await window.desktop.renameCharacterVisualAsset({
+      await window.desktop.character.portrait.renameCharacterVisualAsset({
         fileName: target.image.fileName,
         kind: target.kind,
         name,

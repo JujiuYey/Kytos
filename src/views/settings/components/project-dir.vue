@@ -30,7 +30,7 @@ async function chooseProjectDir() {
   isSelecting.value = true;
   errorMessage.value = '';
   try {
-    const selected = await window.desktop.selectDirectory();
+    const selected = await window.desktop.settings.selectDirectory();
     if (selected && selected !== appStore.workspacePath) {
       pendingPath.value = selected;
       isSwitchDialogOpen.value = true;

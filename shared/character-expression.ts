@@ -7,6 +7,7 @@ import type {
 } from './character-portrait';
 import type { CharacterScopeRequest } from './character-library';
 import type { DeepSeekModel } from './character';
+import type { SavedFileResult } from './desktop';
 
 // 角色表情支持的尺寸
 export const CHARACTER_EXPRESSION_SIZES = ['1:1', '3:4', '4:5'] as const;
@@ -95,4 +96,36 @@ export interface GenerateCharacterExpressionPromptRequest {
   model: DeepSeekModel;
   // 表情名称
   name: string;
+}
+
+// 角色表情 API
+export interface CharacterExpressionApi {
+  // 删除角色表情
+  deleteCharacterExpression: (
+    request: DeleteCharacterExpressionRequest,
+  ) => Promise<CharacterExpressionWorkspaceState>;
+  // 生成角色表情
+  generateCharacterExpression: (
+    request: GenerateCharacterExpressionRequest,
+  ) => Promise<CharacterExpressionRecord>;
+  // 生成角色表情提示词
+  generateCharacterExpressionPrompt: (
+    request: GenerateCharacterExpressionPromptRequest,
+  ) => Promise<string>;
+  // 查询角色表情任务
+  getCharacterExpressionTask: (
+    request: GetCharacterExpressionTaskRequest,
+  ) => Promise<CharacterExpressionRecord>;
+  // 查询角色表情工作区
+  getCharacterExpressionWorkspace: (
+    request: GetCharacterExpressionWorkspaceRequest,
+  ) => Promise<CharacterExpressionWorkspaceState>;
+  // 重命名角色表情
+  renameCharacterExpression: (
+    request: RenameCharacterExpressionRequest,
+  ) => Promise<CharacterExpressionWorkspaceState>;
+  // 上传角色表情
+  uploadCharacterExpression: (
+    request: UploadCharacterExpressionRequest,
+  ) => Promise<SavedFileResult>;
 }

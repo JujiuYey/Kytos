@@ -39,7 +39,7 @@ export const useAppStore = defineStore(
       isInitializing.value = true;
       initializationError.value = '';
       try {
-        desktopSettings.value = await window.desktop.getSettings();
+        desktopSettings.value = await window.desktop.settings.getSettings();
 
         settings.value = {
           deepseekModel: isDeepSeekModel(settings.value.deepseekModel)
@@ -56,15 +56,15 @@ export const useAppStore = defineStore(
     };
 
     const setWorkspaceDirectory = async (workspaceDirectory: string) => {
-      desktopSettings.value = await window.desktop.setWorkspaceDirectory(workspaceDirectory);
+      desktopSettings.value = await window.desktop.settings.setWorkspaceDirectory(workspaceDirectory);
     };
 
     const useSuggestedWorkspace = async () => {
-      desktopSettings.value = await window.desktop.useSuggestedWorkspace();
+      desktopSettings.value = await window.desktop.settings.useSuggestedWorkspace();
     };
 
     const openWorkspaceDirectory = async () => {
-      await window.desktop.openWorkspaceDirectory();
+      await window.desktop.settings.openWorkspaceDirectory();
     };
 
     return {

@@ -185,7 +185,7 @@ async function loadWorkspace(): Promise<void> {
   loading.value = true;
   loadingError.value = '';
   try {
-    workspace.value = await window.desktop.getIllustrationWorkspace();
+    workspace.value = await window.desktop.illustration.getIllustrationWorkspace();
   } catch (error: unknown) {
     loadingError.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -194,7 +194,7 @@ async function loadWorkspace(): Promise<void> {
 }
 
 function uploadIllustration(request: SaveFileRequest): Promise<SavedFileResult> {
-  return window.desktop.uploadIllustration(request);
+  return window.desktop.illustration.uploadIllustration(request);
 }
 
 async function handleUploaded(): Promise<void> {
@@ -223,11 +223,11 @@ async function confirmDelete(): Promise<void> {
   deletingItemId.value = target.id;
   try {
     if (target.source === 'uploaded' && target.uploadId) {
-      workspace.value = await window.desktop.deleteIllustrationUpload({
+      workspace.value = await window.desktop.illustration.deleteIllustrationUpload({
         uploadId: target.uploadId,
       });
     } else if (target.topicId && target.versionId) {
-      const updatedTopic = await window.desktop.deleteIllustrationVersion({
+      const updatedTopic = await window.desktop.illustration.deleteIllustrationVersion({
         topicId: target.topicId,
         versionId: target.versionId,
       });

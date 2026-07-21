@@ -226,7 +226,7 @@ async function startUpload() {
       };
       const result = props.uploadHandler
         ? await props.uploadHandler(saveRequest)
-        : await window.desktop.saveFile(saveRequest);
+        : await window.desktop.file.saveFile(saveRequest);
 
       // 更新进度和状态
       fileItem.progress = 100;

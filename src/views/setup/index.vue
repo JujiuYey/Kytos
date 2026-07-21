@@ -43,7 +43,7 @@ async function chooseWorkspace() {
 
   errorMessage.value = '';
   try {
-    const selectedPath = await window.desktop.selectDirectory();
+    const selectedPath = await window.desktop.settings.selectDirectory();
     if (selectedPath) {
       await finishSetup(() => appStore.setWorkspaceDirectory(selectedPath));
     }

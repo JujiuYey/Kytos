@@ -13,7 +13,7 @@ function applyTheme(theme: Theme) {
 
   document.documentElement.classList.toggle('dark', isDark);
   document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-  void window.desktop.setTheme(theme);
+  void window.desktop.settings.setTheme(theme);
 }
 
 export function useTheme() {

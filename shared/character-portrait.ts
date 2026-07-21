@@ -1,4 +1,8 @@
 // 角色头像与设定图模块的类型定义
+import type { CharacterScopeRequest } from './character-library';
+import type { CharacterWorkspaceState } from './character';
+import type { SaveFileRequest, SavedFileResult } from './desktop';
+
 // 角色头像支持的尺寸
 export const CHARACTER_PORTRAIT_SIZES = ['2:3', '3:4', '4:5', '1:1', '16:9'] as const;
 // 角色头像支持的分辨率
@@ -186,3 +190,55 @@ export interface UploadCharacterVisualAssetRequest {
 export type DeleteCharacterSheetRequest = DeleteCharacterPortraitRequest;
 // 选中角色设定图请求
 export type SelectCharacterSheetRequest = SelectCharacterPortraitRequest;
+
+// 角色头像 API（含设定图与视觉素材管理）
+export interface CharacterPortraitApi {
+  // 删除角色头像
+  deleteCharacterPortrait: (
+    request: DeleteCharacterPortraitRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
+  // 删除角色设定图
+  deleteCharacterSheet: (
+    request: DeleteCharacterSheetRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
+  // 生成角色头像
+  generateCharacterPortrait: (
+    request: GenerateCharacterPortraitRequest,
+  ) => Promise<CharacterPortraitRecord>;
+  // 生成角色设定图
+  generateCharacterSheet: (request: GenerateCharacterSheetRequest) => Promise<CharacterSheetRecord>;
+  // 查询角色头像任务
+  getCharacterPortraitTask: (taskId: string) => Promise<CharacterPortraitRecord>;
+  // 查询角色头像工作区
+  getCharacterPortraitWorkspace: (
+    request?: CharacterScopeRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
+  // 查询角色设定图任务
+  getCharacterSheetTask: (taskId: string) => Promise<CharacterSheetRecord>;
+  // 查询角色工作区
+  getCharacterWorkspace: () => Promise<CharacterWorkspaceState>;
+  // 重命名角色视觉素材
+  renameCharacterVisualAsset: (
+    request: RenameCharacterVisualAssetRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
+  // 选中角色头像
+  selectCharacterPortrait: (
+    request: SelectCharacterPortraitRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
+  // 选中角色设定图
+  selectCharacterSheet: (
+    request: SelectCharacterSheetRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
+  // 设为官方角色视觉素材
+  setCharacterVisualAssetOfficial: (
+    request: SetCharacterVisualAssetOfficialRequest,
+  ) => Promise<CharacterPortraitWorkspaceState>;
+  // 上传角色头像
+  uploadCharacterPortrait: (request: SaveFileRequest) => Promise<SavedFileResult>;
+  // 上传角色视觉素材
+  uploadCharacterVisualAsset: (
+    request: UploadCharacterVisualAssetRequest,
+  ) => Promise<SavedFileResult>;
+  // 上传角色设定图
+  uploadCharacterSheet: (request: SaveFileRequest) => Promise<SavedFileResult>;
+}

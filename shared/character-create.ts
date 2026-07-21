@@ -153,3 +153,21 @@ export interface CharacterVisualGeneration {
   // 更新时间
   updatedAt: string;
 }
+
+// 角色视觉素材生成 API
+export interface CharacterVisualApi {
+  // 生成角色视觉素材
+  generateCharacterVisual: (
+    request: GenerateCharacterVisualRequest,
+  ) => Promise<CharacterVisualGeneration>;
+  // 查询角色视觉素材生成结果
+  getCharacterVisualGeneration: (
+    request: GetCharacterVisualGenerationRequest,
+  ) => Promise<CharacterVisualGeneration>;
+  // 保存角色视觉素材
+  saveCharacterVisual: (request: SaveCharacterVisualRequest) => Promise<SaveCharacterVisualResult>;
+  // 保存角色视觉素材资源
+  saveCharacterVisualAsset: (
+    request: SaveCharacterVisualAssetRequest,
+  ) => Promise<SaveCharacterVisualResult>;
+}

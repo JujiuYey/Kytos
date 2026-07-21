@@ -331,3 +331,33 @@ export function createEmptyStoryShotContent(): StoryShotContent {
     title: '',
   };
 }
+
+// 故事 API
+export interface StoryApi {
+  // 创建故事
+  createStory: (request: CreateStoryRequest) => Promise<StoryProject>;
+  // 创建故事分镜
+  createStoryShot: (request: CreateStoryShotRequest) => Promise<StoryProject>;
+  // 删除故事
+  deleteStory: (request: DeleteStoryRequest) => Promise<StoryWorkspaceState>;
+  // 删除故事分镜
+  deleteStoryShot: (request: DeleteStoryShotRequest) => Promise<StoryProject>;
+  // 删除故事分镜版本
+  deleteStoryShotVersion: (request: DeleteStoryShotVersionRequest) => Promise<StoryProject>;
+  // 生成故事分镜
+  generateStoryShot: (request: GenerateStoryShotRequest) => Promise<StoryShotVersion>;
+  // 查询故事分镜任务
+  getStoryShotTask: (taskId: string) => Promise<StoryShotVersion>;
+  // 查询故事工作区
+  getStoryWorkspace: () => Promise<StoryWorkspaceState>;
+  // 移动故事分镜
+  moveStoryShot: (request: MoveStoryShotRequest) => Promise<StoryProject>;
+  // 保存故事会话
+  saveStoryConversation: (request: SaveStoryConversationRequest) => Promise<StoryProject>;
+  // 选中故事分镜版本
+  selectStoryShotVersion: (request: SelectStoryShotVersionRequest) => Promise<StoryProject>;
+  // 更新故事
+  updateStory: (request: UpdateStoryRequest) => Promise<StoryProject>;
+  // 更新故事分镜
+  updateStoryShot: (request: UpdateStoryShotRequest) => Promise<StoryShotUpdateResult>;
+}

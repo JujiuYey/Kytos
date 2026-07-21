@@ -118,7 +118,7 @@ async function loadWorkspace(): Promise<void> {
   loading.value = true;
   loadingError.value = '';
   try {
-    stories.value = await window.desktop.getStoryWorkspace().then(workspace => workspace.stories);
+    stories.value = await window.desktop.story.getStoryWorkspace().then(workspace => workspace.stories);
   } catch (error: unknown) {
     loadingError.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -136,7 +136,7 @@ async function createStory(): Promise<void> {
   }
   creating.value = true;
   try {
-    const story = await window.desktop.createStory({});
+    const story = await window.desktop.story.createStory({});
     openStory(story);
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : String(error));
@@ -152,7 +152,7 @@ async function confirmDelete(): Promise<void> {
   }
   deletingStoryId.value = target.id;
   try {
-    const workspace = await window.desktop.deleteStory({ storyId: target.id });
+    const workspace = await window.desktop.story.deleteStory({ storyId: target.id });
     stories.value = workspace.stories;
     deleteTarget.value = null;
     toast.success('故事已删除');

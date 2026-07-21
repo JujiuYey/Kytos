@@ -268,10 +268,10 @@ async function initialize(): Promise<void> {
   initializationError.value = '';
   try {
     const [workspace, deepseek, apimart, portraits] = await Promise.all([
-      window.desktop.getStoryWorkspace(),
-      window.desktop.getCredentialStatus('deepseek'),
-      window.desktop.getCredentialStatus('apimart'),
-      window.desktop.getCharacterPortraitWorkspace(),
+      window.desktop.story.getStoryWorkspace(),
+      window.desktop.settings.getCredentialStatus('deepseek'),
+      window.desktop.settings.getCredentialStatus('apimart'),
+      window.desktop.character.portrait.getCharacterPortraitWorkspace(),
     ]);
     stories.value = workspace.stories;
     deepseekStatus.value = deepseek;
@@ -282,7 +282,7 @@ async function initialize(): Promise<void> {
       typeof route.query.storyId === 'string' ? route.query.storyId : undefined;
     let story = stories.value.find(item => item.id === requestedStoryId) ?? stories.value[0];
     if (!story) {
-      story = await window.desktop.createStory({});
+      story = await window.desktop.story.createStory({});
       stories.value = [story];
     }
     applyStory(story);
@@ -316,7 +316,7 @@ async function persistFinishedConversation(): Promise<void> {
   }
   try {
     replaceStory(
-      await window.desktop.saveStoryConversation({
+      await window.desktop.story.saveStoryConversation({
         messages: cloneJsonData(messages.value),
         storyId,
       }),
@@ -349,7 +349,7 @@ async function createStory(): Promise<void> {
     return;
   }
   try {
-    const story = await window.desktop.createStory({});
+    const story = await window.desktop.story.createStory({});
     replaceStory(story);
     applyStory(story);
     await router.replace({ query: { ...route.query, storyId: story.id } });
@@ -382,7 +382,7 @@ async function updateProject(
   }
   isMutating.value = true;
   try {
-    replaceStory(await window.desktop.updateStory({ ...patch, storyId: story.id }));
+    replaceStory(await window.desktop.story.updateStory({ ...patch, storyId: story.id }));
   } catch (updateError: unknown) {
     toast.error(updateError instanceof Error ? updateError.message : String(updateError));
   } finally {
@@ -408,14 +408,14 @@ async function saveShot(content: StoryShotContent): Promise<void> {
   isMutating.value = true;
   try {
     if (editorTarget.value) {
-      const result = await window.desktop.updateStoryShot({
+      const result = await window.desktop.story.updateStoryShot({
         ...content,
         shotId: editorTarget.value.id,
         storyId: story.id,
       });
       replaceShot(result.shot, result.storyboardReady);
     } else {
-      replaceStory(await window.desktop.createStoryShot({ ...content, storyId: story.id }));
+      replaceStory(await window.desktop.story.createStoryShot({ ...content, storyId: story.id }));
     }
     editorOpen.value = false;
   } catch (saveError: unknown) {
@@ -433,7 +433,7 @@ async function moveShot(payload: { direction: -1 | 1; shot: StoryShot }): Promis
   isMutating.value = true;
   try {
     replaceStory(
-      await window.desktop.moveStoryShot({
+      await window.desktop.story.moveStoryShot({
         direction: payload.direction,
         shotId: payload.shot.id,
         storyId: story.id,
@@ -474,7 +474,7 @@ async function pollTask(taskId: string): Promise<void> {
     [taskId]: { attempt: (previousState?.attempt ?? 0) + 1, phase: 'requesting' },
   };
   try {
-    const version = await window.desktop.getStoryShotTask(taskId);
+    const version = await window.desktop.story.getStoryShotTask(taskId);
     const shot = replaceVersion(version);
     operationError.value = '';
     if (['submitted', 'pending', 'processing'].includes(version.status)) {
@@ -510,7 +510,7 @@ async function submitShotGeneration(shot: StoryShot): Promise<void> {
   submittingShotIds.value = [...submittingShotIds.value, shot.id];
   operationError.value = '';
   try {
-    const version = await window.desktop.generateStoryShot({
+    const version = await window.desktop.story.generateStoryShot({
       baseVersion: baseReferences.value[shot.id] ?? null,
       prompt: shot.finalPrompt,
       shotId: shot.id,
@@ -570,7 +570,7 @@ async function selectVersion(payload: {
   isMutating.value = true;
   try {
     replaceStory(
-      await window.desktop.selectStoryShotVersion({
+      await window.desktop.story.selectStoryShotVersion({
         shotId: payload.shot.id,
         storyId: story.id,
         versionId: payload.version.id,
@@ -602,12 +602,12 @@ async function confirmDeleteStory(): Promise<void> {
   }
   isDeleting.value = true;
   try {
-    const workspace = await window.desktop.deleteStory({ storyId: story.id });
+    const workspace = await window.desktop.story.deleteStory({ storyId: story.id });
     stories.value = workspace.stories;
     deleteStoryDialogOpen.value = false;
     let nextStory = stories.value[0];
     if (!nextStory) {
-      nextStory = await window.desktop.createStory({});
+      nextStory = await window.desktop.story.createStory({});
       stories.value = [nextStory];
     }
     applyStory(nextStory);
@@ -627,7 +627,7 @@ async function confirmDeleteShot(): Promise<void> {
   }
   isDeleting.value = true;
   try {
-    replaceStory(await window.desktop.deleteStoryShot({ shotId: shot.id, storyId: story.id }));
+    replaceStory(await window.desktop.story.deleteStoryShot({ shotId: shot.id, storyId: story.id }));
     deleteShotTarget.value = null;
   } catch (deleteError: unknown) {
     toast.error(deleteError instanceof Error ? deleteError.message : String(deleteError));
@@ -645,7 +645,7 @@ async function confirmDeleteVersion(): Promise<void> {
   isDeleting.value = true;
   try {
     replaceStory(
-      await window.desktop.deleteStoryShotVersion({
+      await window.desktop.story.deleteStoryShotVersion({
         shotId: target.shot.id,
         storyId: story.id,
         versionId: target.version.id,

@@ -236,7 +236,7 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
     taskId,
   };
   try {
-    const record = await window.desktop.getCharacterExpressionTask({ characterId, taskId });
+    const record = await window.desktop.character.expression.getCharacterExpressionTask({ characterId, taskId });
     if (selectedCharacterId.value !== characterId) {
       return;
     }
@@ -303,8 +303,8 @@ async function loadCharacterWorkspace(characterId: string): Promise<void> {
   selectedReferenceAssets.value = [];
   try {
     const [expressionWorkspace, currentPortraitWorkspace] = await Promise.all([
-      window.desktop.getCharacterExpressionWorkspace({ characterId }),
-      window.desktop.getCharacterPortraitWorkspace({ characterId }),
+      window.desktop.character.expression.getCharacterExpressionWorkspace({ characterId }),
+      window.desktop.character.portrait.getCharacterPortraitWorkspace({ characterId }),
     ]);
     if (requestId !== loadRequestId || selectedCharacterId.value !== characterId) {
       return;
@@ -330,9 +330,9 @@ async function initialize(): Promise<void> {
   errorMessage.value = '';
   try {
     const [characterLibrary, status, deepseek] = await Promise.all([
-      window.desktop.getCharacterLibrary(),
-      window.desktop.getCredentialStatus('apimart'),
-      window.desktop.getCredentialStatus('deepseek'),
+      window.desktop.character.library.getCharacterLibrary(),
+      window.desktop.settings.getCredentialStatus('apimart'),
+      window.desktop.settings.getCredentialStatus('deepseek'),
     ]);
     library.value = characterLibrary;
     credentialStatus.value = status;
@@ -369,7 +369,7 @@ async function generateExpression(): Promise<void> {
   isSubmitting.value = true;
   errorMessage.value = '';
   try {
-    const record = await window.desktop.generateCharacterExpression({
+    const record = await window.desktop.character.expression.generateCharacterExpression({
       characterId,
       count: count.value,
       description: description.value.trim(),
@@ -412,7 +412,7 @@ async function generateExpressionPrompt(): Promise<void> {
   }
   isGeneratingPrompt.value = true;
   try {
-    description.value = await window.desktop.generateCharacterExpressionPrompt({
+    description.value = await window.desktop.character.expression.generateCharacterExpressionPrompt({
       model: appStore.settings.deepseekModel,
       name: name.value.trim(),
     });
@@ -428,7 +428,7 @@ function uploadExpression(
   expressionName: string,
   request: SaveFileRequest,
 ): Promise<SavedFileResult> {
-  return window.desktop.uploadCharacterExpression({
+  return window.desktop.character.expression.uploadCharacterExpression({
     ...request,
     characterId: selectedCharacterId.value,
     name: expressionName,
@@ -438,7 +438,7 @@ function uploadExpression(
 async function handleUploaded(): Promise<void> {
   try {
     applyWorkspace(
-      await window.desktop.getCharacterExpressionWorkspace({
+      await window.desktop.character.expression.getCharacterExpressionWorkspace({
         characterId: selectedCharacterId.value,
       }),
     );
@@ -472,7 +472,7 @@ async function renameExpression(nextName: string): Promise<void> {
   renamingTaskId.value = renameTarget.value.id;
   try {
     applyWorkspace(
-      await window.desktop.renameCharacterExpression({
+      await window.desktop.character.expression.renameCharacterExpression({
         characterId: selectedCharacterId.value,
         name: nextName,
         taskId: renameTarget.value.id,
@@ -496,7 +496,7 @@ async function deleteExpression(): Promise<void> {
   deletingFileName.value = image.fileName;
   try {
     applyWorkspace(
-      await window.desktop.deleteCharacterExpression({
+      await window.desktop.character.expression.deleteCharacterExpression({
         characterId: selectedCharacterId.value,
         fileName: image.fileName,
         taskId: record.id,
