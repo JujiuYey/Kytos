@@ -61,6 +61,7 @@ const desktopApi: DesktopApi = {
   selectCharacterSheet: request => ipcRenderer.invoke('character-sheet:select', request),
   selectStoryShotVersion: request => ipcRenderer.invoke('story:select-shot-version', request),
   setCredential: request => ipcRenderer.invoke('credential:set', request),
+  setTheme: theme => ipcRenderer.invoke('settings:set-theme', theme),
   setCharacterVisualAssetOfficial: request =>
     ipcRenderer.invoke('character-visual:set-official', request),
   setWorkspaceDirectory: workspacePath =>

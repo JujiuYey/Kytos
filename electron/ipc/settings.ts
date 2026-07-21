@@ -1,5 +1,6 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron';
 import type { OpenDialogOptions } from 'electron';
+import type { DesktopTheme } from '../../shared/desktop';
 import {
   getDesktopSettings,
   getSuggestedWorkspacePath,
@@ -12,6 +13,14 @@ export function registerSettingsIpc(assertTrustedSender: TrustedSenderGuard): vo
   ipcMain.handle('settings:get', async event => {
     assertTrustedSender(event);
     return getDesktopSettings();
+  });
+
+  ipcMain.handle('settings:set-theme', async (event, theme: unknown) => {
+    assertTrustedSender(event);
+    if (!isDesktopTheme(theme)) {
+      throw new TypeError('界面主题无效');
+    }
+    nativeTheme.themeSource = theme;
   });
 
   ipcMain.handle('dialog:select-directory', async event => {
@@ -46,4 +55,8 @@ export function registerSettingsIpc(assertTrustedSender: TrustedSenderGuard): vo
     assertTrustedSender(event);
     await openWorkspaceDirectory();
   });
+}
+
+function isDesktopTheme(theme: unknown): theme is DesktopTheme {
+  return theme === 'dark' || theme === 'light' || theme === 'system';
 }

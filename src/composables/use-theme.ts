@@ -1,24 +1,45 @@
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
+import { useAppStore } from '@/stores/app';
+import type { AppSettings } from '@/types';
 
-type Theme = 'light' | 'dark' | 'system';
+type Theme = AppSettings['theme'];
 
-const theme = ref<Theme>('system');
+let systemThemeQuery: MediaQueryList | null = null;
+
+function applyTheme(theme: Theme) {
+  const isDark =
+    theme === 'dark' ||
+    (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  document.documentElement.classList.toggle('dark', isDark);
+  document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+  void window.desktop.setTheme(theme);
+}
 
 export function useTheme() {
+  const appStore = useAppStore();
+
   const setTheme = (newTheme: Theme) => {
-    theme.value = newTheme;
-    // 实现主题切换逻辑
-    if (newTheme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      document.documentElement.classList.toggle('dark', systemTheme === 'dark');
-    } else {
-      document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    appStore.updateSettings({ theme: newTheme });
+    applyTheme(newTheme);
+  };
+
+  const initializeTheme = () => {
+    applyTheme(appStore.settings.theme);
+
+    if (!systemThemeQuery) {
+      systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      systemThemeQuery.addEventListener('change', () => {
+        if (appStore.settings.theme === 'system') {
+          applyTheme('system');
+        }
+      });
     }
-    localStorage.setItem('theme', newTheme);
   };
 
   return {
-    theme: computed(() => theme.value),
+    initializeTheme,
     setTheme,
+    theme: computed(() => appStore.settings.theme),
   };
 }

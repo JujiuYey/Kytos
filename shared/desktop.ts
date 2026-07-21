@@ -71,6 +71,7 @@ import type {
 } from './story';
 
 export type CredentialService = 'apimart' | 'deepseek';
+export type DesktopTheme = 'dark' | 'light' | 'system';
 
 export interface DesktopSettings {
   suggestedWorkspacePath: string;
@@ -193,6 +194,7 @@ export interface DesktopApi {
   ) => Promise<CharacterPortraitWorkspaceState>;
   selectStoryShotVersion: (request: SelectStoryShotVersionRequest) => Promise<StoryProject>;
   setCredential: (request: SetCredentialRequest) => Promise<CredentialStatus>;
+  setTheme: (theme: DesktopTheme) => Promise<void>;
   setCharacterVisualAssetOfficial: (
     request: SetCharacterVisualAssetOfficialRequest,
   ) => Promise<CharacterPortraitWorkspaceState>;
