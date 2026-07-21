@@ -1,3 +1,4 @@
+// 凭据 IPC 通道注册
 import { ipcMain } from 'electron';
 import type { SetCredentialRequest } from '../../shared/desktop';
 import {
@@ -8,7 +9,9 @@ import {
 } from '../services/credentials';
 import type { TrustedSenderGuard } from './trusted-sender';
 
+// 每个 handler 都先调 assertTrustedSender 验证发送方
 export function registerCredentialsIpc(assertTrustedSender: TrustedSenderGuard): void {
+  // 查询凭据状态（含类型校验）
   ipcMain.handle('credential:get-status', async (event, service: unknown) => {
     assertTrustedSender(event);
     if (!isCredentialService(service)) {
@@ -17,11 +20,13 @@ export function registerCredentialsIpc(assertTrustedSender: TrustedSenderGuard):
     return getCredentialStatus(service);
   });
 
+  // 设置凭据
   ipcMain.handle('credential:set', async (event, request: SetCredentialRequest) => {
     assertTrustedSender(event);
     return setCredential(request);
   });
 
+  // 删除凭据（含类型校验）
   ipcMain.handle('credential:delete', async (event, service: unknown) => {
     assertTrustedSender(event);
     if (!isCredentialService(service)) {

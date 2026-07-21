@@ -1,3 +1,4 @@
+// 角色库 + 角色视觉素材生成 IPC 通道注册
 import { ipcMain } from 'electron';
 import type {
   DeleteCharacterRequest,
@@ -22,11 +23,14 @@ import {
 } from '../services/character-create';
 import type { TrustedSenderGuard } from './trusted-sender';
 
+// 每个 handler 都先调 assertTrustedSender 验证发送方
 export function registerCharacterLibraryIpc(assertTrustedSender: TrustedSenderGuard): void {
+  // 查询角色库
   ipcMain.handle('character-library:get', async event => {
     assertTrustedSender(event);
     return getCharacterLibrary();
   });
+  // 保存角色视觉素材资源
   ipcMain.handle(
     'character-library:save-visual-asset',
     async (event, request: SaveCharacterVisualAssetRequest) => {
@@ -34,6 +38,7 @@ export function registerCharacterLibraryIpc(assertTrustedSender: TrustedSenderGu
       return saveCharacterVisualAsset(request);
     },
   );
+  // 生成角色视觉素材
   ipcMain.handle(
     'character-library:generate-visual',
     async (event, request: GenerateCharacterVisualRequest) => {
@@ -41,6 +46,7 @@ export function registerCharacterLibraryIpc(assertTrustedSender: TrustedSenderGu
       return generateCharacterVisual(request);
     },
   );
+  // 查询角色视觉素材生成结果
   ipcMain.handle(
     'character-library:get-visual-generation',
     async (event, request: GetCharacterVisualGenerationRequest) => {
@@ -48,6 +54,7 @@ export function registerCharacterLibraryIpc(assertTrustedSender: TrustedSenderGu
       return getCharacterVisualGeneration(request);
     },
   );
+  // 保存角色视觉素材
   ipcMain.handle(
     'character-library:save-visual',
     async (event, request: SaveCharacterVisualRequest) => {
@@ -55,6 +62,7 @@ export function registerCharacterLibraryIpc(assertTrustedSender: TrustedSenderGu
       return saveCharacterVisual(request);
     },
   );
+  // 删除角色
   ipcMain.handle(
     'character-library:delete-character',
     async (event, request: DeleteCharacterRequest) => {
@@ -62,6 +70,7 @@ export function registerCharacterLibraryIpc(assertTrustedSender: TrustedSenderGu
       return deleteCharacter(request);
     },
   );
+  // 选中角色
   ipcMain.handle(
     'character-library:select-character',
     async (event, request: SelectCharacterRequest) => {
