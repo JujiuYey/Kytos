@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { AlertCircle } from '@lucide/vue';
 import { toast } from 'vue-sonner';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { ImageReferencePickerDialog } from '@/components/sag/image-reference-picker-dialog';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
+import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
+import SagMissingPrerequisiteAlert from '@/components/sag/sag-missing-prerequisite-alert.vue';
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {
@@ -31,7 +29,6 @@ import ExpressionRenameDialog from './components/expression-rename-dialog.vue';
 import ExpressionUploadDialog from './components/expression-upload-dialog.vue';
 import type { ExpressionReferenceOption } from './expression-reference';
 
-const router = useRouter();
 const appStore = useAppStore();
 const library = ref<CharacterLibraryState | null>(null);
 const selectedCharacterId = ref('');
@@ -236,7 +233,10 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
     taskId,
   };
   try {
-    const record = await window.desktop.character.expression.getCharacterExpressionTask({ characterId, taskId });
+    const record = await window.desktop.character.expression.getCharacterExpressionTask({
+      characterId,
+      taskId,
+    });
     if (selectedCharacterId.value !== characterId) {
       return;
     }
@@ -412,10 +412,12 @@ async function generateExpressionPrompt(): Promise<void> {
   }
   isGeneratingPrompt.value = true;
   try {
-    description.value = await window.desktop.character.expression.generateCharacterExpressionPrompt({
-      model: appStore.settings.deepseekModel,
-      name: name.value.trim(),
-    });
+    description.value = await window.desktop.character.expression.generateCharacterExpressionPrompt(
+      {
+        model: appStore.settings.deepseekModel,
+        name: name.value.trim(),
+      },
+    );
     toast.success('表情提示词已生成');
   } catch (promptError: unknown) {
     toast.error(promptError instanceof Error ? promptError.message : String(promptError));
@@ -540,36 +542,33 @@ onBeforeUnmount(() => {
       />
     </template>
 
-    <Alert v-if="!isInitializing && !hasReferences" class="mx-4 mt-3 shrink-0 sm:mx-5">
-      <AlertCircle class="size-4" />
-      <AlertTitle>生成表情需要角色参考</AlertTitle>
-      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>可以先准备角色视觉，或上传一张已有表情。</span>
-        <Button size="sm" variant="outline" @click="router.push('/character-portrait')">
-          前往角色视觉
-        </Button>
-      </AlertDescription>
-    </Alert>
+    <SagMissingPrerequisiteAlert
+      v-if="!isInitializing && !hasReferences"
+      class="mx-4 mt-3 shrink-0 sm:mx-5"
+      title="生成表情需要角色参考"
+      description="可以先准备角色视觉，或上传一张已有表情。"
+      action-label="前往角色视觉"
+      to="/character-portrait"
+    />
 
-    <Alert v-if="!isInitializing && !keyConfigured" class="mx-4 mt-3 shrink-0 sm:mx-5">
-      <AlertCircle class="size-4" />
-      <AlertTitle>生成图片需要 APIMart API Key</AlertTitle>
-      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>上传已有表情不受影响。</span>
-        <Button size="sm" variant="outline" @click="router.push('/settings')">前往设置</Button>
-      </AlertDescription>
-    </Alert>
+    <SagMissingPrerequisiteAlert
+      v-if="!isInitializing && !keyConfigured"
+      class="mx-4 mt-3 shrink-0 sm:mx-5"
+      title="生成图片需要 APIMart API Key"
+      description="上传已有表情不受影响。"
+      action-label="前往设置"
+      to="/settings"
+    />
 
-    <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-3 shrink-0 sm:mx-5">
-      <AlertCircle class="size-4" />
-      <AlertTitle>表情流程暂时中断</AlertTitle>
-      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>{{ errorMessage }}</span>
-        <Button v-if="activeRecord && !isPolling" size="sm" variant="outline" @click="retryPolling">
-          继续查询
-        </Button>
-      </AlertDescription>
-    </Alert>
+    <SagErrorRetryAlert
+      v-if="errorMessage"
+      class="mx-4 mt-3 shrink-0 sm:mx-5"
+      title="表情流程暂时中断"
+      :error-message="errorMessage"
+      retry-label="继续查询"
+      :can-retry="activeRecord && !isPolling"
+      @retry="retryPolling"
+    />
 
     <div
       :class="[

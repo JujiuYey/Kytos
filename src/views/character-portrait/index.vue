@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { AlertCircle } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -9,6 +8,7 @@ import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upl
 import { CharacterPortraitWorkflow } from '@/components/sag/character-portrait-workflow';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
+import SagMissingPrerequisiteAlert from '@/components/sag/sag-missing-prerequisite-alert.vue';
 import { SagPage } from '@/components/sag/sag-page';
 import type {
   CharacterDraft,
@@ -35,7 +35,6 @@ type AssetKind = 'portrait' | 'sheet';
 type CreationTarget = 'portrait' | 'sheet';
 type WorkspaceMode = 'cards' | 'canvas';
 
-const router = useRouter();
 const library = ref<CharacterLibraryState | null>(null);
 const selectedCharacterId = ref('');
 const draft = ref<CharacterDraft>(createEmptyCharacterDraft());
@@ -552,14 +551,14 @@ onBeforeUnmount(() => {
       />
     </template>
 
-    <Alert v-if="!isInitializing && !keyConfigured" class="mx-4 mt-3 w-auto shrink-0 sm:mx-5">
-      <AlertCircle class="size-4" />
-      <AlertTitle>生成图片需要 APIMart API Key</AlertTitle>
-      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>上传已有角色视觉图片不受影响。</span>
-        <Button size="sm" variant="outline" @click="router.push('/settings')">前往设置</Button>
-      </AlertDescription>
-    </Alert>
+    <SagMissingPrerequisiteAlert
+      v-if="!isInitializing && !keyConfigured"
+      class="mx-4 mt-3 w-auto shrink-0 sm:mx-5"
+      title="生成图片需要 APIMart API Key"
+      description="上传已有角色视觉图片不受影响。"
+      action-label="前往设置"
+      to="/settings"
+    />
 
     <Alert
       v-if="workspaceMode === 'cards' && errorMessage"

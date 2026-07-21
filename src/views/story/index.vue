@@ -4,13 +4,11 @@ import { useRoute, useRouter } from 'vue-router';
 import { DefaultChatTransport } from 'ai';
 import type { ChatStatus } from 'ai';
 import { useChat } from '@ai-sdk/vue';
-import { AlertCircle } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
+import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
 import { SagPage } from '@/components/sag/sag-page';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/app';
 import type {
   CharacterPortraitResolution,
@@ -627,7 +625,9 @@ async function confirmDeleteShot(): Promise<void> {
   }
   isDeleting.value = true;
   try {
-    replaceStory(await window.desktop.story.deleteStoryShot({ shotId: shot.id, storyId: story.id }));
+    replaceStory(
+      await window.desktop.story.deleteStoryShot({ shotId: shot.id, storyId: story.id }),
+    );
     deleteShotTarget.value = null;
   } catch (deleteError: unknown) {
     toast.error(deleteError instanceof Error ? deleteError.message : String(deleteError));
@@ -692,16 +692,15 @@ onBeforeUnmount(() => {
       />
     </template>
 
-    <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-3 shrink-0 sm:mx-5">
-      <AlertCircle class="size-4" />
-      <AlertTitle>故事创作暂时无法继续</AlertTitle>
-      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>{{ errorMessage }}</span>
-        <Button v-if="chatStatus === 'error'" variant="outline" size="sm" @click="retry">
-          重试
-        </Button>
-      </AlertDescription>
-    </Alert>
+    <SagErrorRetryAlert
+      v-if="errorMessage"
+      class="mx-4 mt-3 shrink-0 sm:mx-5"
+      title="故事创作暂时无法继续"
+      :error-message="errorMessage"
+      retry-label="重试"
+      :can-retry="chatStatus === 'error'"
+      @retry="retry"
+    />
 
     <div
       v-if="activeStory"

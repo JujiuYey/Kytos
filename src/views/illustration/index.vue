@@ -4,10 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { DefaultChatTransport } from 'ai';
 import type { ChatStatus } from 'ai';
 import { useChat } from '@ai-sdk/vue';
-import { AlertCircle } from '@lucide/vue';
 import { toast } from 'vue-sonner';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import {
   ImageReferencePickerDialog,
   type ImageReferencePickerFilter,
@@ -15,6 +12,7 @@ import {
 } from '@/components/sag/image-reference-picker-dialog';
 import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
+import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {
@@ -407,7 +405,10 @@ async function updateUseCharacter(value: boolean): Promise<void> {
   }
   try {
     replaceTopic(
-      await window.desktop.illustration.updateIllustrationTopic({ topicId: topic.id, useCharacter: value }),
+      await window.desktop.illustration.updateIllustrationTopic({
+        topicId: topic.id,
+        useCharacter: value,
+      }),
     );
   } catch (updateError: unknown) {
     toast.error(updateError instanceof Error ? updateError.message : String(updateError));
@@ -420,7 +421,9 @@ async function renameTopic(title: string): Promise<void> {
     return;
   }
   try {
-    replaceTopic(await window.desktop.illustration.updateIllustrationTopic({ title, topicId: topic.id }));
+    replaceTopic(
+      await window.desktop.illustration.updateIllustrationTopic({ title, topicId: topic.id }),
+    );
   } catch (renameError: unknown) {
     toast.error(renameError instanceof Error ? renameError.message : String(renameError));
   }
@@ -567,7 +570,9 @@ async function confirmDeleteTopic(): Promise<void> {
   }
   isDeleting.value = true;
   try {
-    const workspace = await window.desktop.illustration.deleteIllustrationTopic({ topicId: topic.id });
+    const workspace = await window.desktop.illustration.deleteIllustrationTopic({
+      topicId: topic.id,
+    });
     topics.value = workspace.topics;
     deleteTopicDialogOpen.value = false;
     let nextTopic = topics.value[0];
@@ -642,16 +647,15 @@ onBeforeUnmount(() => {
       />
     </template>
 
-    <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-3 shrink-0 sm:mx-5">
-      <AlertCircle class="size-4" />
-      <AlertTitle>插画创作暂时无法继续</AlertTitle>
-      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>{{ errorMessage }}</span>
-        <Button v-if="chatStatus === 'error'" variant="outline" size="sm" @click="retry">
-          重试
-        </Button>
-      </AlertDescription>
-    </Alert>
+    <SagErrorRetryAlert
+      v-if="errorMessage"
+      class="mx-4 mt-3 shrink-0 sm:mx-5"
+      title="插画创作暂时无法继续"
+      :error-message="errorMessage"
+      retry-label="重试"
+      :can-retry="chatStatus === 'error'"
+      @retry="retry"
+    />
 
     <div
       v-if="activeTopic"

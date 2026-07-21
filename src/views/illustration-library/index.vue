@@ -13,7 +13,6 @@ import {
 } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Image as AiImage } from '@/components/ai-elements/image';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
@@ -23,6 +22,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
+import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
 import { SagPage } from '@/components/sag/sag-page';
 import type {
   CharacterPortraitImage,
@@ -295,13 +295,14 @@ onMounted(() => {
       </InputGroup>
     </div>
 
-    <Alert v-if="loadingError" variant="destructive" class="mx-4 mt-4 shrink-0 sm:mx-5">
-      <AlertTitle>插画库暂时无法读取</AlertTitle>
-      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>{{ loadingError }}</span>
-        <Button size="sm" variant="outline" @click="loadWorkspace">重试</Button>
-      </AlertDescription>
-    </Alert>
+    <SagErrorRetryAlert
+      v-if="loadingError"
+      class="mx-4 mt-4 shrink-0 sm:mx-5"
+      title="插画库暂时无法读取"
+      :error-message="loadingError"
+      retry-label="重试"
+      @retry="loadWorkspace"
+    />
 
     <ScrollArea class="min-h-0 flex-1 bg-muted/10">
       <div

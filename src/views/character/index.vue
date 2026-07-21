@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router';
 import { Check, MoreHorizontal, Pencil, Plus, Trash2, UserRound, UsersRound } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Image as AiImage } from '@/components/ai-elements/image';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +15,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
+import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
 import { SagPage } from '@/components/sag/sag-page';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type { CharacterImageSize, CharacterLibraryState, CharacterSummary } from '@/types';
@@ -68,7 +68,9 @@ async function editCharacter(character: CharacterSummary): Promise<void> {
   }
   busy.value = true;
   try {
-    library.value = await window.desktop.character.library.selectCharacter({ characterId: character.id });
+    library.value = await window.desktop.character.library.selectCharacter({
+      characterId: character.id,
+    });
     await router.push({
       name: 'character-create',
       query: { characterId: character.id, mode: 'edit' },
@@ -87,7 +89,9 @@ async function confirmDelete(): Promise<void> {
   }
   busy.value = true;
   try {
-    library.value = await window.desktop.character.library.deleteCharacter({ characterId: target.id });
+    library.value = await window.desktop.character.library.deleteCharacter({
+      characterId: target.id,
+    });
     deleteTarget.value = null;
     toast.success('角色已移除');
   } catch (error: unknown) {
@@ -127,13 +131,14 @@ onMounted(() => {
       </Button>
     </template>
 
-    <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-4 shrink-0 sm:mx-5">
-      <AlertTitle>角色资料暂时无法读取</AlertTitle>
-      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>{{ errorMessage }}</span>
-        <Button size="sm" variant="outline" @click="loadLibrary">重试</Button>
-      </AlertDescription>
-    </Alert>
+    <SagErrorRetryAlert
+      v-if="errorMessage"
+      class="mx-4 mt-4 shrink-0 sm:mx-5"
+      title="角色资料暂时无法读取"
+      :error-message="errorMessage"
+      retry-label="重试"
+      @retry="loadLibrary"
+    />
 
     <ScrollArea class="min-h-0 flex-1 bg-muted/10">
       <div

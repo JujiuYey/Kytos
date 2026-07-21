@@ -13,7 +13,6 @@ import {
 } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Image as AiImage } from '@/components/ai-elements/image';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
@@ -21,6 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
+import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
 import { SagPage } from '@/components/sag/sag-page';
 import SagStatusBadge from '@/components/sag/status-badge.vue';
 import type { CharacterPortraitImage, StoryProject } from '@/types';
@@ -118,7 +118,9 @@ async function loadWorkspace(): Promise<void> {
   loading.value = true;
   loadingError.value = '';
   try {
-    stories.value = await window.desktop.story.getStoryWorkspace().then(workspace => workspace.stories);
+    stories.value = await window.desktop.story
+      .getStoryWorkspace()
+      .then(workspace => workspace.stories);
   } catch (error: unknown) {
     loadingError.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -206,13 +208,14 @@ onMounted(() => {
       </span>
     </div>
 
-    <Alert v-if="loadingError" variant="destructive" class="mx-4 mt-4 shrink-0 sm:mx-5">
-      <AlertTitle>故事列表暂时无法读取</AlertTitle>
-      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>{{ loadingError }}</span>
-        <Button size="sm" variant="outline" @click="loadWorkspace">重试</Button>
-      </AlertDescription>
-    </Alert>
+    <SagErrorRetryAlert
+      v-if="loadingError"
+      class="mx-4 mt-4 shrink-0 sm:mx-5"
+      title="故事列表暂时无法读取"
+      :error-message="loadingError"
+      retry-label="重试"
+      @retry="loadWorkspace"
+    />
 
     <ScrollArea class="min-h-0 flex-1 bg-muted/10">
       <div
