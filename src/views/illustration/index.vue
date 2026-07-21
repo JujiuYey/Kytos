@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { DefaultChatTransport } from 'ai';
 import type { ChatStatus } from 'ai';
@@ -10,10 +10,11 @@ import {
   type ImageReferencePickerFilter,
   type ImageReferencePickerOption,
 } from '@/components/sag/image-reference-picker-dialog';
-import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import SagErrorRetryAlert from '@/components/sag/sag-error-retry-alert.vue';
 import { SagPage } from '@/components/sag/sag-page';
+import { useCredentialStatus } from '@/composables/use-credential-status';
+import { useGenerationPolling } from '@/composables/use-generation-polling';
 import { useAppStore } from '@/stores/app';
 import type {
   CharacterPortraitResolution,
@@ -21,7 +22,6 @@ import type {
   CharacterExpressionWorkspaceState,
   CharacterPortraitWorkspaceState,
   CharacterVisualAssetSelection,
-  CredentialStatus,
   IllustrationAgentMessage,
   IllustrationBriefUpdateResult,
   IllustrationSize,
@@ -48,8 +48,6 @@ const router = useRouter();
 const topics = ref<IllustrationTopic[]>([]);
 const uploads = ref<UploadedIllustration[]>([]);
 const activeTopicId = ref('');
-const deepseekStatus = ref<CredentialStatus | null>(null);
-const apimartStatus = ref<CredentialStatus | null>(null);
 const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
 const expressionWorkspace = ref<CharacterExpressionWorkspaceState | null>(null);
 const initializationError = ref('');
@@ -66,16 +64,38 @@ const size = ref<IllustrationSize>('16:9');
 const resolution = ref<CharacterPortraitResolution>('1k');
 const selectedCharacterReferences = ref<CharacterExpressionReferenceSelection[]>([]);
 const revisionTarget = ref<IllustrationVersion | null>(null);
-const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const pollingStates = ref<GenerationPollingStateMap>({});
-let disposed = false;
+
+const {
+  apimartConfigured,
+  deepseekConfigured,
+  refresh: refreshCredentialStatus,
+} = useCredentialStatus();
+
+const { pollingStates, schedulePoll } = useGenerationPolling<IllustrationVersion>({
+  fetchTask: id => window.desktop.illustration.getIllustrationTask(id),
+  isStillRunning: v =>
+    ['submitted', 'pending', 'processing'].includes(v.status),
+  isTerminalSuccess: v => v.status === 'completed',
+  onPollSuccess: (_id, version) => {
+    replaceVersion(version);
+    generationError.value = '';
+  },
+  onCompleted: (_id, version) => {
+    toast.success(`V${version.versionNumber} 已生成并保存到工作区`);
+    mobilePane.value = 'workspace';
+  },
+  onFailed: (_id, version) => {
+    generationError.value = version.errorMessage || '插画生成任务未完成';
+  },
+  onError: (_id, err) => {
+    generationError.value = err instanceof Error ? err.message : String(err);
+  },
+});
 
 const model = computed(() => appStore.settings.deepseekModel);
 const activeTopic = computed(
   () => topics.value.find(topic => topic.id === activeTopicId.value) ?? null,
 );
-const deepseekConfigured = computed(() => Boolean(deepseekStatus.value?.configured));
-const apimartConfigured = computed(() => Boolean(apimartStatus.value?.configured));
 const referenceFilters: ImageReferencePickerFilter[] = [
   { label: '视觉资产', value: 'visual' },
   { label: '已有表情', value: 'expression' },
@@ -298,20 +318,17 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   initializationError.value = '';
   try {
-    const [workspace, deepseek, apimart, portraits, library] = await Promise.all([
+    const [workspace, portraits, library] = await Promise.all([
       window.desktop.illustration.getIllustrationWorkspace(),
-      window.desktop.settings.getCredentialStatus('deepseek'),
-      window.desktop.settings.getCredentialStatus('apimart'),
       window.desktop.character.portrait.getCharacterPortraitWorkspace(),
       window.desktop.character.library.getCharacterLibrary(),
+      refreshCredentialStatus(),
     ]);
     const expressions = await window.desktop.character.expression.getCharacterExpressionWorkspace({
       characterId: library.activeCharacterId,
     });
     topics.value = workspace.topics;
     uploads.value = workspace.uploads;
-    deepseekStatus.value = deepseek;
-    apimartStatus.value = apimart;
     portraitWorkspace.value = portraits;
     expressionWorkspace.value = expressions;
 
@@ -426,61 +443,6 @@ async function renameTopic(title: string): Promise<void> {
     );
   } catch (renameError: unknown) {
     toast.error(renameError instanceof Error ? renameError.message : String(renameError));
-  }
-}
-
-function schedulePoll(taskId: string): void {
-  const currentTimer = pollTimers.get(taskId);
-  if (currentTimer) {
-    clearTimeout(currentTimer);
-  }
-  const previousState = pollingStates.value[taskId];
-  pollingStates.value = {
-    ...pollingStates.value,
-    [taskId]: { attempt: previousState?.attempt ?? 0, phase: 'waiting' },
-  };
-  pollTimers.set(
-    taskId,
-    setTimeout(() => {
-      void pollTask(taskId);
-    }, 2500),
-  );
-}
-
-async function pollTask(taskId: string): Promise<void> {
-  if (disposed) {
-    return;
-  }
-  const previousState = pollingStates.value[taskId];
-  pollingStates.value = {
-    ...pollingStates.value,
-    [taskId]: { attempt: (previousState?.attempt ?? 0) + 1, phase: 'requesting' },
-  };
-  try {
-    const version = await window.desktop.illustration.getIllustrationTask(taskId);
-    replaceVersion(version);
-    generationError.value = '';
-    if (['submitted', 'pending', 'processing'].includes(version.status)) {
-      schedulePoll(taskId);
-      return;
-    }
-    pollTimers.delete(taskId);
-    const nextPollingStates = { ...pollingStates.value };
-    delete nextPollingStates[taskId];
-    pollingStates.value = nextPollingStates;
-    if (version.status === 'completed') {
-      toast.success(`V${version.versionNumber} 已生成并保存到工作区`);
-      mobilePane.value = 'workspace';
-    } else {
-      generationError.value = version.errorMessage || '插画生成任务未完成';
-    }
-  } catch (pollError: unknown) {
-    generationError.value = pollError instanceof Error ? pollError.message : String(pollError);
-    pollTimers.delete(taskId);
-    pollingStates.value = {
-      ...pollingStates.value,
-      [taskId]: { attempt: pollingStates.value[taskId]?.attempt ?? 1, phase: 'paused' },
-    };
   }
 }
 
@@ -616,15 +578,6 @@ watch(messages, messageList => applyToolOutputs(messageList), { deep: true });
 
 onMounted(() => {
   void initialize();
-});
-
-onBeforeUnmount(() => {
-  disposed = true;
-  for (const timer of pollTimers.values()) {
-    clearTimeout(timer);
-  }
-  pollTimers.clear();
-  pollingStates.value = {};
 });
 </script>
 

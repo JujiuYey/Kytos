@@ -62,10 +62,10 @@ export function useCredentialStatus(): CredentialStatusBundle;
   `window.desktop.settings.getCredentialStatus('deepseek')` and
   `window.desktop.settings.getCredentialStatus('apimart')`.
 - On success: writes both `ref`s with the resolved `CredentialStatus` values.
-- On failure: silently preserves the previous values. **Rationale:** current views do not
-  surface a per-channel credential error; failures bubble as part of the outer `initialize()`
-  try/catch which already absorbs them. Preserving the previous value matches current behavior
-  (the previous successful read remains authoritative until the next refresh succeeds).
+- On failure: the rejection propagates to the caller. The previous ref values are preserved
+  **only because** the failure happens before any write — i.e. the partial-write hazard is
+  avoided by ordering the writes after both RPCs resolve. Callers handle the rejection in
+  their own try/catch (e.g. `illustration/index.vue`'s `initialize()` already has one).
 
 ### 3.4 View call site (illustrative)
 
@@ -118,6 +118,7 @@ import type { Ref } from 'vue';
 export interface GenerationPollingOptions<TVersion> {
   fetchTask: (taskId: string) => Promise<TVersion>;
   isStillRunning: (version: TVersion) => boolean;
+  isTerminalSuccess: (version: TVersion) => boolean;
   intervalMs?: number; // default 2500
   /**
    * Called on every successful fetch, regardless of whether the task is still running or
@@ -126,7 +127,7 @@ export interface GenerationPollingOptions<TVersion> {
    */
   onPollSuccess?: (taskId: string, version: TVersion) => void;
   onCompleted?: (taskId: string, version: TVersion) => void;
-  onFailed?: (taskId: string, version: TVersion, message: string) => void;
+  onFailed?: (taskId: string, version: TVersion) => void;
   onError?: (taskId: string, error: unknown) => void;
 }
 
@@ -158,9 +159,10 @@ export function useGenerationPolling<TVersion>(
   3. Calls `options.fetchTask(taskId)`.
      - On success: invokes `options.onPollSuccess(taskId, version)` **regardless** of whether
        the task is still running. If `isStillRunning(version)` is true, schedules the next
-       poll and returns. Otherwise invokes `options.onCompleted(taskId, version)` on terminal
-       success or `options.onFailed(taskId, version, ...)` on terminal non-success. Removes
-       the entry from `pollingStates` and the timer from `pollTimers` after a terminal outcome.
+       poll and returns. Otherwise (terminal) checks `options.isTerminalSuccess(version)`:
+       `true` → invokes `options.onCompleted(taskId, version)`; `false` → invokes
+       `options.onFailed(taskId, version)`. Removes the entry from `pollingStates` and the
+       timer from `pollTimers` after a terminal outcome.
      - On failure (thrown error): invokes `options.onError`, marks the entry as `phase: 'paused'`,
        and removes the timer.
 - `cancel(taskId)`: clears the timer for `taskId`, removes its entry from `pollingStates`.
@@ -200,15 +202,17 @@ const { pollingStates, schedulePoll } = useGenerationPolling<IllustrationVersion
   fetchTask: id => window.desktop.illustration.getIllustrationTask(id),
   isStillRunning: v =>
     ['submitted', 'pending', 'processing'].includes(v.status),
-  onPollSuccess: () => {
+  isTerminalSuccess: v => v.status === 'completed',
+  onPollSuccess: (_id, version) => {
+    replaceVersion(version);
     generationError.value = '';
   },
   onCompleted: (_id, version) => {
     toast.success(`V${version.versionNumber} 已生成并保存到工作区`);
     mobilePane.value = 'workspace';
   },
-  onFailed: (_id, version, message) => {
-    generationError.value = version.errorMessage || message || '插画生成任务未完成';
+  onFailed: (_id, version) => {
+    generationError.value = version.errorMessage || '插画生成任务未完成';
   },
   onError: (_id, err) => {
     generationError.value = err instanceof Error ? err.message : String(err);
@@ -217,8 +221,13 @@ const { pollingStates, schedulePoll } = useGenerationPolling<IllustrationVersion
 ```
 
 The internal cleanup (`pollTimers`, `pollingStates = {}`, `disposed`, `onBeforeUnmount`) is
-removed from the view. `onPollSuccess` carries the success-side `generationError.value = ''`
-reset that currently lives in `illustration/index.vue:462`.
+removed from the view. `onPollSuccess` carries two responsibilities that previously lived
+inline in `pollTask`:
+
+- `replaceVersion(version)` — merge the polled version into the topic (originally
+  `illustration/index.vue:477`).
+- `generationError.value = ''` — clear any transient error UI (originally
+  `illustration/index.vue:478`).
 
 ### 4.6 Order-of-operations preservation
 
@@ -242,8 +251,8 @@ The composable preserves this exact sequence:
 4. on success: invoke `options.onPollSuccess(taskId, version)` **first** (this is where
    `generationError.value = ''` lives).
 5. if `options.isStillRunning(version)`: schedule next poll, return.
-6. else terminal success → `options.onCompleted(taskId, version)`; or non-success terminal →
-   `options.onFailed(taskId, version, message)` with `message = version.errorMessage ?? ''`.
+6. else (terminal): check `options.isTerminalSuccess(version)`. If true → invoke
+   `options.onCompleted(taskId, version)`. If false → invoke `options.onFailed(taskId, version)`.
    In both terminal cases, delete timer entry and `pollingStates[taskId]`.
 7. on thrown error: `options.onError(taskId, err)`, set `pollingStates[taskId].phase = 'paused'`,
    delete timer entry.
