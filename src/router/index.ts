@@ -12,17 +12,17 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: Layout,
-    redirect: '/characters',
+    redirect: '/character',
     children: [
       {
-        path: '/settings',
-        name: 'settings',
-        component: () => import('@/views/settings/index.vue'),
+        path: '/setting',
+        name: 'setting',
+        component: () => import('@/views/setting/index.vue'),
       },
       {
-        path: '/characters',
-        name: 'characters',
-        component: () => import('@/views/characters/index.vue'),
+        path: '/character',
+        name: 'character',
+        component: () => import('@/views/character/index.vue'),
         meta: { title: '角色管理' },
       },
       {
