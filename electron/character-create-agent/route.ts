@@ -4,12 +4,19 @@ import type { DeepSeekModel } from '../../shared/character';
 import type { CharacterCreateDraft } from '../../shared/character-create';
 import { getCredentialValue } from '../services/credentials';
 import { createCharacterCreateAgent } from './agent';
+import { isPlainObject } from 'es-toolkit';
 
+// 角色创建 Agent 请求体
 interface CharacterCreateAgentRequestBody {
+  // 当前角色草稿
   draft: CharacterCreateDraft;
+  // 是否携带参考图
   hasReferenceImage: boolean;
+  // 会话消息列表
   messages: unknown[];
+  // 使用的模型
   model?: DeepSeekModel;
+  // 风格提示词
   stylePrompt?: string;
 }
 
@@ -20,12 +27,12 @@ const corsHeaders = {
 };
 
 function parseBody(value: unknown): CharacterCreateAgentRequestBody {
-  if (!value || typeof value !== 'object') throw new Error('角色访谈请求无效');
+  if (!isPlainObject(value)) throw new Error('角色访谈请求无效');
   const body = value as Record<string, unknown>;
   if (!Array.isArray(body.messages) || body.messages.length > 100) {
     throw new Error('角色访谈消息无效');
   }
-  if (!body.draft || typeof body.draft !== 'object') throw new Error('角色草稿无效');
+  if (!isPlainObject(body.draft)) throw new Error('角色草稿无效');
   const normalizedModel = typeof body.model === 'string' ? body.model.trim() : '';
   if (normalizedModel && !isDeepSeekModel(normalizedModel)) {
     throw new Error('模型标识无效');

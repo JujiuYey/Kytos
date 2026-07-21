@@ -23,6 +23,7 @@ import { saveOfficialCharacterVisual } from './character-portrait';
 import { getCredentialValue } from './credentials';
 import { readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
+import { isPlainObject } from 'es-toolkit';
 
 const API_BASE_URL = 'https://api.apimart.ai';
 const STORE_FILE_NAME = 'character-create-generations.json';
@@ -48,10 +49,6 @@ interface ApiTaskData {
   status?: string;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
 function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
   return ['submitted', 'pending', 'processing', 'completed', 'failed', 'cancelled'].includes(
     String(value),
@@ -68,7 +65,7 @@ function getAssetUrl(fileName: string): string {
 
 function parseImage(value: unknown): CharacterPortraitImage | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName
   ) {
@@ -84,7 +81,7 @@ function parseImage(value: unknown): CharacterPortraitImage | null {
 
 function parseGeneration(value: unknown): StoredGeneration | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !ID_PATTERN.test(value.id) ||
     typeof value.taskId !== 'string' ||
@@ -107,7 +104,7 @@ function parseGeneration(value: unknown): StoredGeneration | null {
 
 async function loadStore(): Promise<StoredGenerationStore> {
   const value = await readJsonFile(getStorePath(await getWorkspaceDirectory()));
-  if (!isRecord(value) || !Array.isArray(value.generations)) {
+  if (!isPlainObject(value) || !Array.isArray(value.generations)) {
     return { generations: [], version: 1 };
   }
   return {
@@ -134,7 +131,7 @@ async function requestApi(url: string, init: RequestInit): Promise<unknown> {
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     const message =
-      isRecord(payload) && isRecord(payload.error) && typeof payload.error.message === 'string'
+      isPlainObject(payload) && isPlainObject(payload.error) && typeof payload.error.message === 'string'
         ? payload.error.message
         : `图片生成服务请求失败（HTTP ${response.status}）`;
     throw new Error(message);
@@ -143,29 +140,29 @@ async function requestApi(url: string, init: RequestInit): Promise<unknown> {
 }
 
 function getSubmittedTaskId(payload: unknown): string {
-  if (!isRecord(payload) || !Array.isArray(payload.data))
+  if (!isPlainObject(payload) || !Array.isArray(payload.data))
     throw new Error('图片生成服务未返回任务编号');
   const item = payload.data[0];
-  if (!isRecord(item) || typeof item.task_id !== 'string' || !ID_PATTERN.test(item.task_id)) {
+  if (!isPlainObject(item) || typeof item.task_id !== 'string' || !ID_PATTERN.test(item.task_id)) {
     throw new Error('图片生成服务返回了无效任务编号');
   }
   return item.task_id;
 }
 
 function parseTaskData(payload: unknown): ApiTaskData {
-  if (!isRecord(payload) || !isRecord(payload.data))
+  if (!isPlainObject(payload) || !isPlainObject(payload.data))
     throw new Error('图片生成服务返回了无效任务状态');
   const data = payload.data;
   const result =
-    isRecord(data.result) && Array.isArray(data.result.images)
-      ? data.result.images.filter(isRecord).map(image => ({
+    isPlainObject(data.result) && Array.isArray(data.result.images)
+      ? data.result.images.filter(isPlainObject).map(image => ({
           url: Array.isArray(image.url)
             ? image.url.filter((url): url is string => typeof url === 'string')
             : [],
         }))
       : undefined;
   return {
-    error: isRecord(data.error)
+    error: isPlainObject(data.error)
       ? { message: typeof data.error.message === 'string' ? data.error.message : undefined }
       : undefined,
     progress: typeof data.progress === 'number' ? data.progress : undefined,
@@ -304,7 +301,7 @@ export async function getCharacterVisualGeneration(
 export async function saveCharacterVisual(
   request: SaveCharacterVisualRequest,
 ): Promise<SaveCharacterVisualResult> {
-  if (!request || typeof request !== 'object' || !ID_PATTERN.test(request.generationId)) {
+  if (!isPlainObject(request) || !ID_PATTERN.test(request.generationId)) {
     throw new Error('角色视觉保存参数无效');
   }
   const store = await loadStore();
@@ -342,8 +339,7 @@ export async function saveCharacterVisualAsset(
   request: SaveCharacterVisualAssetRequest,
 ): Promise<SaveCharacterVisualResult> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     !(request.fileData instanceof Uint8Array) ||
     !request.fileName ||
     !request.mimeType.startsWith('image/')

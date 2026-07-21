@@ -42,6 +42,7 @@ import {
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
+import { isPlainObject } from 'es-toolkit';
 
 const API_BASE_URL = 'https://api.apimart.ai';
 const STORE_FILE_NAME = 'illustrations.json';
@@ -81,10 +82,6 @@ interface ApiTaskData {
   status?: string;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
 function isSize(value: unknown): value is IllustrationSize {
   return ILLUSTRATION_SIZES.includes(value as IllustrationSize);
 }
@@ -101,7 +98,7 @@ function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
 
 function parseBrief(value: unknown): IllustrationBrief {
   const brief = createEmptyIllustrationBrief();
-  if (!isRecord(value)) {
+  if (!isPlainObject(value)) {
     return brief;
   }
   for (const field of BRIEF_FIELDS) {
@@ -120,7 +117,7 @@ function parseMessages(value: unknown): IllustrationAgentMessage[] {
   return value
     .filter(
       message =>
-        isRecord(message) &&
+        isPlainObject(message) &&
         typeof message.id === 'string' &&
         ['assistant', 'system', 'user'].includes(String(message.role)) &&
         Array.isArray(message.parts),
@@ -130,7 +127,7 @@ function parseMessages(value: unknown): IllustrationAgentMessage[] {
 
 function parseSelection(value: unknown): CharacterPortraitSelection | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName ||
     typeof value.taskId !== 'string' ||
@@ -147,7 +144,7 @@ function parseCharacterReferenceSelection(
   const selection = parseSelection(value);
   if (
     !selection ||
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     !['expression', 'portrait', 'sheet'].includes(String(value.kind))
   ) {
     return null;
@@ -164,7 +161,7 @@ function characterReferenceKey(selection: CharacterExpressionReferenceSelection)
 
 function parseVersionReference(value: unknown): IllustrationVersionReference | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName ||
     typeof value.versionId !== 'string' ||
@@ -181,7 +178,7 @@ function getAssetUrl(fileName: string): string {
 
 function parseImage(value: unknown): CharacterPortraitImage | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName
   ) {
@@ -196,7 +193,7 @@ function parseImage(value: unknown): CharacterPortraitImage | null {
 
 function parseUpload(value: unknown): UploadedIllustration | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !ID_PATTERN.test(value.id) ||
     typeof value.fileName !== 'string' ||
@@ -224,7 +221,7 @@ function parseUpload(value: unknown): UploadedIllustration | null {
 
 function parseVersion(value: unknown): IllustrationVersion | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !ID_PATTERN.test(value.id) ||
     typeof value.versionNumber !== 'number' ||
@@ -271,7 +268,7 @@ function parseVersion(value: unknown): IllustrationVersion | null {
 
 function parseTopic(value: unknown): IllustrationTopic | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !ID_PATTERN.test(value.id) ||
     typeof value.title !== 'string' ||
@@ -306,7 +303,7 @@ async function getStorePath(): Promise<string> {
 async function loadStore(): Promise<StoredIllustrationWorkspace> {
   const storePath = await getStorePath();
   const value = await readJsonFile(storePath);
-  if (!isRecord(value)) {
+  if (!isPlainObject(value)) {
     return { topics: [], uploads: [], version: 4 };
   }
   const topics = Array.isArray(value.topics)
@@ -370,7 +367,7 @@ export async function getIllustrationTopic(topicId: string): Promise<Illustratio
 export async function createIllustrationTopic(
   request: CreateIllustrationTopicRequest,
 ): Promise<IllustrationTopic> {
-  if (!request || typeof request !== 'object' || typeof request.useCharacter !== 'boolean') {
+  if (!isPlainObject(request) || typeof request.useCharacter !== 'boolean') {
     throw new Error('新建插画主题参数无效');
   }
   const now = new Date().toISOString();
@@ -392,7 +389,7 @@ export async function createIllustrationTopic(
 export async function updateIllustrationTopic(
   request: UpdateIllustrationTopicRequest,
 ): Promise<IllustrationTopic> {
-  if (!request || typeof request !== 'object' || typeof request.topicId !== 'string') {
+  if (!isPlainObject(request) || typeof request.topicId !== 'string') {
     throw new Error('插画主题更新参数无效');
   }
   if (
@@ -450,7 +447,7 @@ export async function updateIllustrationBrief(
 export async function saveIllustrationConversation(
   request: SaveIllustrationConversationRequest,
 ): Promise<IllustrationTopic> {
-  if (!request || typeof request !== 'object' || typeof request.topicId !== 'string') {
+  if (!isPlainObject(request) || typeof request.topicId !== 'string') {
     throw new Error('插画对话保存参数无效');
   }
   const messages = parseMessages(request.messages);
@@ -469,7 +466,7 @@ export async function saveIllustrationConversation(
 }
 
 function getApiErrorMessage(payload: unknown, fallback: string): string {
-  if (isRecord(payload) && isRecord(payload.error) && typeof payload.error.message === 'string') {
+  if (isPlainObject(payload) && isPlainObject(payload.error) && typeof payload.error.message === 'string') {
     return payload.error.message;
   }
   return fallback;
@@ -497,12 +494,12 @@ async function requestApi(url: string, init: RequestInit): Promise<unknown> {
 }
 
 function getSubmittedTaskId(payload: unknown): string {
-  if (!isRecord(payload) || !Array.isArray(payload.data)) {
+  if (!isPlainObject(payload) || !Array.isArray(payload.data)) {
     throw new Error('图片生成服务未返回任务编号');
   }
   const firstItem = payload.data[0];
   if (
-    !isRecord(firstItem) ||
+    !isPlainObject(firstItem) ||
     typeof firstItem.task_id !== 'string' ||
     !ID_PATTERN.test(firstItem.task_id)
   ) {
@@ -512,20 +509,20 @@ function getSubmittedTaskId(payload: unknown): string {
 }
 
 function parseTaskData(payload: unknown): ApiTaskData {
-  if (!isRecord(payload) || !isRecord(payload.data)) {
+  if (!isPlainObject(payload) || !isPlainObject(payload.data)) {
     throw new Error('图片生成服务返回了无效的任务状态');
   }
   const data = payload.data;
   const resultImages =
-    isRecord(data.result) && Array.isArray(data.result.images)
-      ? data.result.images.filter(isRecord).map(image => ({
+    isPlainObject(data.result) && Array.isArray(data.result.images)
+      ? data.result.images.filter(isPlainObject).map(image => ({
           url: Array.isArray(image.url)
             ? image.url.filter((url): url is string => typeof url === 'string')
             : [],
         }))
       : undefined;
   return {
-    error: isRecord(data.error)
+    error: isPlainObject(data.error)
       ? { message: typeof data.error.message === 'string' ? data.error.message : undefined }
       : undefined,
     progress: typeof data.progress === 'number' ? data.progress : undefined,
@@ -551,8 +548,7 @@ function getImageExtension(mimeType: string, imageUrl: string): string {
 
 function validateUploadRequest(request: UploadIllustrationRequest): void {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.fileName !== 'string' ||
     !request.fileName.trim() ||
     path.basename(request.fileName) !== request.fileName ||
@@ -666,8 +662,7 @@ function buildPrompt(prompt: string, useCharacter: boolean, revisionPrompt: stri
 
 function validateGenerateRequest(request: GenerateIllustrationRequest): void {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.topicId !== 'string' ||
     typeof request.prompt !== 'string' ||
     !request.prompt.trim() ||
@@ -875,8 +870,7 @@ export async function deleteIllustrationVersion(
   request: DeleteIllustrationVersionRequest,
 ): Promise<IllustrationTopic> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.topicId !== 'string' ||
     typeof request.versionId !== 'string'
   ) {
@@ -943,8 +937,7 @@ export async function deleteIllustrationUpload(
   request: DeleteIllustrationUploadRequest,
 ): Promise<IllustrationWorkspaceState> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.uploadId !== 'string' ||
     !ID_PATTERN.test(request.uploadId)
   ) {
@@ -980,7 +973,7 @@ export async function deleteIllustrationUpload(
 export async function deleteIllustrationTopic(
   request: DeleteIllustrationTopicRequest,
 ): Promise<IllustrationWorkspaceState> {
-  if (!request || typeof request !== 'object' || typeof request.topicId !== 'string') {
+  if (!isPlainObject(request) || typeof request.topicId !== 'string') {
     throw new Error('插画主题删除参数无效');
   }
   const store = await loadStore();

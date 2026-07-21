@@ -6,6 +6,7 @@ import type {
   SetCredentialRequest,
 } from '../../shared/desktop';
 import { readJsonFile, writeJsonFile } from './json-store';
+import { isPlainObject } from 'es-toolkit';
 
 interface StoredSecrets {
   credentials: Partial<Record<CredentialService, string>>;
@@ -22,9 +23,9 @@ async function loadStoredSecrets(): Promise<StoredSecrets> {
   const value = await readJsonFile(getSecretsFilePath());
   const credentials: Partial<Record<CredentialService, string>> = {};
 
-  if (value && typeof value === 'object' && 'credentials' in value) {
+  if (isPlainObject(value) && 'credentials' in value) {
     const storedCredentials = value.credentials;
-    if (storedCredentials && typeof storedCredentials === 'object') {
+    if (isPlainObject(storedCredentials)) {
       for (const service of credentialServices) {
         if (service in storedCredentials) {
           const encryptedValue = (storedCredentials as Record<string, unknown>)[service];
@@ -72,7 +73,7 @@ export async function getCredentialStatus(service: CredentialService): Promise<C
 }
 
 export async function setCredential(request: SetCredentialRequest): Promise<CredentialStatus> {
-  if (!request || typeof request !== 'object' || !isCredentialService(request.service)) {
+  if (!isPlainObject(request) || !isCredentialService(request.service)) {
     throw new Error('凭据类型无效');
   }
   if (typeof request.value !== 'string' || !request.value.trim()) {

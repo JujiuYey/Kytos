@@ -4,6 +4,7 @@ import type { DeepSeekModel } from '../../shared/character';
 import { getCredentialValue } from '../services/credentials';
 import { getStory } from '../services/story';
 import { createStoryAgent } from './agent';
+import { isPlainObject } from 'es-toolkit';
 
 interface StoryAgentRequestBody {
   messages: unknown[];
@@ -20,7 +21,7 @@ const corsHeaders = {
 };
 
 function parseRequestBody(value: unknown): StoryAgentRequestBody {
-  if (!value || typeof value !== 'object' || !('messages' in value) || !('storyId' in value)) {
+  if (!isPlainObject(value) || !('messages' in value) || !('storyId' in value)) {
     throw new Error('故事对话请求无效');
   }
   const messages = value.messages;

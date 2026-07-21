@@ -46,6 +46,7 @@ import {
 import { getCredentialValue } from './credentials';
 import { readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
+import { isPlainObject } from 'es-toolkit';
 
 const API_BASE_URL = 'https://api.apimart.ai';
 const STORE_FILE_NAME = 'stories.json';
@@ -104,10 +105,6 @@ interface ApiTaskData {
 
 let taskCommitQueue: Promise<void> = Promise.resolve();
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
 function isSize(value: unknown): value is IllustrationSize {
   return ILLUSTRATION_SIZES.includes(value as IllustrationSize);
 }
@@ -129,7 +126,7 @@ function parseMessages(value: unknown): StoryAgentMessage[] {
   return value
     .filter(
       message =>
-        isRecord(message) &&
+        isPlainObject(message) &&
         typeof message.id === 'string' &&
         ['assistant', 'system', 'user'].includes(String(message.role)) &&
         Array.isArray(message.parts),
@@ -139,7 +136,7 @@ function parseMessages(value: unknown): StoryAgentMessage[] {
 
 function parseDraft(value: unknown): StoryDraft {
   const draft = createEmptyStoryDraft();
-  if (!isRecord(value)) {
+  if (!isPlainObject(value)) {
     return draft;
   }
   for (const field of DRAFT_FIELDS) {
@@ -152,7 +149,7 @@ function parseDraft(value: unknown): StoryDraft {
 
 function parseShotContent(value: unknown): StoryShotContent {
   const content = createEmptyStoryShotContent();
-  if (!isRecord(value)) {
+  if (!isPlainObject(value)) {
     return content;
   }
   for (const field of SHOT_FIELDS) {
@@ -165,7 +162,7 @@ function parseShotContent(value: unknown): StoryShotContent {
 
 function parseSelection(value: unknown): CharacterPortraitSelection | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName ||
     typeof value.taskId !== 'string' ||
@@ -178,7 +175,7 @@ function parseSelection(value: unknown): CharacterPortraitSelection | null {
 
 function parseVersionReference(value: unknown): StoryVersionReference | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName ||
     typeof value.shotId !== 'string' ||
@@ -197,7 +194,7 @@ function getAssetUrl(fileName: string): string {
 
 function parseImage(value: unknown): CharacterPortraitImage | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName
   ) {
@@ -212,7 +209,7 @@ function parseImage(value: unknown): CharacterPortraitImage | null {
 
 function parseVersion(value: unknown): StoryShotVersion | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !ID_PATTERN.test(value.id) ||
     typeof value.versionNumber !== 'number' ||
@@ -251,7 +248,7 @@ function parseVersion(value: unknown): StoryShotVersion | null {
 
 function parseShot(value: unknown, fallbackOrder: number): StoryShot | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !ID_PATTERN.test(value.id) ||
     typeof value.order !== 'number' ||
@@ -304,7 +301,7 @@ function normalizeShotOrder(shots: StoryShot[]): StoryShot[] {
 
 function parseStory(value: unknown, migrateResolutionStale: boolean): StoryProject | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !ID_PATTERN.test(value.id) ||
     typeof value.title !== 'string' ||
@@ -360,7 +357,7 @@ async function getStorePath(): Promise<string> {
 
 async function loadStore(): Promise<StoredStoryWorkspace> {
   const value = await readJsonFile(await getStorePath());
-  if (!isRecord(value)) {
+  if (!isPlainObject(value)) {
     return { stories: [], version: 3 };
   }
   const migrateResolutionStale = value.version !== 2 && value.version !== 3;
@@ -445,7 +442,7 @@ export async function createStory(_request: CreateStoryRequest): Promise<StoryPr
 }
 
 export async function updateStory(request: UpdateStoryRequest): Promise<StoryProject> {
-  if (!request || typeof request !== 'object' || typeof request.storyId !== 'string') {
+  if (!isPlainObject(request) || typeof request.storyId !== 'string') {
     throw new Error('故事更新参数无效');
   }
   if (
@@ -639,8 +636,7 @@ export async function updateStoryShot(
   request: UpdateStoryShotRequest,
 ): Promise<StoryShotUpdateResult> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.storyId !== 'string' ||
     typeof request.shotId !== 'string'
   ) {
@@ -650,7 +646,7 @@ export async function updateStoryShot(
 }
 
 export async function createStoryShot(request: CreateStoryShotRequest): Promise<StoryProject> {
-  if (!request || typeof request !== 'object' || typeof request.storyId !== 'string') {
+  if (!isPlainObject(request) || typeof request.storyId !== 'string') {
     throw new Error('新增分镜参数无效');
   }
   const store = await loadStore();
@@ -676,8 +672,7 @@ export async function createStoryShot(request: CreateStoryShotRequest): Promise<
 
 export async function moveStoryShot(request: MoveStoryShotRequest): Promise<StoryProject> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.storyId !== 'string' ||
     typeof request.shotId !== 'string' ||
     ![-1, 1].includes(request.direction)
@@ -711,8 +706,7 @@ export async function moveStoryShot(request: MoveStoryShotRequest): Promise<Stor
 
 export async function deleteStoryShot(request: DeleteStoryShotRequest): Promise<StoryProject> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.storyId !== 'string' ||
     typeof request.shotId !== 'string'
   ) {
@@ -759,7 +753,7 @@ export async function deleteStoryShot(request: DeleteStoryShotRequest): Promise<
 export async function saveStoryConversation(
   request: SaveStoryConversationRequest,
 ): Promise<StoryProject> {
-  if (!request || typeof request !== 'object' || typeof request.storyId !== 'string') {
+  if (!isPlainObject(request) || typeof request.storyId !== 'string') {
     throw new Error('故事对话保存参数无效');
   }
   const messages = parseMessages(request.messages);
@@ -778,7 +772,7 @@ export async function saveStoryConversation(
 }
 
 function getApiErrorMessage(payload: unknown, fallback: string): string {
-  if (isRecord(payload) && isRecord(payload.error) && typeof payload.error.message === 'string') {
+  if (isPlainObject(payload) && isPlainObject(payload.error) && typeof payload.error.message === 'string') {
     return payload.error.message;
   }
   return fallback;
@@ -806,12 +800,12 @@ async function requestApi(url: string, init: RequestInit): Promise<unknown> {
 }
 
 function getSubmittedTaskId(payload: unknown): string {
-  if (!isRecord(payload) || !Array.isArray(payload.data)) {
+  if (!isPlainObject(payload) || !Array.isArray(payload.data)) {
     throw new Error('图片生成服务未返回任务编号');
   }
   const firstItem = payload.data[0];
   if (
-    !isRecord(firstItem) ||
+    !isPlainObject(firstItem) ||
     typeof firstItem.task_id !== 'string' ||
     !ID_PATTERN.test(firstItem.task_id)
   ) {
@@ -821,20 +815,20 @@ function getSubmittedTaskId(payload: unknown): string {
 }
 
 function parseTaskData(payload: unknown): ApiTaskData {
-  if (!isRecord(payload) || !isRecord(payload.data)) {
+  if (!isPlainObject(payload) || !isPlainObject(payload.data)) {
     throw new Error('图片生成服务返回了无效的任务状态');
   }
   const data = payload.data;
   const resultImages =
-    isRecord(data.result) && Array.isArray(data.result.images)
-      ? data.result.images.filter(isRecord).map(image => ({
+    isPlainObject(data.result) && Array.isArray(data.result.images)
+      ? data.result.images.filter(isPlainObject).map(image => ({
           url: Array.isArray(image.url)
             ? image.url.filter((url): url is string => typeof url === 'string')
             : [],
         }))
       : undefined;
   return {
-    error: isRecord(data.error)
+    error: isPlainObject(data.error)
       ? { message: typeof data.error.message === 'string' ? data.error.message : undefined }
       : undefined,
     progress: typeof data.progress === 'number' ? data.progress : undefined,
@@ -960,8 +954,7 @@ function buildPrompt(story: StoryProject, shot: StoryShot, prompt: string): stri
 
 function validateGenerateRequest(request: GenerateStoryShotRequest): void {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.storyId !== 'string' ||
     typeof request.shotId !== 'string' ||
     typeof request.prompt !== 'string' ||
@@ -1160,8 +1153,7 @@ export async function selectStoryShotVersion(
   request: SelectStoryShotVersionRequest,
 ): Promise<StoryProject> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.storyId !== 'string' ||
     typeof request.shotId !== 'string' ||
     typeof request.versionId !== 'string'
@@ -1222,8 +1214,7 @@ export async function deleteStoryShotVersion(
   request: DeleteStoryShotVersionRequest,
 ): Promise<StoryProject> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.storyId !== 'string' ||
     typeof request.shotId !== 'string' ||
     typeof request.versionId !== 'string'
@@ -1276,7 +1267,7 @@ export async function deleteStoryShotVersion(
 }
 
 export async function deleteStory(request: DeleteStoryRequest): Promise<StoryWorkspaceState> {
-  if (!request || typeof request !== 'object' || typeof request.storyId !== 'string') {
+  if (!isPlainObject(request) || typeof request.storyId !== 'string') {
     throw new Error('故事删除参数无效');
   }
   const store = await loadStore();

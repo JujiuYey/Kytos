@@ -34,6 +34,7 @@ import { getCredentialValue } from './credentials';
 import { createDeepSeekCompatibleProvider, DEEPSEEK_PROVIDER_OPTIONS } from './deepseek-provider';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
+import { isPlainObject } from 'es-toolkit';
 
 const API_BASE_URL = 'https://api.apimart.ai';
 const EXPRESSION_STORE_FILE_NAME = 'character-expressions.json';
@@ -68,10 +69,6 @@ interface ExpressionReferenceData {
   selection: CharacterExpressionReferenceSelection;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
 function isExpressionSize(value: unknown): value is CharacterExpressionSize {
   return CHARACTER_EXPRESSION_SIZES.includes(value as CharacterExpressionSize);
 }
@@ -88,7 +85,7 @@ function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
 
 function parseReferenceSelection(value: unknown): CharacterExpressionReferenceSelection | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     !['expression', 'portrait', 'sheet'].includes(String(value.kind)) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName ||
@@ -114,7 +111,7 @@ function getExpressionAssetUrl(fileName: string): string {
 
 function parseImage(value: unknown): CharacterPortraitImage | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName
   ) {
@@ -129,7 +126,7 @@ function parseImage(value: unknown): CharacterPortraitImage | null {
 
 function parseExpressionRecord(value: unknown): CharacterExpressionRecord | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !TASK_ID_PATTERN.test(value.id) ||
     typeof value.name !== 'string' ||
@@ -197,7 +194,7 @@ async function getExpressionStorePath(characterId: string): Promise<string> {
 
 async function loadExpressionStore(characterId: string): Promise<StoredExpressionWorkspace> {
   const value = await readJsonFile(await getExpressionStorePath(characterId));
-  if (!isRecord(value)) {
+  if (!isPlainObject(value)) {
     return { records: [], version: 2 };
   }
   if (value.version !== 2) {
@@ -237,8 +234,7 @@ function validateGenerateRequest(
   request: GenerateCharacterExpressionRequest,
 ): CharacterExpressionReferenceSelection[] {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.characterId !== 'string' ||
     typeof request.name !== 'string' ||
     !request.name.trim() ||
@@ -292,8 +288,7 @@ export async function generateCharacterExpressionPrompt(
   request: GenerateCharacterExpressionPromptRequest,
 ): Promise<string> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.name !== 'string' ||
     !request.name.trim() ||
     request.name.length > MAX_NAME_LENGTH
@@ -324,8 +319,7 @@ export async function generateCharacterExpressionPrompt(
 
 function validateUploadRequest(request: UploadCharacterExpressionRequest): void {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.characterId !== 'string' ||
     typeof request.name !== 'string' ||
     !request.name.trim() ||
@@ -362,7 +356,7 @@ function getUploadedImageExtension(request: UploadCharacterExpressionRequest): s
 }
 
 function getApiErrorMessage(payload: unknown, fallback: string): string {
-  if (isRecord(payload) && isRecord(payload.error) && typeof payload.error.message === 'string') {
+  if (isPlainObject(payload) && isPlainObject(payload.error) && typeof payload.error.message === 'string') {
     return payload.error.message;
   }
   return fallback;
@@ -391,11 +385,11 @@ async function requestApi(url: string, init: RequestInit): Promise<unknown> {
 }
 
 function getSubmittedTaskId(payload: unknown): string {
-  if (!isRecord(payload) || !Array.isArray(payload.data)) {
+  if (!isPlainObject(payload) || !Array.isArray(payload.data)) {
     throw new Error('图片生成服务未返回任务编号');
   }
   const firstItem = payload.data[0];
-  if (!isRecord(firstItem) || typeof firstItem.task_id !== 'string') {
+  if (!isPlainObject(firstItem) || typeof firstItem.task_id !== 'string') {
     throw new Error('图片生成服务未返回任务编号');
   }
   if (!TASK_ID_PATTERN.test(firstItem.task_id)) {
@@ -405,16 +399,16 @@ function getSubmittedTaskId(payload: unknown): string {
 }
 
 function parseTaskData(payload: unknown): ApiTaskData {
-  if (!isRecord(payload) || !isRecord(payload.data)) {
+  if (!isPlainObject(payload) || !isPlainObject(payload.data)) {
     throw new Error('图片生成服务返回了无效的任务状态');
   }
   const data = payload.data;
-  const error = isRecord(data.error)
+  const error = isPlainObject(data.error)
     ? { message: typeof data.error.message === 'string' ? data.error.message : undefined }
     : undefined;
   const resultImages =
-    isRecord(data.result) && Array.isArray(data.result.images)
-      ? data.result.images.filter(isRecord).map(image => ({
+    isPlainObject(data.result) && Array.isArray(data.result.images)
+      ? data.result.images.filter(isPlainObject).map(image => ({
           url: Array.isArray(image.url)
             ? image.url.filter((url): url is string => typeof url === 'string')
             : [],
@@ -630,7 +624,7 @@ export async function generateCharacterExpression(
 export async function getCharacterExpressionTask(
   request: GetCharacterExpressionTaskRequest,
 ): Promise<CharacterExpressionRecord> {
-  if (!request || typeof request !== 'object') {
+  if (!isPlainObject(request)) {
     throw new Error('表情任务参数无效');
   }
   const { characterId, taskId } = request;
@@ -736,8 +730,7 @@ export async function renameCharacterExpression(
   request: RenameCharacterExpressionRequest,
 ): Promise<CharacterExpressionWorkspaceState> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.characterId !== 'string' ||
     typeof request.taskId !== 'string' ||
     !TASK_ID_PATTERN.test(request.taskId) ||
@@ -774,8 +767,7 @@ export async function deleteCharacterExpression(
   request: DeleteCharacterExpressionRequest,
 ): Promise<CharacterExpressionWorkspaceState> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.characterId !== 'string' ||
     typeof request.taskId !== 'string' ||
     !TASK_ID_PATTERN.test(request.taskId) ||

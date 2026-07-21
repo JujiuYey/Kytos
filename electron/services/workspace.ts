@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { app, shell } from 'electron';
 import type { DesktopSettings, SaveFileRequest, SavedFileResult } from '../../shared/desktop';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
+import { isPlainObject } from 'es-toolkit';
 
 interface StoredSettings {
   workspacePath: string | null;
@@ -27,8 +28,7 @@ async function loadStoredSettings(): Promise<StoredSettings> {
 
   const value = await readJsonFile(getSettingsFilePath());
   const workspacePath =
-    value &&
-    typeof value === 'object' &&
+    isPlainObject(value) &&
     'workspacePath' in value &&
     typeof value.workspacePath === 'string' &&
     path.isAbsolute(value.workspacePath)
@@ -111,7 +111,7 @@ function createStoredFileName(originalName: string): string {
 }
 
 function validateSaveFileRequest(request: SaveFileRequest): void {
-  if (!request || typeof request !== 'object') {
+  if (!isPlainObject(request)) {
     throw new Error('文件参数无效');
   }
   if (!request.fileName || path.basename(request.fileName) !== request.fileName) {

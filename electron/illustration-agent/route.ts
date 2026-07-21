@@ -4,6 +4,7 @@ import type { DeepSeekModel } from '../../shared/character';
 import { getCredentialValue } from '../services/credentials';
 import { getIllustrationTopic } from '../services/illustration';
 import { createIllustrationAgent } from './agent';
+import { isPlainObject } from 'es-toolkit';
 
 interface IllustrationAgentRequestBody {
   messages: unknown[];
@@ -20,7 +21,7 @@ const corsHeaders = {
 };
 
 function parseRequestBody(value: unknown): IllustrationAgentRequestBody {
-  if (!value || typeof value !== 'object' || !('messages' in value) || !('topicId' in value)) {
+  if (!isPlainObject(value) || !('messages' in value) || !('topicId' in value)) {
     throw new Error('插画对话请求无效');
   }
   const messages = value.messages;

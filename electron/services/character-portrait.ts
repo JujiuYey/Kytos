@@ -33,6 +33,7 @@ import { getActiveCharacterDirectory, getCharacterDirectory } from './character-
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
+import { isPlainObject } from 'es-toolkit';
 
 const API_BASE_URL = 'https://api.apimart.ai';
 const PORTRAIT_STORE_FILE_NAME = 'character-portraits.json';
@@ -70,10 +71,6 @@ export interface OfficialCharacterVisualReference {
   selection: CharacterVisualAssetSelection;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
 function isPortraitSize(value: unknown): value is CharacterPortraitSize {
   return CHARACTER_PORTRAIT_SIZES.includes(value as CharacterPortraitSize);
 }
@@ -98,7 +95,7 @@ function parseImage(
   fallbackName?: string,
 ): CharacterPortraitImage | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName
   ) {
@@ -117,7 +114,7 @@ function parseImage(
 
 function parsePortraitRecord(value: unknown): CharacterPortraitRecord | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !TASK_ID_PATTERN.test(value.id) ||
     typeof value.prompt !== 'string' ||
@@ -162,7 +159,7 @@ function parsePortraitRecord(value: unknown): CharacterPortraitRecord | null {
 
 function parseSheetRecord(value: unknown): CharacterSheetRecord | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !TASK_ID_PATTERN.test(value.id) ||
     typeof value.prompt !== 'string' ||
@@ -218,7 +215,7 @@ function parseSheetRecord(value: unknown): CharacterSheetRecord | null {
 
 function parseSelection(value: unknown): CharacterPortraitSelection | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName ||
     typeof value.taskId !== 'string' ||
@@ -231,7 +228,7 @@ function parseSelection(value: unknown): CharacterPortraitSelection | null {
 
 function parseVisualAssetSelection(value: unknown): CharacterVisualAssetSelection | null {
   const selection = parseSelection(value);
-  if (!selection || !isRecord(value) || (value.kind !== 'portrait' && value.kind !== 'sheet')) {
+  if (!selection || !isPlainObject(value) || (value.kind !== 'portrait' && value.kind !== 'sheet')) {
     return null;
   }
   return { ...selection, kind: value.kind };
@@ -310,7 +307,7 @@ async function getPortraitStorePath(characterId?: string): Promise<string> {
 async function loadPortraitStore(characterId?: string): Promise<StoredPortraitWorkspace> {
   const storePath = await getPortraitStorePath(characterId);
   const value = await readJsonFile(storePath);
-  if (!isRecord(value)) {
+  if (!isPlainObject(value)) {
     return {
       officialAssets: [],
       records: [],
@@ -361,7 +358,7 @@ async function savePortraitStore(
 }
 
 function validateGenerateRequest(request: GenerateCharacterPortraitRequest): void {
-  if (!request || typeof request !== 'object') {
+  if (!isPlainObject(request)) {
     throw new Error('生成参数无效');
   }
   if (
@@ -383,7 +380,7 @@ function validateGenerateRequest(request: GenerateCharacterPortraitRequest): voi
 }
 
 function getApiErrorMessage(payload: unknown, fallback: string): string {
-  if (isRecord(payload) && isRecord(payload.error) && typeof payload.error.message === 'string') {
+  if (isPlainObject(payload) && isPlainObject(payload.error) && typeof payload.error.message === 'string') {
     return payload.error.message;
   }
   return fallback;
@@ -415,11 +412,11 @@ async function requestApi(url: string, init: RequestInit): Promise<unknown> {
 }
 
 function getSubmittedTaskId(payload: unknown): string {
-  if (!isRecord(payload) || !Array.isArray(payload.data)) {
+  if (!isPlainObject(payload) || !Array.isArray(payload.data)) {
     throw new Error('图片生成服务未返回任务编号');
   }
   const firstItem = payload.data[0];
-  if (!isRecord(firstItem) || typeof firstItem.task_id !== 'string') {
+  if (!isPlainObject(firstItem) || typeof firstItem.task_id !== 'string') {
     throw new Error('图片生成服务未返回任务编号');
   }
   if (!TASK_ID_PATTERN.test(firstItem.task_id)) {
@@ -429,17 +426,17 @@ function getSubmittedTaskId(payload: unknown): string {
 }
 
 function parseTaskData(payload: unknown): ApiTaskData {
-  if (!isRecord(payload) || !isRecord(payload.data)) {
+  if (!isPlainObject(payload) || !isPlainObject(payload.data)) {
     throw new Error('图片生成服务返回了无效的任务状态');
   }
 
   const data = payload.data;
-  const error = isRecord(data.error)
+  const error = isPlainObject(data.error)
     ? { message: typeof data.error.message === 'string' ? data.error.message : undefined }
     : undefined;
   const resultImages =
-    isRecord(data.result) && Array.isArray(data.result.images)
-      ? data.result.images.filter(isRecord).map(image => ({
+    isPlainObject(data.result) && Array.isArray(data.result.images)
+      ? data.result.images.filter(isPlainObject).map(image => ({
           url: Array.isArray(image.url)
             ? image.url.filter((url): url is string => typeof url === 'string')
             : [],
@@ -471,8 +468,7 @@ function getImageExtension(mimeType: string, imageUrl: string): string {
 
 function validateImageUploadRequest(request: SaveFileRequest & { name?: string }): void {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.fileName !== 'string' ||
     path.basename(request.fileName) !== request.fileName ||
     !(request.fileData instanceof Uint8Array) ||
@@ -628,8 +624,7 @@ function validateVisualAssetSelection(
   request: CharacterVisualAssetSelection,
 ): CharacterVisualAssetSelection {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     (request.kind !== 'portrait' && request.kind !== 'sheet') ||
     typeof request.taskId !== 'string' ||
     !TASK_ID_PATTERN.test(request.taskId) ||
@@ -874,8 +869,7 @@ export async function deleteCharacterPortrait(
   request: DeleteCharacterPortraitRequest,
 ): Promise<CharacterPortraitWorkspaceState> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.taskId !== 'string' ||
     !TASK_ID_PATTERN.test(request.taskId) ||
     typeof request.fileName !== 'string' ||
@@ -1021,8 +1015,7 @@ export async function generateCharacterSheet(
   request: GenerateCharacterSheetRequest,
 ): Promise<CharacterSheetRecord> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.name !== 'string' ||
     !request.name.trim() ||
     request.name.length > MAX_NAME_LENGTH ||
@@ -1160,8 +1153,7 @@ export async function selectCharacterSheet(
   request: SelectCharacterSheetRequest,
 ): Promise<CharacterPortraitWorkspaceState> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.taskId !== 'string' ||
     !TASK_ID_PATTERN.test(request.taskId) ||
     typeof request.fileName !== 'string' ||
@@ -1182,8 +1174,7 @@ export async function deleteCharacterSheet(
   request: DeleteCharacterSheetRequest,
 ): Promise<CharacterPortraitWorkspaceState> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.taskId !== 'string' ||
     !TASK_ID_PATTERN.test(request.taskId) ||
     typeof request.fileName !== 'string' ||
@@ -1238,8 +1229,7 @@ export async function selectCharacterPortrait(
   request: SelectCharacterPortraitRequest,
 ): Promise<CharacterPortraitWorkspaceState> {
   if (
-    !request ||
-    typeof request !== 'object' ||
+    !isPlainObject(request) ||
     typeof request.taskId !== 'string' ||
     !TASK_ID_PATTERN.test(request.taskId) ||
     typeof request.fileName !== 'string' ||

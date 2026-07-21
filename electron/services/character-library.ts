@@ -12,6 +12,7 @@ import type { CharacterImageSize, CharacterPortraitSize } from '../../shared/cha
 import { CHARACTER_PORTRAIT_SIZES, CHARACTER_SHEET_SIZE } from '../../shared/character-portrait';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
+import { isPlainObject } from 'es-toolkit';
 
 const STORE_FILE_NAME = 'character-library.json';
 const CHARACTER_DIRECTORY = 'characters';
@@ -37,17 +38,13 @@ let initialization: Promise<StoredCharacterLibrary> | null = null;
 let initializedWorkspacePath = '';
 let mutationQueue: Promise<void> = Promise.resolve();
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
 function createCharacterId(): string {
   return `character_${randomUUID()}`;
 }
 
 function parseCharacter(value: unknown): CharacterSummary | null {
   if (
-    !isRecord(value) ||
+    !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !ID_PATTERN.test(value.id) ||
     typeof value.name !== 'string' ||
@@ -75,13 +72,13 @@ function parseCharacters(value: unknown): CharacterSummary[] {
 }
 
 function parseStore(value: unknown): StoredCharacterLibrary | null {
-  if (!isRecord(value)) {
+  if (!isPlainObject(value)) {
     return null;
   }
 
   let characters = parseCharacters(value.characters);
   if (!characters.length && Array.isArray(value.ips)) {
-    characters = value.ips.flatMap(ip => (isRecord(ip) ? parseCharacters(ip.characters) : []));
+    characters = value.ips.flatMap(ip => (isPlainObject(ip) ? parseCharacters(ip.characters) : []));
   }
   if (!characters.length) {
     return null;
@@ -124,7 +121,7 @@ function parseVisualAssetRecords(
   const directory = kind === 'portrait' ? PORTRAIT_ASSET_DIRECTORY : SHEET_ASSET_DIRECTORY;
   const candidates: VisualAssetCandidate[] = [];
   for (const record of value) {
-    if (!isRecord(record) || !isImageSize(record.size) || !Array.isArray(record.images)) {
+    if (!isPlainObject(record) || !isImageSize(record.size) || !Array.isArray(record.images)) {
       continue;
     }
     if (
@@ -135,12 +132,12 @@ function parseVisualAssetRecords(
     }
     const image = record.images.find(
       item =>
-        isRecord(item) &&
+        isPlainObject(item) &&
         typeof item.fileName === 'string' &&
         path.basename(item.fileName) === item.fileName &&
         officialAssets.has(`${kind}:${record.id}:${item.fileName}`),
     );
-    if (isRecord(image) && typeof image.fileName === 'string') {
+    if (isPlainObject(image) && typeof image.fileName === 'string') {
       candidates.push({
         asset: {
           kind,
@@ -161,13 +158,13 @@ function parseVisualAssetRecords(
 }
 
 function parseCharacterVisualAsset(value: unknown): CharacterLibraryVisualAsset | null {
-  if (!isRecord(value)) {
+  if (!isPlainObject(value)) {
     return null;
   }
   const officialAssets = new Set(
     Array.isArray(value.officialAssets)
       ? value.officialAssets.flatMap(asset =>
-          isRecord(asset) &&
+          isPlainObject(asset) &&
           (asset.kind === 'portrait' || asset.kind === 'sheet') &&
           typeof asset.taskId === 'string' &&
           typeof asset.fileName === 'string'
@@ -175,12 +172,12 @@ function parseCharacterVisualAsset(value: unknown): CharacterLibraryVisualAsset 
             : [],
         )
       : [
-          isRecord(value.selectedImage) &&
+          isPlainObject(value.selectedImage) &&
           typeof value.selectedImage.taskId === 'string' &&
           typeof value.selectedImage.fileName === 'string'
             ? `portrait:${value.selectedImage.taskId}:${value.selectedImage.fileName}`
             : '',
-          isRecord(value.selectedSheet) &&
+          isPlainObject(value.selectedSheet) &&
           typeof value.selectedSheet.taskId === 'string' &&
           typeof value.selectedSheet.fileName === 'string'
             ? `sheet:${value.selectedSheet.taskId}:${value.selectedSheet.fileName}`
@@ -223,7 +220,7 @@ async function toCharacterLibraryState(
 
 async function getLegacyCharacterName(workspacePath: string): Promise<string> {
   const value = await readJsonFile(path.join(workspacePath, 'character-draft.json'));
-  return isRecord(value) && typeof value.name === 'string' && value.name.trim()
+  return isPlainObject(value) && typeof value.name === 'string' && value.name.trim()
     ? value.name.trim().slice(0, MAX_NAME_LENGTH)
     : '主角色';
 }
@@ -295,7 +292,7 @@ async function loadStore(): Promise<StoredCharacterLibrary> {
       if (!store) {
         return createInitialStore(workspacePath);
       }
-      if (!isRecord(value) || value.version !== 2 || !Array.isArray(value.characters)) {
+      if (!isPlainObject(value) || value.version !== 2 || !Array.isArray(value.characters)) {
         await writeJsonFile(getStorePath(workspacePath), store);
       }
       return store;
