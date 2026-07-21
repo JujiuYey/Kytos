@@ -23,7 +23,7 @@ import type {
   SaveFileRequest,
   SavedFileResult,
 } from '@/types';
-import { CHARACTER_CREATE_AGENT_ENDPOINT, DEFAULT_DEEPSEEK_MODEL } from '@/types';
+import { CHARACTER_CREATE_AGENT_ENDPOINT } from '@/types';
 import CharacterCreateStepper from './components/character-create-stepper.vue';
 import CharacterGenerationStep from './components/character-generation-step.vue';
 import CharacterPromptStep from './components/character-prompt-step.vue';
@@ -60,7 +60,7 @@ const activeGeneration = ref<CharacterVisualGeneration | null>(null);
 const uploadedOfficialUrl = ref('');
 let generationTimer: ReturnType<typeof setTimeout> | null = null;
 
-const model = computed(() => appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL);
+const model = computed(() => appStore.settings.deepseekModel);
 const transport = new DefaultChatTransport<CharacterCreateAgentMessage>({
   api: CHARACTER_CREATE_AGENT_ENDPOINT,
 });

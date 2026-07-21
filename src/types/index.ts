@@ -82,10 +82,13 @@ export {
   CHARACTER_SEED_FIELDS,
   CHARACTER_VISUAL_ANCHOR_FIELDS,
   CHARACTER_VISUAL_PRESENTATION_FIELDS,
+  DEEPSEEK_MODELS,
   DEFAULT_DEEPSEEK_MODEL,
   createEmptyCharacterDraft,
+  isDeepSeekModel,
   normalizeCharacterDraft,
 } from '../../shared/character';
+export type { DeepSeekModel } from '../../shared/character';
 export {
   CHARACTER_PORTRAIT_RESOLUTIONS,
   CHARACTER_PORTRAIT_SIZES,

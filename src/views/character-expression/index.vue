@@ -23,7 +23,7 @@ import type {
   SaveFileRequest,
   SavedFileResult,
 } from '@/types';
-import { DEFAULT_DEEPSEEK_MODEL, MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
+import { MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
 import ExpressionGallery from './components/expression-gallery.vue';
 import ExpressionGeneratorPanel from './components/expression-generator-panel.vue';
 import ExpressionPageHeader from './components/expression-page-header.vue';
@@ -413,7 +413,7 @@ async function generateExpressionPrompt(): Promise<void> {
   isGeneratingPrompt.value = true;
   try {
     description.value = await window.desktop.generateCharacterExpressionPrompt({
-      model: appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL,
+      model: appStore.settings.deepseekModel,
       name: name.value.trim(),
     });
     toast.success('表情提示词已生成');

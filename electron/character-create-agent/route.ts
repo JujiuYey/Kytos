@@ -1,5 +1,6 @@
 import { createAgentUIStreamResponse } from 'ai';
-import { DEFAULT_DEEPSEEK_MODEL } from '../../shared/character';
+import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel } from '../../shared/character';
+import type { DeepSeekModel } from '../../shared/character';
 import type { CharacterCreateDraft } from '../../shared/character-create';
 import { getCredentialValue } from '../services/credentials';
 import { createCharacterCreateAgent } from './agent';
@@ -8,7 +9,7 @@ interface CharacterCreateAgentRequestBody {
   draft: CharacterCreateDraft;
   hasReferenceImage: boolean;
   messages: unknown[];
-  model?: string;
+  model?: DeepSeekModel;
   stylePrompt?: string;
 }
 
@@ -25,15 +26,16 @@ function parseBody(value: unknown): CharacterCreateAgentRequestBody {
     throw new Error('角色访谈消息无效');
   }
   if (!body.draft || typeof body.draft !== 'object') throw new Error('角色草稿无效');
-  const model = typeof body.model === 'string' ? body.model.trim() : '';
-  if (model.length > 200 || (model && !/^[a-zA-Z0-9._-]+$/.test(model))) {
+  const normalizedModel = typeof body.model === 'string' ? body.model.trim() : '';
+  if (normalizedModel && !isDeepSeekModel(normalizedModel)) {
     throw new Error('模型标识无效');
   }
+  const model = isDeepSeekModel(normalizedModel) ? normalizedModel : undefined;
   return {
     draft: body.draft as CharacterCreateDraft,
     hasReferenceImage: body.hasReferenceImage === true,
     messages: body.messages,
-    model: model || undefined,
+    model,
     stylePrompt: typeof body.stylePrompt === 'string' ? body.stylePrompt.slice(0, 20_000) : '',
   };
 }

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { generateText } from 'ai';
-import { DEFAULT_DEEPSEEK_MODEL } from '../../shared/character';
+import { isDeepSeekModel } from '../../shared/character';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceSelection,
@@ -282,17 +282,10 @@ function buildExpressionPrompt(request: GenerateCharacterExpressionRequest): str
 }
 
 function resolveDeepSeekModel(value: unknown): string {
-  if (typeof value !== 'string') {
+  if (!isDeepSeekModel(value)) {
     throw new Error('DeepSeek 模型无效');
   }
-  const model = value.trim();
-  if (!model || model === 'deepseek-chat' || model === 'deepseek-reasoner') {
-    return DEFAULT_DEEPSEEK_MODEL;
-  }
-  if (model.length > 200 || !/^[a-zA-Z0-9._-]+$/.test(model)) {
-    throw new Error('DeepSeek 模型无效');
-  }
-  return model;
+  return value;
 }
 
 export async function generateCharacterExpressionPrompt(

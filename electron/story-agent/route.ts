@@ -1,23 +1,17 @@
 import { createAgentUIStreamResponse } from 'ai';
-import { DEFAULT_DEEPSEEK_MODEL } from '../../shared/character';
+import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel } from '../../shared/character';
+import type { DeepSeekModel } from '../../shared/character';
 import { getCredentialValue } from '../services/credentials';
 import { getStory } from '../services/story';
 import { createStoryAgent } from './agent';
 
 interface StoryAgentRequestBody {
   messages: unknown[];
-  model?: string;
+  model?: DeepSeekModel;
   storyId: string;
 }
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/;
-
-function resolveModel(model: string | undefined): string {
-  if (!model || model === 'deepseek-chat' || model === 'deepseek-reasoner') {
-    return DEFAULT_DEEPSEEK_MODEL;
-  }
-  return model;
-}
 
 const corsHeaders = {
   'Access-Control-Allow-Headers': 'content-type',
@@ -37,10 +31,12 @@ function parseRequestBody(value: unknown): StoryAgentRequestBody {
   if (typeof storyId !== 'string' || !ID_PATTERN.test(storyId)) {
     throw new Error('故事编号无效');
   }
-  const model = 'model' in value && typeof value.model === 'string' ? value.model.trim() : '';
-  if (model.length > 200 || (model && !/^[a-zA-Z0-9._-]+$/.test(model))) {
+  const normalizedModel =
+    'model' in value && typeof value.model === 'string' ? value.model.trim() : '';
+  if (normalizedModel && !isDeepSeekModel(normalizedModel)) {
     throw new Error('模型标识无效');
   }
+  const model = isDeepSeekModel(normalizedModel) ? normalizedModel : undefined;
   return { messages, model: model || undefined, storyId };
 }
 
@@ -71,7 +67,7 @@ export async function handleStoryAgentRequest(request: Request): Promise<Respons
     ]);
     const agent = createStoryAgent({
       apiKey,
-      model: resolveModel(body.model),
+      model: body.model ?? DEFAULT_DEEPSEEK_MODEL,
       story,
     });
     return await createAgentUIStreamResponse({

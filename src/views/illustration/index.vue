@@ -32,11 +32,7 @@ import type {
   IllustrationVersionReference,
   UploadedIllustration,
 } from '@/types';
-import {
-  DEFAULT_DEEPSEEK_MODEL,
-  ILLUSTRATION_AGENT_ENDPOINT,
-  MAX_ILLUSTRATION_REFERENCE_IMAGES,
-} from '@/types';
+import { ILLUSTRATION_AGENT_ENDPOINT, MAX_ILLUSTRATION_REFERENCE_IMAGES } from '@/types';
 import { cloneJsonData } from '@/utils/serialization';
 import IllustrationChatInput from './components/illustration-chat-input.vue';
 import IllustrationChatMessages from './components/illustration-chat-messages.vue';
@@ -76,7 +72,7 @@ const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pollingStates = ref<GenerationPollingStateMap>({});
 let disposed = false;
 
-const model = computed(() => appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL);
+const model = computed(() => appStore.settings.deepseekModel);
 const activeTopic = computed(
   () => topics.value.find(topic => topic.id === activeTopicId.value) ?? null,
 );

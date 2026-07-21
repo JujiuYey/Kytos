@@ -27,7 +27,7 @@ import type {
   StoryVersionReference,
   StoryboardUpdateResult,
 } from '@/types';
-import { DEFAULT_DEEPSEEK_MODEL, STORY_AGENT_ENDPOINT } from '@/types';
+import { STORY_AGENT_ENDPOINT } from '@/types';
 import { cloneJsonData } from '@/utils/serialization';
 import StoryChatInput from './components/story-chat-input.vue';
 import StoryChatMessages from './components/story-chat-messages.vue';
@@ -62,7 +62,7 @@ const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pollingStates = ref<GenerationPollingStateMap>({});
 let disposed = false;
 
-const model = computed(() => appStore.settings.deepseekModel.trim() || DEFAULT_DEEPSEEK_MODEL);
+const model = computed(() => appStore.settings.deepseekModel);
 const activeStory = computed(
   () => stories.value.find(story => story.id === activeStoryId.value) ?? null,
 );

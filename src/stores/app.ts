@@ -1,50 +1,12 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import type { AppSettings, DesktopSettings } from '@/types';
-import { DEFAULT_DEEPSEEK_MODEL } from '@/types';
+import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel } from '@/types';
 
 const defaultSettings: AppSettings = {
-  autoSave: true,
   theme: 'system',
-  deepseekModel: '',
+  deepseekModel: DEFAULT_DEEPSEEK_MODEL,
 };
-
-function migrateDeepSeekModel(model: string | undefined): string {
-  const normalizedModel = model?.trim() ?? '';
-  if (
-    normalizedModel === 'deepseek-chat' ||
-    normalizedModel === 'deepseek-reasoner' ||
-    normalizedModel === 'deepseek-v4-flash'
-  ) {
-    return DEFAULT_DEEPSEEK_MODEL;
-  }
-  return normalizedModel;
-}
-
-function getLegacyWorkspacePath(): string | null {
-  try {
-    const persistedValue = localStorage.getItem('app-setting');
-    if (!persistedValue) {
-      return null;
-    }
-
-    const value: unknown = JSON.parse(persistedValue);
-    if (!value || typeof value !== 'object' || !('settings' in value)) {
-      return null;
-    }
-
-    const settings = value.settings;
-    if (!settings || typeof settings !== 'object' || !('storagePath' in settings)) {
-      return null;
-    }
-
-    return typeof settings.storagePath === 'string' && settings.storagePath
-      ? settings.storagePath
-      : null;
-  } catch {
-    return null;
-  }
-}
 
 export const useAppStore = defineStore(
   'app',
@@ -78,14 +40,11 @@ export const useAppStore = defineStore(
       initializationError.value = '';
       try {
         desktopSettings.value = await window.desktop.getSettings();
-        const legacyWorkspacePath = getLegacyWorkspacePath();
-        if (!desktopSettings.value.workspacePath && legacyWorkspacePath) {
-          desktopSettings.value = await window.desktop.setWorkspaceDirectory(legacyWorkspacePath);
-        }
 
         settings.value = {
-          autoSave: settings.value.autoSave ?? defaultSettings.autoSave,
-          deepseekModel: migrateDeepSeekModel(settings.value.deepseekModel),
+          deepseekModel: isDeepSeekModel(settings.value.deepseekModel)
+            ? settings.value.deepseekModel
+            : DEFAULT_DEEPSEEK_MODEL,
           theme: settings.value.theme ?? defaultSettings.theme,
         };
       } catch (error: unknown) {
