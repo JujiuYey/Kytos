@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Camera, Images, SlidersHorizontal, Upload, WandSparkles, Workflow } from '@lucide/vue';
+import { Camera, Images, SlidersHorizontal, Upload, WandSparkles } from '@lucide/vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,11 +11,8 @@ import {
 } from '@/components/ui/select';
 import type { CharacterLibraryCharacter } from '@/types';
 
-type WorkspaceStage = 'portrait' | 'sheet';
-
 defineProps<{
   assetCount: number;
-  canvasOpen: boolean;
   cardOpen: boolean;
   characters: CharacterLibraryCharacter[];
   characterSelectionDisabled: boolean;
@@ -25,7 +22,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: 'ai-create', value: WorkspaceStage): void;
+  (event: 'ai-create'): void;
   (event: 'upload'): void;
   (event: 'update:mobilePane', value: 'settings' | 'gallery'): void;
   (event: 'update:selectedCharacterId', value: string): void;
@@ -72,22 +69,12 @@ const emit = defineEmits<{
     size="sm"
     :variant="cardOpen ? 'secondary' : 'outline'"
     :disabled="operationDisabled"
-    @click="emit('ai-create', 'portrait')"
+    @click="emit('ai-create')"
   >
     <WandSparkles class="size-4" />
     创建卡片
   </Button>
-  <Button
-    size="sm"
-    :variant="canvasOpen ? 'secondary' : 'outline'"
-    :disabled="operationDisabled"
-    @click="emit('ai-create', 'sheet')"
-  >
-    <Workflow class="size-4" />
-    创建画布
-  </Button>
-
-  <div v-if="!canvasOpen" class="flex items-center gap-1 lg:hidden">
+  <div class="flex items-center gap-1 lg:hidden">
     <Button
       v-if="cardOpen"
       size="icon"

@@ -5,7 +5,6 @@ import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upload-dialog';
-import { CharacterPortraitWorkflow } from '@/components/sag/character-portrait-workflow';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagMissingPrerequisiteAlert } from '@/components/sag/missing-prerequisite-alert';
@@ -32,8 +31,6 @@ import PortraitGeneratorPanel from './components/portrait-generator-panel.vue';
 import VisualAssetRenameDialog from './components/visual-asset-rename-dialog.vue';
 
 type AssetKind = 'portrait' | 'sheet';
-type CreationTarget = 'portrait' | 'sheet';
-type WorkspaceMode = 'cards' | 'canvas';
 
 const library = ref<CharacterLibraryState | null>(null);
 const selectedCharacterId = ref('');
@@ -69,7 +66,6 @@ const renameTarget = ref<{
   record: CharacterImageRecord;
 } | null>(null);
 const generatorOpen = ref(true);
-const workspaceMode = ref<WorkspaceMode>('cards');
 const mobilePane = ref<'settings' | 'gallery'>('settings');
 
 let portraitPollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -87,7 +83,6 @@ const characterSelectionDisabled = computed(
   () =>
     isInitializing.value ||
     isBusy.value ||
-    workspaceMode.value === 'canvas' ||
     Boolean(selectingFileName.value) ||
     Boolean(renamingFileName.value) ||
     Boolean(deletingFileName.value),
@@ -245,10 +240,6 @@ function applyCharacterWorkspace(
   if (unfinishedRecord) {
     schedulePoll(unfinishedRecord.id);
   }
-  if (unfinishedSheet) {
-    workspaceMode.value = 'canvas';
-    generatorOpen.value = false;
-  }
   if (unfinishedRecord || unfinishedSheet) {
     mobilePane.value = 'gallery';
   }
@@ -369,16 +360,10 @@ function closeGenerator(): void {
   mobilePane.value = 'gallery';
 }
 
-function openGenerator(stage: CreationTarget): void {
+function openGenerator(): void {
   if (operationDisabled.value) {
     return;
   }
-  if (stage === 'sheet') {
-    workspaceMode.value = 'canvas';
-    generatorOpen.value = false;
-    return;
-  }
-  workspaceMode.value = 'cards';
   generatorOpen.value = true;
   mobilePane.value = 'settings';
   void refreshPortraitWorkspace();
@@ -541,8 +526,7 @@ onBeforeUnmount(() => {
         :characters="characters"
         :character-selection-disabled="characterSelectionDisabled"
         :asset-count="assetCount"
-        :canvas-open="workspaceMode === 'canvas'"
-        :card-open="workspaceMode === 'cards' && generatorOpen"
+        :card-open="generatorOpen"
         :operation-disabled="operationDisabled"
         :selected-character-id="selectedCharacterId"
         @ai-create="openGenerator"
@@ -560,11 +544,7 @@ onBeforeUnmount(() => {
       to="/settings"
     />
 
-    <Alert
-      v-if="workspaceMode === 'cards' && errorMessage"
-      variant="destructive"
-      class="mx-4 mt-3 w-auto shrink-0 sm:mx-5"
-    >
+    <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-3 w-auto shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
       <AlertTitle>角色图片流程暂时中断</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
@@ -575,14 +555,7 @@ onBeforeUnmount(() => {
       </AlertDescription>
     </Alert>
 
-    <CharacterPortraitWorkflow
-      v-if="workspaceMode === 'canvas'"
-      class="min-h-0 min-w-0 flex-1"
-      @workspace-updated="refreshPortraitWorkspace"
-    />
-
     <div
-      v-else
       :class="[
         'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
         generatorOpen && 'lg:grid-cols-[minmax(0,9fr)_minmax(340px,4fr)]',
