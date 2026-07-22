@@ -3,7 +3,7 @@ import { X } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileUpload } from '@/components/sag/file-upload';
+import { LocalFileUpload } from '@/components/sag/local-file-upload';
 import type { SaveFileRequest, SavedFileResult } from '@/types';
 
 defineProps<{
@@ -32,6 +32,13 @@ async function localUploadHandler(request: SaveFileRequest): Promise<SavedFileRe
     url: URL.createObjectURL(blob),
   };
 }
+
+function handleUploaded(result: SavedFileResult | SavedFileResult[]): void {
+  const target = Array.isArray(result) ? result[0] : result;
+  if (target) {
+    emit('uploadSuccess', target);
+  }
+}
 </script>
 
 <template>
@@ -46,15 +53,17 @@ async function localUploadHandler(request: SaveFileRequest): Promise<SavedFileRe
         @update:model-value="emit('update:characterName', String($event))"
       />
     </div>
-    <FileUpload
+    <LocalFileUpload
       :upload-handler="localUploadHandler"
       accept="image/*"
       :multiple="false"
       :max-files="1"
       :max-file-size="10 * 1024 * 1024"
-      :show-file-list="false"
-      :auto-upload="true"
-      @upload-success="emit('uploadSuccess', $event)"
+      enable-drop-zone
+      description="支持 JPG / PNG / WebP，单张最大 10MB"
+      dropzone-hint="拖放参考图到此处，或"
+      label="选择参考图片"
+      @upload-success="handleUploaded"
     />
     <div v-if="sourceImageUrl" class="flex items-center gap-3 rounded-lg border bg-background p-3">
       <img

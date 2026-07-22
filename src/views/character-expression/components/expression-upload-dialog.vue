@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { FileUpload } from '@/components/sag/file-upload';
+import { LocalFileUpload } from '@/components/sag/local-file-upload';
 import type { SaveFileRequest, SavedFileResult } from '@/types';
 
 const props = defineProps<{
@@ -39,8 +39,12 @@ function upload(request: SaveFileRequest): Promise<SavedFileResult> {
   return props.uploadHandler(expressionName, request);
 }
 
-function handleUploaded(result: SavedFileResult) {
-  emit('uploaded', result);
+function handleUploaded(result: SavedFileResult | SavedFileResult[]): void {
+  const target = Array.isArray(result) ? result[0] : result;
+  if (!target) {
+    return;
+  }
+  emit('uploaded', target);
   emit('update:open', false);
 }
 </script>
@@ -55,14 +59,17 @@ function handleUploaded(result: SavedFileResult) {
         </DialogDescription>
       </DialogHeader>
 
-      <FileUpload
+      <LocalFileUpload
         :key="uploadKey"
         accept="image/png,image/jpeg,image/webp,image/avif"
         :max-file-size="20 * 1024 * 1024"
-        :max-files="1"
-        :multiple="false"
-        :show-file-list="true"
+        :max-files="20"
+        :multiple="true"
+        enable-drop-zone
         :upload-handler="upload"
+        description="支持 PNG / JPG / WebP / AVIF，最多 20 张，单张最大 20MB"
+        dropzone-hint="拖放表情到此处，或"
+        label="选择表情图片"
         @upload-success="handleUploaded"
       />
     </DialogContent>

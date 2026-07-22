@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { FileUpload } from '@/components/sag/file-upload';
+import { LocalFileUpload } from '@/components/sag/local-file-upload';
 import type { SaveFileRequest, SavedFileResult } from '@/types';
 
 const props = defineProps<{
@@ -18,7 +18,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: 'uploaded', result: SavedFileResult): void;
+  (event: 'uploaded', result: SavedFileResult | SavedFileResult[]): void;
   (event: 'update:open', value: boolean): void;
 }>();
 
@@ -32,6 +32,11 @@ watch(
     }
   },
 );
+
+function handleUploaded(result: SavedFileResult | SavedFileResult[]): void {
+  emit('uploaded', result);
+  emit('update:open', false);
+}
 </script>
 
 <template>
@@ -44,15 +49,18 @@ watch(
         </DialogDescription>
       </DialogHeader>
 
-      <FileUpload
+      <LocalFileUpload
         :key="uploadKey"
         accept="image/png,image/jpeg,image/webp,image/avif"
         :max-file-size="20 * 1024 * 1024"
         :max-files="20"
         :multiple="true"
-        :show-file-list="true"
+        enable-drop-zone
         :upload-handler="uploadHandler"
-        @upload-success="emit('uploaded', $event)"
+        description="支持 PNG / JPG / WebP / AVIF，最多 20 张，单张最大 20MB"
+        dropzone-hint="拖放插画到此处，或"
+        label="选择插画图片"
+        @upload-success="handleUploaded"
       />
 
       <DialogFooter>
