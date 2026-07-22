@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Camera, Images, SlidersHorizontal, Upload, WandSparkles } from '@lucide/vue';
+import { Camera, Images, PersonStanding, SlidersHorizontal, Upload } from '@lucide/vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,7 +13,7 @@ import type { CharacterLibraryCharacter } from '@/types';
 
 defineProps<{
   assetCount: number;
-  cardOpen: boolean;
+  generatorOpen: boolean;
   characters: CharacterLibraryCharacter[];
   characterSelectionDisabled: boolean;
   mobilePane: 'settings' | 'gallery';
@@ -41,7 +41,7 @@ const emit = defineEmits<{
         <h1 class="truncate text-sm font-semibold">角色视觉资产</h1>
         <Badge variant="secondary" class="shrink-0 tabular-nums">{{ assetCount }}</Badge>
       </div>
-      <p class="truncate text-xs text-muted-foreground">统一查看和管理角色图片</p>
+      <p class="truncate text-xs text-muted-foreground">基于正式视觉生成和管理角色动作</p>
     </div>
   </div>
 
@@ -67,16 +67,16 @@ const emit = defineEmits<{
 
   <Button
     size="sm"
-    :variant="cardOpen ? 'secondary' : 'outline'"
+    :variant="generatorOpen ? 'secondary' : 'default'"
     :disabled="operationDisabled"
     @click="emit('ai-create')"
   >
-    <WandSparkles class="size-4" />
-    创建卡片
+    <PersonStanding class="size-4" />
+    生成动作
   </Button>
   <div class="flex items-center gap-1 lg:hidden">
     <Button
-      v-if="cardOpen"
+      v-if="generatorOpen"
       size="icon"
       :variant="mobilePane === 'settings' ? 'secondary' : 'ghost'"
       aria-label="显示设置"

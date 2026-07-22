@@ -4,6 +4,7 @@ import type { CharacterScopeRequest } from '../../shared/character-library';
 import type {
   DeleteCharacterPortraitRequest,
   DeleteCharacterSheetRequest,
+  GenerateCharacterActionPromptRequest,
   GenerateCharacterPortraitRequest,
   GenerateCharacterSheetRequest,
   RenameCharacterVisualAssetRequest,
@@ -17,6 +18,7 @@ import {
   deleteCharacterPortrait,
   deleteCharacterSheet,
   generateCharacterPortrait,
+  generateCharacterActionPrompt,
   generateCharacterSheet,
   getCharacterPortraitTask,
   getCharacterPortraitWorkspace,
@@ -54,6 +56,15 @@ export function registerCharacterPortraitIpc(assertTrustedSender: TrustedSenderG
     async (event, request: GenerateCharacterPortraitRequest) => {
       assertTrustedSender(event);
       return generateCharacterPortrait(request);
+    },
+  );
+
+  // 生成角色动作提示词
+  ipcMain.handle(
+    'character-portrait:generate-action-prompt',
+    async (event, request: GenerateCharacterActionPromptRequest) => {
+      assertTrustedSender(event);
+      return generateCharacterActionPrompt(request);
     },
   );
 

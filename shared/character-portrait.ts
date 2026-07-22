@@ -1,6 +1,6 @@
 // 角色头像与设定图模块的类型定义
 import type { CharacterScopeRequest } from './character-library';
-import type { CharacterWorkspaceState } from './character';
+import type { CharacterWorkspaceState, DeepSeekModel } from './character';
 import type { SaveFileRequest, SavedFileResult } from './desktop';
 
 // 角色头像支持的尺寸
@@ -11,6 +11,8 @@ export const CHARACTER_PORTRAIT_RESOLUTIONS = ['1k', '2k', '4k'] as const;
 export const CHARACTER_SHEET_SIZE = '16:9' as const;
 // 角色设定图最大参考图数量
 export const MAX_CHARACTER_SHEET_REFERENCE_IMAGES = 16;
+// 角色动作描述最大长度
+export const MAX_CHARACTER_ACTION_LENGTH = 500;
 
 // 角色头像尺寸
 export type CharacterPortraitSize = (typeof CHARACTER_PORTRAIT_SIZES)[number];
@@ -33,16 +35,26 @@ export type CharacterPortraitTaskStatus =
 
 // 生成角色头像请求
 export interface GenerateCharacterPortraitRequest {
+  // 只允许改变的角色动作
+  action: string;
   // 生成数量
   count: number;
   // 角色名称
   name: string;
-  // 提示词
-  prompt: string;
+  // 正式角色视觉参考
+  referenceAsset: CharacterVisualAssetSelection;
   // 分辨率
   resolution: CharacterPortraitResolution;
   // 尺寸
   size: CharacterPortraitSize;
+}
+
+// 生成角色动作提示词请求
+export interface GenerateCharacterActionPromptRequest {
+  // 动作名称
+  name: string;
+  // 使用的模型
+  model: DeepSeekModel;
 }
 
 // 角色头像图片
@@ -90,7 +102,10 @@ export interface CharacterImageRecord<TSize extends CharacterImageSize = Charact
 }
 
 // 角色头像记录
-export type CharacterPortraitRecord = CharacterImageRecord<CharacterPortraitSize>;
+export interface CharacterPortraitRecord extends CharacterImageRecord<CharacterPortraitSize> {
+  // 生成动作时使用的正式角色视觉；历史记录可能没有
+  referenceAsset?: CharacterVisualAssetSelection | null;
+}
 
 // 角色设定图记录
 export interface CharacterSheetRecord extends CharacterImageRecord<typeof CHARACTER_SHEET_SIZE> {
@@ -205,6 +220,8 @@ export interface CharacterPortraitApi {
   generateCharacterPortrait: (
     request: GenerateCharacterPortraitRequest,
   ) => Promise<CharacterPortraitRecord>;
+  // 生成角色动作提示词
+  generateCharacterActionPrompt: (request: GenerateCharacterActionPromptRequest) => Promise<string>;
   // 生成角色设定图
   generateCharacterSheet: (request: GenerateCharacterSheetRequest) => Promise<CharacterSheetRecord>;
   // 查询角色头像任务

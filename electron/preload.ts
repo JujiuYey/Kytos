@@ -89,6 +89,9 @@ const portraitApi: CharacterPortraitApi = {
   deleteCharacterSheet: request => ipcRenderer.invoke('character-sheet:delete', request),
   // 生成角色头像
   generateCharacterPortrait: request => ipcRenderer.invoke('character-portrait:generate', request),
+  // 生成角色动作提示词
+  generateCharacterActionPrompt: request =>
+    ipcRenderer.invoke('character-portrait:generate-action-prompt', request),
   // 生成角色设定图
   generateCharacterSheet: request => ipcRenderer.invoke('character-sheet:generate', request),
   // 查询角色头像任务

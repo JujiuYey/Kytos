@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { generateText } from 'ai';
+import { isDeepSeekModel } from '../../shared/character';
 import type {
   CharacterImageSource,
   CharacterPortraitImage,
@@ -14,6 +16,7 @@ import type {
   CharacterVisualAssetSelection,
   DeleteCharacterPortraitRequest,
   DeleteCharacterSheetRequest,
+  GenerateCharacterActionPromptRequest,
   GenerateCharacterPortraitRequest,
   GenerateCharacterSheetRequest,
   RenameCharacterVisualAssetRequest,
@@ -26,11 +29,13 @@ import {
   CHARACTER_PORTRAIT_RESOLUTIONS,
   CHARACTER_PORTRAIT_SIZES,
   CHARACTER_SHEET_SIZE,
+  MAX_CHARACTER_ACTION_LENGTH,
   MAX_CHARACTER_SHEET_REFERENCE_IMAGES,
 } from '../../shared/character-portrait';
 import type { SaveFileRequest, SavedFileResult } from '../../shared/desktop';
 import { getActiveCharacterDirectory, getCharacterDirectory } from './character-library';
 import { getCredentialValue } from './credentials';
+import { createDeepSeekCompatibleProvider, DEEPSEEK_PROVIDER_OPTIONS } from './deepseek-provider';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 import { isPlainObject } from 'es-toolkit';
@@ -149,6 +154,7 @@ function parsePortraitRecord(value: unknown): CharacterPortraitRecord | null {
     originalName: typeof value.originalName === 'string' ? value.originalName : null,
     progress: typeof value.progress === 'number' ? Math.min(100, Math.max(0, value.progress)) : 0,
     prompt: value.prompt,
+    referenceAsset: parseVisualAssetSelection(value.referenceAsset),
     resolution: value.resolution,
     size: value.size,
     source: value.source === 'uploaded' ? 'uploaded' : 'generated',
@@ -228,7 +234,11 @@ function parseSelection(value: unknown): CharacterPortraitSelection | null {
 
 function parseVisualAssetSelection(value: unknown): CharacterVisualAssetSelection | null {
   const selection = parseSelection(value);
-  if (!selection || !isPlainObject(value) || (value.kind !== 'portrait' && value.kind !== 'sheet')) {
+  if (
+    !selection ||
+    !isPlainObject(value) ||
+    (value.kind !== 'portrait' && value.kind !== 'sheet')
+  ) {
     return null;
   }
   return { ...selection, kind: value.kind };
@@ -357,7 +367,9 @@ async function savePortraitStore(
   await writeJsonFile(await getPortraitStorePath(characterId), store);
 }
 
-function validateGenerateRequest(request: GenerateCharacterPortraitRequest): void {
+function validateGenerateRequest(
+  request: GenerateCharacterPortraitRequest,
+): CharacterVisualAssetSelection {
   if (!isPlainObject(request)) {
     throw new Error('生成参数无效');
   }
@@ -365,11 +377,11 @@ function validateGenerateRequest(request: GenerateCharacterPortraitRequest): voi
     typeof request.name !== 'string' ||
     !request.name.trim() ||
     request.name.length > MAX_NAME_LENGTH ||
-    typeof request.prompt !== 'string' ||
-    !request.prompt.trim() ||
-    request.prompt.length > MAX_PROMPT_LENGTH
+    typeof request.action !== 'string' ||
+    !request.action.trim() ||
+    request.action.length > MAX_CHARACTER_ACTION_LENGTH
   ) {
-    throw new Error('角色视觉名称或提示词无效');
+    throw new Error('角色动作名称或描述无效');
   }
   if (!Number.isInteger(request.count) || request.count < 1 || request.count > 4) {
     throw new Error('候选张数必须在 1 到 4 之间');
@@ -377,10 +389,65 @@ function validateGenerateRequest(request: GenerateCharacterPortraitRequest): voi
   if (!isPortraitSize(request.size) || !isPortraitResolution(request.resolution)) {
     throw new Error('图片规格无效');
   }
+  return validateVisualAssetSelection(request.referenceAsset);
+}
+
+function buildCharacterActionPrompt(action: string): string {
+  return [
+    '以参考图中的角色为唯一身份与视觉依据，生成同一个角色的全身动作视觉资产。',
+    `本次唯一允许改变的是角色姿势与肢体动作：${action.trim()}`,
+    '必须严格保持参考图中的脸部特征、面部表情、发型、身材比例、服装、鞋子、配色、配饰、绘制风格、线条、材质和细节密度完全一致。',
+    '保持单一角色、全身完整入镜和干净背景。根据动作调整身体朝向与四肢位置，但不要重新设计角色。',
+    '禁止改变外貌、表情、服装或画风；禁止新增道具、场景、其他人物、文字、Logo、水印或拼贴排版。',
+  ].join('\n');
+}
+
+function resolveDeepSeekModel(value: unknown): string {
+  if (!isDeepSeekModel(value)) {
+    throw new Error('DeepSeek 模型无效');
+  }
+  return value;
+}
+
+export async function generateCharacterActionPrompt(
+  request: GenerateCharacterActionPromptRequest,
+): Promise<string> {
+  if (
+    !isPlainObject(request) ||
+    typeof request.name !== 'string' ||
+    !request.name.trim() ||
+    request.name.length > MAX_NAME_LENGTH
+  ) {
+    throw new Error('请先填写有效的动作名称');
+  }
+  const apiKey = await getCredentialValue('deepseek');
+  const deepSeek = createDeepSeekCompatibleProvider(apiKey);
+  const { text } = await generateText({
+    maxOutputTokens: 600,
+    model: deepSeek(resolveDeepSeekModel(request.model)),
+    prompt: `动作名称：${request.name.trim()}`,
+    providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
+    system: `你负责为角色动作图生图编写中文提示词。根据用户给出的动作名称，输出一段可直接编辑和用于生图的姿势描述。
+
+要求：
+1. 只描述身体朝向、重心、躯干角度、头部角度、手臂、手势、腿部和脚步的位置关系，让姿势清晰且符合人体结构。
+2. 不描述或改变角色的外貌、面部表情、视线、发型、身材、服装、配色、配饰和绘画风格，这些全部由参考图决定。
+3. 不添加道具、场景、其他人物、文字、尺寸、分辨率或模型名称。
+4. 不写解释、标题、Markdown 或引号，控制在 80 至 180 个中文字符，只输出提示词正文。`,
+  });
+  const prompt = text.trim();
+  if (!prompt) {
+    throw new Error('DeepSeek 未返回动作提示词');
+  }
+  return prompt.slice(0, MAX_CHARACTER_ACTION_LENGTH);
 }
 
 function getApiErrorMessage(payload: unknown, fallback: string): string {
-  if (isPlainObject(payload) && isPlainObject(payload.error) && typeof payload.error.message === 'string') {
+  if (
+    isPlainObject(payload) &&
+    isPlainObject(payload.error) &&
+    typeof payload.error.message === 'string'
+  ) {
     return payload.error.message;
   }
   return fallback;
@@ -923,12 +990,27 @@ export async function deleteCharacterPortrait(
 export async function generateCharacterPortrait(
   request: GenerateCharacterPortraitRequest,
 ): Promise<CharacterPortraitRecord> {
-  validateGenerateRequest(request);
+  const referenceAsset = validateGenerateRequest(request);
+  const store = await loadPortraitStore();
+  if (!store.officialAssets.some(asset => selectionKey(asset) === selectionKey(referenceAsset))) {
+    throw new Error('动作参考图必须是当前角色的正式视觉');
+  }
+  const { image } = findVisualAsset(store, referenceAsset);
+  const workspacePath = await getWorkspaceDirectory();
+  const referenceDirectory =
+    referenceAsset.kind === 'portrait' ? PORTRAIT_ASSET_DIRECTORY : SHEET_ASSET_DIRECTORY;
+  const referenceData = await readFile(
+    path.join(workspacePath, 'assets', referenceDirectory, image.fileName),
+  );
+  if (referenceData.byteLength > MAX_REFERENCE_IMAGE_SIZE) {
+    throw new Error(`正式角色视觉图片“${image.name || image.fileName}”超过 20 MB`);
+  }
   const apiKey = await getCredentialValue('apimart');
   const body: Record<string, unknown> = {
+    image_urls: [`data:${image.mimeType};base64,${referenceData.toString('base64')}`],
     model: 'gpt-image-2',
     n: request.count,
-    prompt: request.prompt.trim(),
+    prompt: buildCharacterActionPrompt(request.action),
     resolution: request.resolution,
     size: request.size,
   };
@@ -945,7 +1027,8 @@ export async function generateCharacterPortrait(
   const record: CharacterPortraitRecord = {
     count: request.count,
     name: request.name.trim(),
-    prompt: request.prompt.trim(),
+    prompt: request.action.trim(),
+    referenceAsset,
     createdAt: now,
     errorMessage: null,
     id: getSubmittedTaskId(payload),
@@ -958,8 +1041,7 @@ export async function generateCharacterPortrait(
     size: request.size,
     updatedAt: now,
   };
-  const store = replaceRecord(await loadPortraitStore(), record);
-  await savePortraitStore(store);
+  await savePortraitStore(replaceRecord(store, record));
   return record;
 }
 
