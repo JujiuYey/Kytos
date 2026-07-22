@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, MoreHorizontal, Pencil, Trash2, UserRound } from '@lucide/vue';
+import { Camera, Check, ImagePlus, MoreHorizontal, Pencil, Trash2, UserRound } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import {
   DropdownMenu,
@@ -30,7 +30,8 @@ defineProps<{
 }>();
 
 defineEmits<{
-  (event: 'edit', character: CharacterLibraryCharacter): void;
+  (event: 'open-visual', character: CharacterLibraryCharacter): void;
+  (event: 'rename', character: CharacterLibraryCharacter): void;
   (event: 'request-delete', character: CharacterLibraryCharacter): void;
 }>();
 </script>
@@ -43,8 +44,12 @@ defineEmits<{
       variant="ghost"
       class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
       :disabled="busy"
-      :aria-label="`编辑角色 ${character.name}`"
-      @click="$emit('edit', character)"
+      :aria-label="
+        character.visualAsset
+          ? `管理角色 ${character.name} 的视觉`
+          : `为角色 ${character.name} 创建第一个形象`
+      "
+      @click="$emit('open-visual', character)"
     >
       <AiImage
         v-if="character.visualAsset"
@@ -83,19 +88,36 @@ defineEmits<{
       </div>
 
       <div class="flex items-center justify-between gap-2">
-        <Button size="sm" variant="outline" :disabled="busy" @click="$emit('edit', character)">
-          编辑角色
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="busy"
+          @click="$emit('open-visual', character)"
+        >
+          <Camera v-if="character.visualAsset" class="size-4" />
+          <ImagePlus v-else class="size-4" />
+          {{ character.visualAsset ? '管理视觉' : '创建第一个形象' }}
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <Button size="icon-sm" variant="ghost" :aria-label="`管理角色 ${character.name}`">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              :disabled="busy"
+              :aria-label="`管理角色 ${character.name}`"
+            >
               <MoreHorizontal class="size-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem @select="$emit('edit', character)">
+            <DropdownMenuItem @select="$emit('rename', character)">
               <Pencil class="size-4" />
-              编辑角色
+              修改名称
+            </DropdownMenuItem>
+            <DropdownMenuItem @select="$emit('open-visual', character)">
+              <Camera v-if="character.visualAsset" class="size-4" />
+              <ImagePlus v-else class="size-4" />
+              {{ character.visualAsset ? '管理角色视觉' : '创建第一个形象' }}
             </DropdownMenuItem>
             <DropdownMenuItem
               class="text-destructive focus:text-destructive"

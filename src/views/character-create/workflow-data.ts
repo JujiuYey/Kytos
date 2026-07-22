@@ -56,7 +56,7 @@ export const CHARACTER_WORKFLOW_STEPS = [
   {
     number: 2,
     label: '提供素材',
-    description: '照片可以作为 AI 生图参考；如果已经有完整角色视觉，也可以上传后直接设为正式资产。',
+    description: '上传一张照片作为 AI 生图参考；没有合适的参考图也可以直接跳过。',
   },
   {
     number: 3,
@@ -66,7 +66,7 @@ export const CHARACTER_WORKFLOW_STEPS = [
   {
     number: 4,
     label: '生成图片',
-    description: '先生成一张看看，满意就保存，不满意回到任何一步继续调整。',
+    description: '生成这个角色的第一个正式形象；满意后保存并回到角色管理。',
   },
 ] as const;
 

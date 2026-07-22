@@ -18,8 +18,10 @@ export type {
   CharacterLibraryState,
   CharacterScopeRequest,
   CharacterSummary,
+  CreateCharacterRequest,
   DeleteCharacterRequest,
   SelectCharacterRequest,
+  UpdateCharacterRequest,
 } from '../../shared/character-library';
 export type {
   CharacterCreateAgentMessage,

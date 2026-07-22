@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import { X } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { LocalFileUpload } from '@/components/sag/local-file-upload';
 import type { SaveFileRequest, SavedFileResult } from '@/types';
 
 defineProps<{
-  characterName: string;
-  isEditing: boolean;
   sourceImageName: string;
   sourceImageUrl: string;
 }>();
@@ -16,9 +12,7 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'removeImage'): void;
   (event: 'referenceSelected', request: SaveFileRequest): void;
-  (event: 'saveAsOfficial'): void;
   (event: 'uploadSuccess', result: SavedFileResult): void;
-  (event: 'update:characterName', value: string): void;
 }>();
 
 async function localUploadHandler(request: SaveFileRequest): Promise<SavedFileResult> {
@@ -42,17 +36,7 @@ function handleUploaded(result: SavedFileResult | SavedFileResult[]): void {
 </script>
 
 <template>
-  <section class="w-full space-y-4" aria-label="角色参考照片或已有角色视觉资产">
-    <div v-if="!isEditing" class="max-w-md space-y-2">
-      <Label for="character-name">角色名称</Label>
-      <Input
-        id="character-name"
-        :model-value="characterName"
-        maxlength="100"
-        placeholder="例如：小林、我的产品角色"
-        @update:model-value="emit('update:characterName', String($event))"
-      />
-    </div>
+  <section class="w-full space-y-4" aria-label="角色参考图">
     <LocalFileUpload
       :upload-handler="localUploadHandler"
       accept="image/*"
@@ -83,14 +67,6 @@ function handleUploaded(result: SavedFileResult | SavedFileResult[]): void {
         @click="emit('removeImage')"
       >
         <X class="size-4" />
-      </Button>
-      <Button
-        variant="outline"
-        class="shrink-0 gap-2"
-        :disabled="!sourceImageUrl || (!isEditing && !characterName.trim())"
-        @click="emit('saveAsOfficial')"
-      >
-        直接设为正式视觉
       </Button>
     </div>
   </section>

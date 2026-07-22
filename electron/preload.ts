@@ -69,12 +69,16 @@ const illustrationApi: IllustrationApi = {
 
 // 角色库 IPC 桥接
 const libraryApi: CharacterLibraryApi = {
+  // 创建角色概要
+  createCharacter: request => ipcRenderer.invoke('character-library:create-character', request),
   // 删除角色
   deleteCharacter: request => ipcRenderer.invoke('character-library:delete-character', request),
   // 查询角色库
   getCharacterLibrary: () => ipcRenderer.invoke('character-library:get'),
   // 选中角色
   selectCharacter: request => ipcRenderer.invoke('character-library:select-character', request),
+  // 更新角色概要
+  updateCharacter: request => ipcRenderer.invoke('character-library:update-character', request),
 };
 
 // 角色头像/设定图/视觉素材管理 IPC 桥接
@@ -138,7 +142,8 @@ const expressionApi: CharacterExpressionApi = {
 // 角色视觉素材生成 IPC 桥接
 const visualApi: CharacterVisualApi = {
   // 生成角色视觉素材
-  generateCharacterVisual: request => ipcRenderer.invoke('character-library:generate-visual', request),
+  generateCharacterVisual: request =>
+    ipcRenderer.invoke('character-library:generate-visual', request),
   // 查询角色视觉素材生成结果
   getCharacterVisualGeneration: request =>
     ipcRenderer.invoke('character-library:get-visual-generation', request),

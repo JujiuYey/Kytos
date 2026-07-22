@@ -21,12 +21,12 @@ const currentKey = computed(() => {
 
 const getMenuButtonClass = computed(() => ({
   'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground':
-    currentKey.value === 'settings',
-  'hover:bg-gray-200 dark:hover:bg-gray-700': currentKey.value !== 'settings',
+    currentKey.value === 'setting',
+  'hover:bg-gray-200 dark:hover:bg-gray-700': currentKey.value !== 'setting',
 }));
 
 function handleClick() {
-  router.push('/settings');
+  router.push('/setting');
 }
 </script>
 

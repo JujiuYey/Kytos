@@ -39,6 +39,12 @@ export interface CharacterLibraryState {
   characters: CharacterLibraryCharacter[];
 }
 
+// 创建角色请求
+export interface CreateCharacterRequest {
+  // 角色名称
+  name: string;
+}
+
 // 删除角色请求
 export interface DeleteCharacterRequest {
   // 角色ID
@@ -51,6 +57,12 @@ export interface SelectCharacterRequest {
   characterId: string;
 }
 
+// 更新角色概要请求
+export interface UpdateCharacterRequest extends SelectCharacterRequest {
+  // 角色名称
+  name: string;
+}
+
 // 角色作用域请求（带角色ID的通用入参）
 export interface CharacterScopeRequest {
   // 角色ID
@@ -59,10 +71,14 @@ export interface CharacterScopeRequest {
 
 // 角色库 API
 export interface CharacterLibraryApi {
+  // 创建角色概要
+  createCharacter: (request: CreateCharacterRequest) => Promise<CharacterLibraryState>;
   // 删除角色
   deleteCharacter: (request: DeleteCharacterRequest) => Promise<CharacterLibraryState>;
   // 查询角色库
   getCharacterLibrary: () => Promise<CharacterLibraryState>;
   // 选中角色
   selectCharacter: (request: SelectCharacterRequest) => Promise<CharacterLibraryState>;
+  // 更新角色概要
+  updateCharacter: (request: UpdateCharacterRequest) => Promise<CharacterLibraryState>;
 }

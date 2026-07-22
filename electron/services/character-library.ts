@@ -5,8 +5,10 @@ import type {
   CharacterLibraryState,
   CharacterLibraryVisualAsset,
   CharacterSummary,
+  CreateCharacterRequest,
   DeleteCharacterRequest,
   SelectCharacterRequest,
+  UpdateCharacterRequest,
 } from '../../shared/character-library';
 import type { CharacterImageSize, CharacterPortraitSize } from '../../shared/character-portrait';
 import { CHARACTER_PORTRAIT_SIZES, CHARACTER_SHEET_SIZE } from '../../shared/character-portrait';
@@ -340,8 +342,59 @@ function findCharacter(store: StoredCharacterLibrary, characterId: string): Char
   return character;
 }
 
+function normalizeCharacterName(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error('请输入角色名称');
+  }
+  const name = value.trim();
+  if (name.length > MAX_NAME_LENGTH) {
+    throw new Error('角色名称最多 100 个字符');
+  }
+  return name;
+}
+
+async function updateCharacterDraftName(
+  workspacePath: string,
+  characterId: string,
+  name: string,
+): Promise<void> {
+  const draftPath = getCharacterDraftPath(workspacePath, characterId);
+  const value = await readJsonFile(draftPath);
+  await writeJsonFile(draftPath, {
+    ...(isPlainObject(value) ? value : {}),
+    name,
+  });
+}
+
 export async function getCharacterLibrary(): Promise<CharacterLibraryState> {
   return toCharacterLibraryState(await loadStore());
+}
+
+export async function createCharacter(
+  request: CreateCharacterRequest,
+): Promise<CharacterLibraryState> {
+  if (!isPlainObject(request)) {
+    throw new Error('角色概要无效');
+  }
+  const name = normalizeCharacterName(request.name);
+  const workspacePath = await getWorkspaceDirectory();
+  const store = await mutateStore(async store => {
+    const now = new Date().toISOString();
+    const character: CharacterSummary = {
+      createdAt: now,
+      id: createCharacterId(),
+      name,
+      updatedAt: now,
+    };
+    await mkdir(path.join(workspacePath, CHARACTER_DIRECTORY, character.id), { recursive: true });
+    await initializeCharacterDraft(workspacePath, character.id, character.name);
+    return {
+      ...store,
+      activeCharacterId: character.id,
+      characters: [character, ...store.characters],
+    };
+  });
+  return toCharacterLibraryState(store);
 }
 
 export async function getActiveCharacterDirectory(): Promise<string> {
@@ -355,58 +408,18 @@ export async function getCharacterDirectory(characterId: string): Promise<string
   return path.join(await getWorkspaceDirectory(), CHARACTER_DIRECTORY, character.id);
 }
 
-export async function prepareCharacterVisualSave(
-  characterId?: string,
-  requestedName?: string,
-): Promise<{
-  characterId: string;
-  created: boolean;
-}> {
-  if (characterId !== undefined) {
-    const store = await mutateStore(store => {
-      const character = findCharacter(store, characterId);
-      return { ...store, activeCharacterId: character.id };
-    });
-    return { characterId: store.activeCharacterId, created: false };
+export async function prepareCharacterVisualSave(characterId: string): Promise<string> {
+  const workspacePath = await getWorkspaceDirectory();
+  const currentStore = await loadStore();
+  const character = findCharacter(currentStore, characterId);
+  if (await getCharacterVisualAsset(workspacePath, character.id)) {
+    throw new Error('这个角色已经有正式视觉，请前往角色视觉继续管理');
   }
-
-  let createdCharacterId = '';
-  await mutateStore(async store => {
-    const now = new Date().toISOString();
-    createdCharacterId = createCharacterId();
-    const normalizedName = requestedName?.trim();
-    if (normalizedName && normalizedName.length > MAX_NAME_LENGTH) {
-      throw new Error('角色名称最多 100 个字符');
-    }
-    const usedNames = new Set(store.characters.map(character => character.name));
-    let sequence = store.characters.length + 1;
-    while (usedNames.has(`角色 ${sequence}`)) sequence += 1;
-    const character: CharacterSummary = {
-      createdAt: now,
-      id: createdCharacterId,
-      name: normalizedName || `角色 ${sequence}`,
-      updatedAt: now,
-    };
-    await mkdir(path.join(await getWorkspaceDirectory(), CHARACTER_DIRECTORY, createdCharacterId), {
-      recursive: true,
-    });
-    return {
-      ...store,
-      activeCharacterId: character.id,
-      characters: [character, ...store.characters],
-    };
+  const store = await mutateStore(store => {
+    const target = findCharacter(store, characterId);
+    return { ...store, activeCharacterId: target.id };
   });
-  return { characterId: createdCharacterId, created: true };
-}
-
-export async function rollbackCharacterVisualSave(characterId: string): Promise<void> {
-  await mutateStore(store => {
-    const characters = store.characters.filter(character => character.id !== characterId);
-    if (characters.length === store.characters.length || !characters.length) return store;
-    const activeCharacterId =
-      store.activeCharacterId === characterId ? characters[0].id : store.activeCharacterId;
-    return { ...store, activeCharacterId, characters };
-  });
+  return store.activeCharacterId;
 }
 
 export async function deleteCharacter(
@@ -431,6 +444,29 @@ export async function selectCharacter(
   const store = await mutateStore(store => {
     const character = findCharacter(store, request?.characterId);
     return { ...store, activeCharacterId: character.id };
+  });
+  return toCharacterLibraryState(store);
+}
+
+export async function updateCharacter(
+  request: UpdateCharacterRequest,
+): Promise<CharacterLibraryState> {
+  if (!isPlainObject(request)) {
+    throw new Error('角色概要无效');
+  }
+  const name = normalizeCharacterName(request.name);
+  const workspacePath = await getWorkspaceDirectory();
+  const store = await mutateStore(async store => {
+    const target = findCharacter(store, request.characterId);
+    await updateCharacterDraftName(workspacePath, target.id, name);
+    return {
+      ...store,
+      characters: store.characters.map(character =>
+        character.id === target.id
+          ? { ...character, name, updatedAt: new Date().toISOString() }
+          : character,
+      ),
+    };
   });
   return toCharacterLibraryState(store);
 }

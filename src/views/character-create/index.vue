@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { DefaultChatTransport } from 'ai';
 import { useChat } from '@ai-sdk/vue';
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   LoaderCircle,
   RotateCcw,
   Save,
@@ -29,6 +30,7 @@ import CharacterGenerationStep from './components/character-generation-step.vue'
 import CharacterPromptStep from './components/character-prompt-step.vue';
 import CharacterSourceStep from './components/character-source-step.vue';
 import CharacterStyleStep from './components/character-style-step.vue';
+import CharacterSummaryStart from './components/character-summary-start.vue';
 import { getPromptSuggestions } from './prompt-interview';
 import {
   CHARACTER_STYLES,
@@ -49,6 +51,11 @@ const sourceImageUrl = ref('');
 const sourceImageName = ref('');
 const sourceImageFile = ref<SaveFileRequest | null>(null);
 const characterName = ref('');
+const isInitializing = ref(true);
+const isSavingSummary = ref(false);
+const needsSummary = ref(false);
+const summaryInitialName = ref('');
+const summaryTargetId = ref('');
 const prompt = ref('');
 const promptDraft = ref<CharacterPromptDraft>(createEmptyCharacterPromptDraft());
 const isGenerating = ref(false);
@@ -57,7 +64,6 @@ const hasGenerated = ref(false);
 const isSaved = ref(false);
 const generationCount = ref(0);
 const activeGeneration = ref<CharacterVisualGeneration | null>(null);
-const uploadedOfficialUrl = ref('');
 let generationTimer: ReturnType<typeof setTimeout> | null = null;
 
 const model = computed(() => appStore.settings.deepseekModel);
@@ -78,8 +84,8 @@ const isPromptAssistantResponding = computed(
 const selectedStyleDetails = computed(() =>
   CHARACTER_STYLES.find(style => style.id === selectedStyle.value),
 );
-const isEditing = computed(
-  () => route.query.mode === 'edit' && typeof route.query.characterId === 'string',
+const characterId = computed(() =>
+  typeof route.query.characterId === 'string' ? route.query.characterId : '',
 );
 const currentStepDetails = computed(() => CHARACTER_WORKFLOW_STEPS[currentStep.value - 1]);
 const canContinue = computed(() => {
@@ -142,7 +148,7 @@ function syncAgentOutputs(): void {
 }
 
 function goToStep(step: Step): void {
-  if (step > furthestStep.value) return;
+  if (isSaved.value || step > furthestStep.value) return;
   currentStep.value = step;
 }
 
@@ -190,39 +196,6 @@ function resetSource(): void {
   sourceImageFile.value = null;
 }
 
-async function saveUploadedAsOfficial(): Promise<void> {
-  const file = sourceImageFile.value;
-  if (!file || isSaving.value) return;
-  isSaving.value = true;
-  try {
-    const result = await window.desktop.character.visual.saveCharacterVisualAsset({
-      characterId:
-        isEditing.value && typeof route.query.characterId === 'string'
-          ? route.query.characterId
-          : undefined,
-      name: isEditing.value ? undefined : characterName.value,
-      fileData: file.fileData,
-      fileName: file.fileName,
-      mimeType: file.mimeType,
-    });
-    uploadedOfficialUrl.value = sourceImageUrl.value;
-    activeGeneration.value = null;
-    hasGenerated.value = true;
-    isSaved.value = true;
-    currentStep.value = 4;
-    furthestStep.value = 4;
-    await router.replace({
-      name: 'character-create',
-      query: { characterId: result.characterId, mode: 'edit' },
-    });
-    toast.success('已有图片已设为正式角色视觉');
-  } catch (error: unknown) {
-    toast.error(error instanceof Error ? error.message : String(error));
-  } finally {
-    isSaving.value = false;
-  }
-}
-
 async function generateImage(): Promise<void> {
   if (isGenerating.value || !prompt.value.trim()) return;
   isGenerating.value = true;
@@ -249,7 +222,9 @@ async function generateImage(): Promise<void> {
 
 async function pollGeneration(generationId: string): Promise<void> {
   try {
-    const generation = await window.desktop.character.visual.getCharacterVisualGeneration({ generationId });
+    const generation = await window.desktop.character.visual.getCharacterVisualGeneration({
+      generationId,
+    });
     activeGeneration.value = generation;
     if (['submitted', 'pending', 'processing'].includes(generation.status)) {
       generationTimer = setTimeout(() => void pollGeneration(generationId), 2500);
@@ -269,25 +244,16 @@ async function pollGeneration(generationId: string): Promise<void> {
 }
 
 async function saveImage(): Promise<void> {
-  if (isSaving.value || !hasGenerated.value) return;
+  if (isSaving.value || !hasGenerated.value || !characterId.value) return;
   isSaving.value = true;
   try {
     if (!activeGeneration.value?.image) throw new Error('未找到当前生成结果');
-    const result = await window.desktop.character.visual.saveCharacterVisual({
-      characterId:
-        isEditing.value && typeof route.query.characterId === 'string'
-          ? route.query.characterId
-          : undefined,
+    await window.desktop.character.visual.saveCharacterVisual({
+      characterId: characterId.value,
       generationId: activeGeneration.value.id,
     });
     isSaved.value = true;
-    if (!isEditing.value) {
-      await router.replace({
-        name: 'character-create',
-        query: { characterId: result.characterId, mode: 'edit' },
-      });
-    }
-    toast.success('正式角色视觉已保存');
+    toast.success('第一个正式角色视觉已保存');
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : String(error));
   } finally {
@@ -297,11 +263,122 @@ async function saveImage(): Promise<void> {
 
 function startOver(): void {
   activeGeneration.value = null;
-  uploadedOfficialUrl.value = '';
   hasGenerated.value = false;
   isSaved.value = false;
   currentStep.value = 1;
   furthestStep.value = 1;
+}
+
+function finishWorkflow(): void {
+  void router.push({ name: 'character' });
+}
+
+function resetCreationSession(): void {
+  if (generationTimer) {
+    clearTimeout(generationTimer);
+    generationTimer = null;
+  }
+  void stop();
+  messages.value = [];
+  revokeSourceImageUrl();
+  currentStep.value = 1;
+  furthestStep.value = 1;
+  selectedStyle.value = null;
+  sourceImageUrl.value = '';
+  sourceImageName.value = '';
+  sourceImageFile.value = null;
+  characterName.value = '';
+  prompt.value = '';
+  promptDraft.value = createEmptyCharacterPromptDraft();
+  isGenerating.value = false;
+  isSaving.value = false;
+  hasGenerated.value = false;
+  isSaved.value = false;
+  generationCount.value = 0;
+  activeGeneration.value = null;
+  needsSummary.value = false;
+  summaryInitialName.value = '';
+  summaryTargetId.value = '';
+}
+
+async function saveCharacterSummary(
+  name: string,
+  visualAsset: SaveFileRequest | null,
+): Promise<void> {
+  if (isSavingSummary.value) return;
+  isSavingSummary.value = true;
+  try {
+    const library = summaryTargetId.value
+      ? await window.desktop.character.library.updateCharacter({
+          characterId: summaryTargetId.value,
+          name,
+        })
+      : await window.desktop.character.library.createCharacter({ name });
+    const id = summaryTargetId.value || library.activeCharacterId;
+    const character = library.characters.find(item => item.id === id);
+    if (!character) {
+      throw new Error('角色概要创建失败');
+    }
+    summaryTargetId.value = character.id;
+    summaryInitialName.value = character.name;
+
+    if (visualAsset) {
+      await window.desktop.character.visual.saveCharacterVisualAsset({
+        characterId: character.id,
+        fileData: visualAsset.fileData,
+        fileName: visualAsset.fileName,
+        mimeType: visualAsset.mimeType,
+      });
+      toast.success('角色和已有视觉已保存');
+      await router.push({ name: 'character' });
+      return;
+    }
+
+    await router.replace({ name: 'character-create', query: { characterId: character.id } });
+    characterName.value = character.name;
+    needsSummary.value = false;
+    summaryTargetId.value = '';
+    summaryInitialName.value = '';
+    toast.success('角色概要已保存，可以开始创建第一个形象');
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    isSavingSummary.value = false;
+  }
+}
+
+async function initialize(): Promise<void> {
+  try {
+    if (!characterId.value) {
+      const library = await window.desktop.character.library.getCharacterLibrary();
+      const activeCharacter = library.characters.find(
+        character => character.id === library.activeCharacterId,
+      );
+      if (activeCharacter && !activeCharacter.visualAsset) {
+        summaryTargetId.value = activeCharacter.id;
+        summaryInitialName.value = activeCharacter.name;
+      }
+      needsSummary.value = true;
+      return;
+    }
+    const library = await window.desktop.character.library.getCharacterLibrary();
+    const character = library.characters.find(item => item.id === characterId.value);
+    if (!character) {
+      throw new Error('未找到这个角色');
+    }
+    await window.desktop.character.library.selectCharacter({ characterId: character.id });
+    if (character.visualAsset) {
+      toast.info('这个角色已经有正式视觉，请在角色视觉中继续管理');
+      await router.replace({ name: 'character-portrait' });
+      return;
+    }
+    characterName.value = character.name;
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : String(error));
+    await router.replace({ name: 'character' });
+  } finally {
+    isInitializing.value = false;
+  }
 }
 
 watch([selectedStyle, sourceImageUrl, prompt], () => {
@@ -314,6 +391,17 @@ watch([selectedStyle, sourceImageUrl, prompt], () => {
 watch(messages, syncAgentOutputs, { deep: true });
 watch(chatError, error => {
   if (error) toast.error(error.message);
+});
+watch(characterId, (id, previousId) => {
+  if (!id && previousId) {
+    resetCreationSession();
+    isInitializing.value = true;
+    void initialize();
+  }
+});
+
+onMounted(() => {
+  void initialize();
 });
 
 onBeforeUnmount(() => {
@@ -333,16 +421,41 @@ onBeforeUnmount(() => {
           <Sparkles class="size-4" />
         </div>
         <div class="min-w-0">
-          <h1 class="truncate text-sm font-semibold">{{ isEditing ? '编辑角色' : '创建角色' }}</h1>
+          <h1 class="truncate text-sm font-semibold">
+            {{ needsSummary || !characterName ? '创建角色' : '创建第一个形象' }}
+          </h1>
           <p class="truncate text-xs text-muted-foreground">
-            {{ isEditing ? '调整角色形象，直到满意为止' : '先做出一张满意的角色形象' }}
+            {{
+              needsSummary
+                ? '先建立角色概要，再创建第一个正式形象'
+                : characterName
+                  ? `正在为「${characterName}」建立正式视觉`
+                  : '正在读取角色概要'
+            }}
           </p>
         </div>
       </div>
-      <span class="text-xs text-muted-foreground">{{ currentStep }} / 4</span>
+      <span v-if="!isInitializing && !needsSummary" class="text-xs text-muted-foreground">
+        {{ currentStep }} / 4
+      </span>
     </template>
 
-    <div class="shrink-0 bg-background">
+    <div v-if="isInitializing" class="flex min-h-0 flex-1 items-center justify-center bg-muted/20">
+      <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
+    </div>
+
+    <ScrollArea v-if="!isInitializing && needsSummary" class="min-h-0 flex-1 bg-muted/20">
+      <main class="mx-auto flex min-h-full w-full max-w-6xl px-5 py-9 sm:px-8 lg:px-10 lg:py-14">
+        <CharacterSummaryStart
+          :existing="Boolean(summaryTargetId)"
+          :initial-name="summaryInitialName"
+          :loading="isSavingSummary"
+          @submit="saveCharacterSummary"
+        />
+      </main>
+    </ScrollArea>
+
+    <div v-if="!isInitializing && !needsSummary" class="shrink-0 bg-background">
       <CharacterCreateStepper
         :current-step="currentStep"
         :furthest-step="furthestStep"
@@ -351,7 +464,7 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <ScrollArea class="min-h-0 flex-1 bg-muted/20">
+    <ScrollArea v-if="!isInitializing && !needsSummary" class="min-h-0 flex-1 bg-muted/20">
       <main
         class="mx-auto flex min-h-full w-full max-w-6xl flex-col px-5 py-7 sm:px-8 sm:py-9 lg:px-10"
       >
@@ -376,15 +489,11 @@ onBeforeUnmount(() => {
             />
             <CharacterSourceStep
               v-else-if="currentStep === 2"
-              :character-name="characterName"
-              :is-editing="isEditing"
               :source-image-name="sourceImageName"
               :source-image-url="sourceImageUrl"
               @remove-image="resetSource"
               @reference-selected="handleReferenceSelected"
-              @save-as-official="saveUploadedAsOfficial"
               @upload-success="handleUploadSuccess"
-              @update:character-name="characterName = $event"
             />
             <CharacterPromptStep
               v-else-if="currentStep === 3"
@@ -401,11 +510,10 @@ onBeforeUnmount(() => {
             <CharacterGenerationStep
               v-else
               :generation-count="generationCount"
-              :generated-image="activeGeneration?.image?.url || uploadedOfficialUrl"
+              :generated-image="activeGeneration?.image?.url || ''"
               :has-generated="hasGenerated"
               :is-generating="isGenerating"
               :is-saved="isSaved"
-              :is-uploaded-asset="Boolean(uploadedOfficialUrl)"
               :progress="activeGeneration?.progress || 0"
               :selected-style-name="selectedStyleDetails?.name || '访谈生成风格'"
             />
@@ -414,22 +522,26 @@ onBeforeUnmount(() => {
       </main>
     </ScrollArea>
 
-    <footer class="shrink-0 border-t bg-background">
+    <footer v-if="!isInitializing && !needsSummary" class="shrink-0 border-t bg-background">
       <div
         class="mx-auto flex w-full max-w-6xl flex-col-reverse justify-between gap-3 px-5 py-2 sm:flex-row sm:items-center sm:px-8 lg:px-10"
       >
         <Button
           variant="ghost"
           class="justify-center gap-2 text-muted-foreground sm:justify-start"
-          :disabled="currentStep === 1 || isGenerating"
+          :disabled="currentStep === 1 || isGenerating || isSaved"
           @click="previousStep"
         >
           <ArrowLeft class="size-4" />
           {{ currentStep === 4 ? '返回调整' : '上一步' }}
         </Button>
         <div class="flex flex-col-reverse gap-3 sm:flex-row">
+          <Button v-if="isSaved" class="min-w-44 justify-center gap-2" @click="finishWorkflow">
+            <Check class="size-4" />
+            完成，返回角色管理
+          </Button>
           <Button
-            v-if="currentStep === 4 && hasGenerated"
+            v-else-if="currentStep === 4 && hasGenerated"
             variant="ghost"
             class="gap-2"
             @click="startOver"
@@ -437,7 +549,7 @@ onBeforeUnmount(() => {
             重新开始
           </Button>
           <Button
-            v-if="currentStep === 4 && hasGenerated && !uploadedOfficialUrl"
+            v-if="currentStep === 4 && hasGenerated && !isSaved"
             variant="outline"
             class="min-w-32 justify-center gap-2"
             @click="nextStep"
@@ -446,16 +558,16 @@ onBeforeUnmount(() => {
             <RotateCcw class="size-4" />
           </Button>
           <Button
-            v-if="currentStep === 4 && hasGenerated"
+            v-if="currentStep === 4 && hasGenerated && !isSaved"
             class="min-w-40 justify-center gap-2"
-            :disabled="isSaved || isSaving"
+            :disabled="isSaving"
             @click="saveImage"
           >
             <Save class="size-4" />
-            {{ isSaving ? '保存中' : isSaved ? '已设为正式视觉' : '满意，设为正式视觉' }}
+            {{ isSaving ? '保存中' : '满意，设为正式视觉' }}
           </Button>
           <Button
-            v-else
+            v-if="!(currentStep === 4 && hasGenerated) && !isSaved"
             class="min-w-32 justify-center gap-2"
             :disabled="!canContinue || isGenerating"
             @click="nextStep"

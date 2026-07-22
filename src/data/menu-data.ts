@@ -27,16 +27,16 @@ export const menuGroups: MenuGroup[] = [
     label: '角色形象',
     items: [
       {
-        title: '角色管理',
-        key: 'characters',
-        icon: UsersRound,
-        path: '/characters',
-      },
-      {
         title: '创建角色',
         key: 'character-create',
         icon: Sparkles,
         path: '/character-create',
+      },
+      {
+        title: '角色管理',
+        key: 'characters',
+        icon: UsersRound,
+        path: '/character',
       },
       {
         title: '角色视觉',

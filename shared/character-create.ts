@@ -114,18 +114,16 @@ export interface GetCharacterVisualGenerationRequest {
 
 // 保存角色视觉素材请求
 export interface SaveCharacterVisualRequest {
-  // 目标角色ID（可选，不传则新建角色）
-  characterId?: string;
+  // 目标角色ID
+  characterId: string;
   // 生成任务ID
   generationId: string;
 }
 
 // 保存角色视觉素材资源请求
 export interface SaveCharacterVisualAssetRequest extends CharacterVisualReferenceImage {
-  // 所属角色ID（可选）
-  characterId?: string;
-  // 素材名称（可选）
-  name?: string;
+  // 所属角色ID
+  characterId: string;
 }
 
 // 保存角色视觉素材结果

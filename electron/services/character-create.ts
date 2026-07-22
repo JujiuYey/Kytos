@@ -14,11 +14,7 @@ import type {
   CharacterPortraitTaskStatus,
 } from '../../shared/character-portrait';
 import type { SaveFileRequest } from '../../shared/desktop';
-import {
-  getCharacterLibrary,
-  prepareCharacterVisualSave,
-  rollbackCharacterVisualSave,
-} from './character-library';
+import { getCharacterLibrary, prepareCharacterVisualSave } from './character-library';
 import { saveOfficialCharacterVisual } from './character-portrait';
 import { getCredentialValue } from './credentials';
 import { readJsonFile, writeJsonFile } from './json-store';
@@ -131,7 +127,9 @@ async function requestApi(url: string, init: RequestInit): Promise<unknown> {
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     const message =
-      isPlainObject(payload) && isPlainObject(payload.error) && typeof payload.error.message === 'string'
+      isPlainObject(payload) &&
+      isPlainObject(payload.error) &&
+      typeof payload.error.message === 'string'
         ? payload.error.message
         : `图片生成服务请求失败（HTTP ${response.status}）`;
     throw new Error(message);
@@ -312,19 +310,14 @@ export async function saveCharacterVisual(
   const fileData = await readFile(
     path.join(await getWorkspaceDirectory(), 'assets', ASSET_DIRECTORY, generation.image.fileName),
   );
-  const prepared = await prepareCharacterVisualSave(request.characterId);
-  try {
-    await saveOfficialCharacterVisual(prepared.characterId, {
-      fileData: new Uint8Array(fileData),
-      fileName: generation.image.fileName,
-      mimeType: generation.image.mimeType,
-    } satisfies SaveFileRequest);
-  } catch (error: unknown) {
-    if (prepared.created) await rollbackCharacterVisualSave(prepared.characterId);
-    throw error;
-  }
+  const characterId = await prepareCharacterVisualSave(request.characterId);
+  await saveOfficialCharacterVisual(characterId, {
+    fileData: new Uint8Array(fileData),
+    fileName: generation.image.fileName,
+    mimeType: generation.image.mimeType,
+  } satisfies SaveFileRequest);
 
-  const result = { characterId: prepared.characterId, library: await getCharacterLibrary() };
+  const result = { characterId, library: await getCharacterLibrary() };
   await saveStore({
     ...store,
     generations: store.generations.filter(item => item.id !== generation.id),
@@ -346,12 +339,7 @@ export async function saveCharacterVisualAsset(
   ) {
     throw new Error('角色视觉资产无效');
   }
-  const prepared = await prepareCharacterVisualSave(request.characterId, request.name);
-  try {
-    await saveOfficialCharacterVisual(prepared.characterId, request, 'uploaded');
-  } catch (error: unknown) {
-    if (prepared.created) await rollbackCharacterVisualSave(prepared.characterId);
-    throw error;
-  }
-  return { characterId: prepared.characterId, library: await getCharacterLibrary() };
+  const characterId = await prepareCharacterVisualSave(request.characterId);
+  await saveOfficialCharacterVisual(characterId, request, 'uploaded');
+  return { characterId, library: await getCharacterLibrary() };
 }

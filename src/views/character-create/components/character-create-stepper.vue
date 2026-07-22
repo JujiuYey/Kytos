@@ -14,7 +14,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <nav aria-label="创建角色步骤">
+  <nav aria-label="创建第一个形象步骤">
     <ol class="mx-auto flex w-full max-w-3xl items-center">
       <li
         v-for="step in CHARACTER_WORKFLOW_STEPS"
