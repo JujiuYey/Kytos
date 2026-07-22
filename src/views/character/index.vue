@@ -1,24 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { Check, MoreHorizontal, Pencil, Plus, Trash2, UserRound, UsersRound } from '@lucide/vue';
 import { toast } from 'vue-sonner';
-import { Image as AiImage } from '@/components/ai-elements/image';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
-import { SagStatusBadge } from '@/components/sag/status-badge';
-import type { CharacterImageSize, CharacterLibraryState, CharacterSummary } from '@/types';
+import type { CharacterLibraryState, CharacterSummary } from '@/types';
+import CharacterCard from './components/character-card.vue';
+import CharacterCardSkeleton from './components/character-card-skeleton.vue';
+import CharacterPageHeader from './components/character-page-header.vue';
 
 const router = useRouter();
 const library = ref<CharacterLibraryState | null>(null);
@@ -28,23 +19,6 @@ const errorMessage = ref('');
 const deleteTarget = ref<CharacterSummary | null>(null);
 
 const characters = computed(() => library.value?.characters ?? []);
-
-const visualAssetAspectClasses: Record<CharacterImageSize, string> = {
-  '1:1': 'aspect-square',
-  '16:9': 'aspect-video',
-  '2:3': 'aspect-[2/3]',
-  '3:4': 'aspect-[3/4]',
-  '4:5': 'aspect-[4/5]',
-};
-const skeletonAspectClasses = ['aspect-[2/3]', 'aspect-square', 'aspect-[3/4]', 'aspect-[4/5]'];
-
-function getVisualAssetAspectClass(size: CharacterImageSize): string {
-  return visualAssetAspectClasses[size];
-}
-
-function getSkeletonAspectClass(index: number): string {
-  return skeletonAspectClasses[(index - 1) % skeletonAspectClasses.length] ?? 'aspect-[3/4]';
-}
 
 async function loadLibrary(): Promise<void> {
   loading.value = true;
@@ -82,6 +56,10 @@ async function editCharacter(character: CharacterSummary): Promise<void> {
   }
 }
 
+function requestDelete(character: CharacterSummary): void {
+  deleteTarget.value = character;
+}
+
 async function confirmDelete(): Promise<void> {
   const target = deleteTarget.value;
   if (!target || busy.value) {
@@ -109,26 +87,7 @@ onMounted(() => {
 <template>
   <SagPage>
     <template #header>
-      <div class="flex min-w-0 flex-1 items-center gap-3">
-        <div
-          class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
-        >
-          <UsersRound class="size-4" />
-        </div>
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <h1 class="truncate text-sm font-semibold">角色管理</h1>
-            <Badge variant="secondary" class="shrink-0 tabular-nums">
-              {{ characters.length }}
-            </Badge>
-          </div>
-          <p class="truncate text-xs text-muted-foreground">管理多个角色及其完整形象资料</p>
-        </div>
-      </div>
-      <Button :disabled="busy" @click="createCharacter">
-        <Plus class="size-4" />
-        新建角色
-      </Button>
+      <CharacterPageHeader :count="characters.length" :busy="busy" @create="createCharacter" />
     </template>
 
     <SagErrorRetryAlert
@@ -145,107 +104,22 @@ onMounted(() => {
         v-if="loading"
         class="mx-auto w-full max-w-7xl columns-1 gap-5 px-4 py-5 sm:columns-2 sm:px-5 xl:columns-3 2xl:columns-4"
       >
-        <article
-          v-for="index in 6"
-          :key="index"
-          class="mb-5 inline-block w-full break-inside-avoid overflow-hidden rounded-md border bg-background align-top"
-        >
-          <Skeleton :class="[getSkeletonAspectClass(index), 'w-full rounded-none']" />
-          <div class="space-y-3 border-t px-3 py-3">
-            <Skeleton class="h-4 w-3/5" />
-            <Skeleton class="h-8 w-full" />
-          </div>
-        </article>
+        <CharacterCardSkeleton v-for="index in 6" :key="index" :index="index" />
       </div>
 
       <div
         v-else
         class="mx-auto w-full max-w-7xl columns-1 gap-5 px-4 py-5 sm:columns-2 sm:px-5 xl:columns-3 2xl:columns-4"
       >
-        <article
+        <CharacterCard
           v-for="character in characters"
           :key="character.id"
-          class="mb-5 inline-block w-full break-inside-avoid overflow-hidden rounded-md border bg-background align-top"
-        >
-          <Button
-            variant="ghost"
-            class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
-            :disabled="busy"
-            :aria-label="`编辑角色 ${character.name}`"
-            @click="editCharacter(character)"
-          >
-            <AiImage
-              v-if="character.visualAsset"
-              :alt="`${character.name}的${character.visualAsset.name}`"
-              :src="character.visualAsset.url"
-              :class="[
-                getVisualAssetAspectClass(character.visualAsset.size),
-                'w-full rounded-none bg-muted/30 object-cover transition-opacity hover:opacity-95',
-              ]"
-            />
-            <div
-              v-else
-              class="flex aspect-[3/4] w-full flex-col items-center justify-center gap-3 bg-muted/30 px-4 text-muted-foreground"
-            >
-              <UserRound class="size-10" />
-              <span class="text-xs">尚无正式角色视觉</span>
-            </div>
-          </Button>
-
-          <div class="space-y-3 border-t px-3 py-3">
-            <div class="flex min-w-0 items-start justify-between gap-2">
-              <div class="min-w-0">
-                <h2 class="truncate text-sm font-medium">{{ character.name }}</h2>
-                <p class="mt-1 truncate text-xs text-muted-foreground">
-                  {{
-                    character.visualAsset
-                      ? `正式资产 · ${character.visualAsset.name}`
-                      : '等待添加正式角色视觉'
-                  }}
-                </p>
-              </div>
-              <SagStatusBadge
-                v-if="library?.activeCharacterId === character.id"
-                tone="success"
-                class="shrink-0"
-              >
-                <Check class="size-3" />
-                当前角色
-              </SagStatusBadge>
-            </div>
-
-            <div class="flex items-center justify-between gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                :disabled="busy"
-                @click="editCharacter(character)"
-              >
-                编辑角色
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button size="icon-sm" variant="ghost" :aria-label="`管理角色 ${character.name}`">
-                    <MoreHorizontal class="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem @select="editCharacter(character)">
-                    <Pencil class="size-4" />
-                    编辑角色
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    class="text-destructive focus:text-destructive"
-                    @select="deleteTarget = character"
-                  >
-                    <Trash2 class="size-4" />
-                    移除角色
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </article>
+          :busy="busy"
+          :character="character"
+          :is-active="library?.activeCharacterId === character.id"
+          @edit="editCharacter"
+          @request-delete="requestDelete"
+        />
       </div>
     </ScrollArea>
 
