@@ -75,7 +75,7 @@ export interface CharacterCreatePromptResult {
 type CharacterCreateAgentTools = {
   // 定稿角色提示词
   finalizeCharacterPrompt: {
-    input: { draft: Partial<CharacterCreateDraft>; prompt: string };
+    input: { draft: Partial<CharacterCreateDraft> };
     output: CharacterCreatePromptResult;
   };
   // 更新角色草稿
@@ -104,6 +104,14 @@ export interface GenerateCharacterVisualRequest {
   prompt: string;
   // 参考图（可选）
   referenceImage?: CharacterVisualReferenceImage;
+  // 图生图参考（公网 URL 或 data URI）
+  imageUrls?: string[];
+  // 图片比例，例如 3:4
+  size?: string;
+  // 图片分辨率
+  resolution?: '1k' | '2k' | '4k';
+  // 候选数量
+  n?: number;
 }
 
 // 查询角色视觉素材生成结果请求
@@ -118,6 +126,8 @@ export interface SaveCharacterVisualRequest {
   characterId: string;
   // 生成任务ID
   generationId: string;
+  // 要保存的生成图片；省略时保存首张
+  imageFileName?: string;
 }
 
 // 保存角色视觉素材资源请求
@@ -144,6 +154,8 @@ export interface CharacterVisualGeneration {
   id: string;
   // 生成的图片
   image: CharacterPortraitImage | null;
+  // 生成的所有图片
+  images: CharacterPortraitImage[];
   // 生成进度
   progress: number;
   // 任务状态

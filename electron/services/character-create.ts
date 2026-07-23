@@ -28,6 +28,8 @@ const MAX_PROMPT_LENGTH = 20_000;
 const MAX_REFERENCE_IMAGE_SIZE = 20 * 1024 * 1024;
 const MAX_RESULT_IMAGE_SIZE = 50 * 1024 * 1024;
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/;
+const IMAGE_URL_LIMIT = 16;
+const IMAGE_SIZE_PATTERN = /^\d{1,2}:\d{1,2}$/;
 
 interface StoredGeneration extends CharacterVisualGeneration {
   taskId: string;
@@ -86,11 +88,19 @@ function parseGeneration(value: unknown): StoredGeneration | null {
   ) {
     return null;
   }
+  const images = Array.isArray(value.images)
+    ? value.images
+        .map(parseImage)
+        .filter((image): image is CharacterPortraitImage => Boolean(image))
+    : [];
+  const image = parseImage(value.image) ?? images[0] ?? null;
+  if (images.length === 0 && image) images.push(image);
   return {
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     errorMessage: typeof value.errorMessage === 'string' ? value.errorMessage : null,
     id: value.id,
-    image: parseImage(value.image),
+    image,
+    images,
     progress: typeof value.progress === 'number' ? value.progress : 0,
     status: value.status,
     taskId: value.taskId,
@@ -183,7 +193,34 @@ function validateReferenceImage(image: GenerateCharacterVisualRequest['reference
   }
 }
 
-async function downloadImage(taskId: string, imageUrl: string): Promise<CharacterPortraitImage> {
+function validateImageUrls(imageUrls: string[] | undefined): void {
+  if (!imageUrls) return;
+  if (imageUrls.length === 0 || imageUrls.length > IMAGE_URL_LIMIT) {
+    throw new Error(`图生图参考数量需在 1 到 ${IMAGE_URL_LIMIT} 张之间`);
+  }
+  for (const imageUrl of imageUrls) {
+    if (
+      typeof imageUrl !== 'string' ||
+      !(imageUrl.startsWith('https://') || imageUrl.startsWith('data:image/'))
+    ) {
+      throw new Error('图生图参考必须是 HTTPS 图片地址或图片 data URI');
+    }
+  }
+}
+
+function getImageUrls(request: GenerateCharacterVisualRequest): string[] {
+  if (request.imageUrls?.length) return request.imageUrls;
+  if (!request.referenceImage) return [];
+  return [
+    `data:${request.referenceImage.mimeType};base64,${Buffer.from(request.referenceImage.fileData).toString('base64')}`,
+  ];
+}
+
+async function downloadImage(
+  taskId: string,
+  imageUrl: string,
+  index: number,
+): Promise<CharacterPortraitImage> {
   const parsedUrl = new URL(imageUrl);
   if (parsedUrl.protocol !== 'https:') throw new Error('图片生成服务返回了不安全的图片地址');
   const response = await fetch(parsedUrl, { signal: AbortSignal.timeout(60_000) });
@@ -195,7 +232,7 @@ async function downloadImage(taskId: string, imageUrl: string): Promise<Characte
   }
   const extension =
     mimeType === 'image/jpeg' ? '.jpg' : mimeType === 'image/webp' ? '.webp' : '.png';
-  const fileName = `${taskId}${extension}`;
+  const fileName = `${taskId}-${index + 1}${extension}`;
   const assetDirectory = path.join(await getWorkspaceDirectory(), 'assets', ASSET_DIRECTORY);
   await mkdir(assetDirectory, { recursive: true });
   await writeFile(path.join(assetDirectory, fileName), fileData);
@@ -214,17 +251,20 @@ export async function generateCharacterVisual(
     throw new Error('角色视觉提示词无效');
   }
   validateReferenceImage(request.referenceImage);
-  const imageUrls = request.referenceImage
-    ? [
-        `data:${request.referenceImage.mimeType};base64,${Buffer.from(request.referenceImage.fileData).toString('base64')}`,
-      ]
-    : [];
+  validateImageUrls(request.imageUrls);
+  const imageUrls = getImageUrls(request);
+  const n = request.n ?? 1;
+  if (!Number.isInteger(n) || n < 1 || n > 10) throw new Error('候选数量需在 1 到 10 之间');
+  const size = request.size ?? '1:1';
+  if (!IMAGE_SIZE_PATTERN.test(size)) throw new Error('图片比例无效');
+  const resolution = request.resolution ?? '1k';
+  if (!['1k', '2k', '4k'].includes(resolution)) throw new Error('图片分辨率无效');
   const body: Record<string, unknown> = {
     model: 'gpt-image-2',
-    n: 1,
+    n,
     prompt: request.prompt.trim(),
-    resolution: '1k',
-    size: '1:1',
+    resolution,
+    size,
   };
   if (imageUrls.length) body.image_urls = imageUrls;
   const taskId = getSubmittedTaskId(
@@ -243,6 +283,7 @@ export async function generateCharacterVisual(
     errorMessage: null,
     id: `generation_${randomUUID()}`,
     image: null,
+    images: [],
     progress: 0,
     status: 'submitted',
     taskId,
@@ -260,7 +301,7 @@ export async function getCharacterVisualGeneration(
   const store = await loadStore();
   const existing = store.generations.find(generation => generation.id === request.generationId);
   if (!existing) throw new Error('未找到角色视觉任务');
-  if (existing.status === 'completed' && existing.image) return existing;
+  if (existing.status === 'completed' && existing.images.length > 0) return existing;
   const taskData = parseTaskData(
     await requestApi(
       `${API_BASE_URL}/v1/tasks/${encodeURIComponent(existing.taskId)}?language=zh`,
@@ -271,17 +312,26 @@ export async function getCharacterVisualGeneration(
     ),
   );
   if (!isTaskStatus(taskData.status)) throw new Error('图片生成服务返回了未知任务状态');
-  const imageUrl = taskData.result?.images?.[0]?.url?.[0];
-  const image =
-    taskData.status === 'completed' && imageUrl
-      ? await downloadImage(existing.taskId, imageUrl)
-      : existing.image;
+  const imageUrls = taskData.result?.images?.flatMap(image => image.url) ?? [];
+  if (taskData.status === 'completed' && imageUrls.length === 0) {
+    throw new Error('图片生成任务已完成，但没有返回图片');
+  }
+  const images =
+    imageUrls.length > 0
+      ? await Promise.all(
+          imageUrls.map(
+            (imageUrl, index) =>
+              existing.images[index] ?? downloadImage(existing.taskId, imageUrl, index),
+          ),
+        )
+      : existing.images;
   const updated: StoredGeneration = {
     ...existing,
     errorMessage: ['failed', 'cancelled'].includes(taskData.status)
       ? taskData.error?.message || '图片生成任务未完成'
       : null,
-    image,
+    image: images[0] ?? null,
+    images,
     progress:
       taskData.status === 'completed'
         ? 100
@@ -304,17 +354,20 @@ export async function saveCharacterVisual(
   }
   const store = await loadStore();
   const generation = store.generations.find(item => item.id === request.generationId);
-  if (!generation || generation.status !== 'completed' || !generation.image) {
+  const image = request.imageFileName
+    ? generation?.images.find(item => item.fileName === request.imageFileName)
+    : generation?.image;
+  if (!generation || generation.status !== 'completed' || !image) {
     throw new Error('角色视觉还没有生成完成');
   }
   const fileData = await readFile(
-    path.join(await getWorkspaceDirectory(), 'assets', ASSET_DIRECTORY, generation.image.fileName),
+    path.join(await getWorkspaceDirectory(), 'assets', ASSET_DIRECTORY, image.fileName),
   );
   const characterId = await prepareCharacterVisualSave(request.characterId);
   await saveOfficialCharacterVisual(characterId, {
     fileData: new Uint8Array(fileData),
-    fileName: generation.image.fileName,
-    mimeType: generation.image.mimeType,
+    fileName: image.fileName,
+    mimeType: image.mimeType,
   } satisfies SaveFileRequest);
 
   const result = { characterId, library: await getCharacterLibrary() };
@@ -322,9 +375,12 @@ export async function saveCharacterVisual(
     ...store,
     generations: store.generations.filter(item => item.id !== generation.id),
   }).catch(() => undefined);
-  await unlink(
-    path.join(await getWorkspaceDirectory(), 'assets', ASSET_DIRECTORY, generation.image.fileName),
-  ).catch(() => undefined);
+  const assetDirectory = path.join(await getWorkspaceDirectory(), 'assets', ASSET_DIRECTORY);
+  await Promise.all(
+    generation.images.map(item =>
+      unlink(path.join(assetDirectory, item.fileName)).catch(() => undefined),
+    ),
+  );
   return result;
 }
 

@@ -1,91 +1,124 @@
 <script setup lang="ts">
-import { Check, LoaderCircle, WandSparkles } from '@lucide/vue';
+import { Check, History, ImageUpscale, LoaderCircle } from '@lucide/vue';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import type { CharacterPortraitImage, CharacterVisualGeneration } from '@/types';
 
 defineProps<{
-  generationCount: number;
-  generatedImage: string;
-  hasGenerated: boolean;
+  baseImage: CharacterPortraitImage;
+  finalImage: CharacterPortraitImage | null;
+  finalVersions: CharacterVisualGeneration[];
   isGenerating: boolean;
   isSaved: boolean;
   progress: number;
-  selectedStyleName: string;
+  selectedFinalGenerationId: string;
+  skipRefinement: boolean;
+}>();
+
+const emit = defineEmits<{
+  (event: 'selectFinalVersion', generationId: string): void;
+  (event: 'update:skipRefinement', value: boolean): void;
 }>();
 </script>
 
 <template>
-  <section class="max-w-4xl" aria-labelledby="result-heading">
-    <div
-      v-if="isGenerating"
-      class="flex min-h-96 flex-col items-center justify-center rounded-xl border bg-background px-6 text-center"
-    >
-      <div
-        class="generation-orbit mb-6 flex size-20 items-center justify-center rounded-full border border-primary/20 bg-primary/5"
-      >
-        <LoaderCircle class="size-8 animate-spin text-primary" />
+  <section class="w-full" aria-labelledby="result-heading">
+    <div class="mb-6 flex flex-col justify-between gap-3 border-b pb-5 sm:flex-row sm:items-start">
+      <div>
+        <h3 id="result-heading" class="text-lg font-semibold">精修正式视觉</h3>
+        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+          默认会以选中候选为基底生成一张 2k 定稿，尽量保持脸型、发型与画风。
+        </p>
       </div>
-      <h3 class="text-base font-semibold">正在生成角色形象</h3>
-      <p class="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-        先把「{{ selectedStyleName }}」和你的描述组合起来，生成一张可以继续调整的初稿。
-      </p>
-      <Progress :value="progress" class="mt-6 max-w-xs" />
+      <label class="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+        <Switch :checked="skipRefinement" @update:checked="emit('update:skipRefinement', $event)" />
+        直接保存候选
+      </label>
     </div>
 
-    <div v-else-if="hasGenerated" class="space-y-5">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <p class="text-xs font-semibold uppercase text-muted-foreground">
-            第 {{ generationCount }} 次生成
-          </p>
-          <h3 id="result-heading" class="mt-1 text-xl font-semibold">这张方向接近你想要的吗？</h3>
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
+      <figure class="overflow-hidden rounded-lg border bg-background">
+        <div class="aspect-[3/4] bg-muted/10">
+          <img :src="baseImage.url" alt="选中的角色候选基底" class="size-full object-contain" />
         </div>
-        <span
-          v-if="isSaved"
-          class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700"
+        <figcaption class="border-t px-3 py-2 text-xs text-muted-foreground">候选基底</figcaption>
+      </figure>
+
+      <ImageUpscale class="mx-auto hidden size-5 text-muted-foreground lg:block" />
+
+      <figure class="overflow-hidden rounded-lg border bg-background">
+        <div
+          v-if="isGenerating"
+          class="flex aspect-[3/4] flex-col items-center justify-center px-6 text-center"
         >
-          <Check class="size-3.5" />
-          已设为正式视觉
-        </span>
-      </div>
-
-      <div
-        class="flex aspect-square max-h-[640px] items-center justify-center overflow-hidden rounded-xl border bg-muted/10"
-      >
-        <img
-          :src="generatedImage"
-          :alt="`生成的${selectedStyleName}角色示例`"
-          class="size-full object-contain"
-        />
-      </div>
+          <LoaderCircle class="size-7 animate-spin text-primary" />
+          <p class="mt-4 text-sm font-medium">正在精修定稿</p>
+          <Progress :value="progress" class="mt-4 max-w-xs" />
+        </div>
+        <div v-else-if="finalImage" class="aspect-[3/4] bg-muted/10">
+          <img :src="finalImage.url" alt="精修后的角色正式视觉" class="size-full object-contain" />
+        </div>
+        <div
+          v-else
+          class="flex aspect-[3/4] flex-col items-center justify-center px-6 text-center text-muted-foreground"
+        >
+          <ImageUpscale class="size-7" />
+          <p class="mt-3 text-sm">
+            {{ skipRefinement ? '将直接保存这张候选图' : '准备生成 2k 定稿' }}
+          </p>
+        </div>
+        <figcaption
+          class="flex items-center gap-1.5 border-t px-3 py-2 text-xs text-muted-foreground"
+        >
+          <Check v-if="isSaved" class="size-3.5 text-emerald-600" />
+          {{ isSaved ? '已设为正式视觉' : skipRefinement ? '直接保存' : '2k 精修定稿' }}
+        </figcaption>
+      </figure>
     </div>
 
-    <div
-      v-else
-      class="flex min-h-80 flex-col items-center justify-center rounded-xl border border-dashed bg-background px-6 text-center"
+    <section
+      v-if="finalVersions.length"
+      class="mt-7 border-t pt-5"
+      aria-labelledby="version-heading"
     >
-      <div class="mb-4 flex size-14 items-center justify-center rounded-full bg-muted">
-        <WandSparkles class="size-6 text-muted-foreground" />
+      <div class="mb-3 flex items-center gap-2">
+        <History class="size-4 text-muted-foreground" />
+        <div>
+          <h4 id="version-heading" class="text-sm font-medium">精修版本</h4>
+          <p class="mt-0.5 text-xs text-muted-foreground">选择一个已生成版本即可回退为当前定稿。</p>
+        </div>
       </div>
-      <h3 class="text-base font-semibold">准备好生成第一张了</h3>
-      <p class="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-        点击下方按钮，先得到一张可以讨论的初稿。它不是终稿，随时可以回来修改。
-      </p>
-    </div>
+      <div class="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+        <Button
+          v-for="(version, index) in finalVersions"
+          :key="version.id"
+          type="button"
+          variant="outline"
+          class="h-auto min-h-0 w-full overflow-hidden rounded-md p-0 text-left"
+          :class="
+            selectedFinalGenerationId === version.id && 'border-primary ring-2 ring-primary/20'
+          "
+          :aria-pressed="selectedFinalGenerationId === version.id"
+          :aria-label="`回退到第 ${index + 1} 个精修版本`"
+          @click="emit('selectFinalVersion', version.id)"
+        >
+          <span class="relative block aspect-[3/4] w-full bg-muted/10">
+            <img
+              v-if="version.image"
+              :src="version.image.url"
+              :alt="`精修版本 ${index + 1}`"
+              class="size-full object-cover"
+            />
+            <span
+              v-if="selectedFinalGenerationId === version.id"
+              class="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground"
+            >
+              <Check class="size-3" />
+            </span>
+          </span>
+        </Button>
+      </div>
+    </section>
   </section>
 </template>
-
-<style scoped>
-.generation-orbit {
-  animation: orbit-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes orbit-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.06);
-  }
-}
-</style>

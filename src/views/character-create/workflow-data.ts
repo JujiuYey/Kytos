@@ -9,6 +9,83 @@ export type Step = 1 | 2 | 3 | 4;
 export type StyleId = 'notion' | 'doodle' | 'contrast-line' | 'q-version' | 'chibi';
 
 export type CharacterPromptDraft = CharacterCreateDraft;
+export const CORE_DRAFT_FIELDS = [
+  'gender',
+  'age',
+  'hairstyle',
+  'hairColor',
+  'clothingStyle',
+  'bottomsStyle',
+  'characterMood',
+  'primaryColor',
+  'overallStyleKeywords',
+] as const;
+export type CoreDraftField = (typeof CORE_DRAFT_FIELDS)[number];
+
+export interface CharacterDraftPreset {
+  color?: string;
+  label: string;
+  value: string;
+}
+
+export const CHARACTER_DRAFT_PRESETS: Record<
+  Exclude<CoreDraftField, 'overallStyleKeywords'>,
+  CharacterDraftPreset[]
+> = {
+  gender: [
+    { label: '女性', value: 'female woman' },
+    { label: '男性', value: 'male man' },
+    { label: '中性', value: 'androgynous person' },
+  ],
+  age: [
+    { label: '儿童', value: 'child' },
+    { label: '少年', value: 'teenager' },
+    { label: '青年', value: 'young adult' },
+    { label: '成熟', value: 'adult' },
+  ],
+  hairstyle: [
+    { label: '短发', value: 'short hair' },
+    { label: '长发', value: 'long hair' },
+    { label: '马尾', value: 'ponytail' },
+    { label: '卷发', value: 'curly hair' },
+    { label: '齐刘海', value: 'straight bangs' },
+  ],
+  hairColor: [
+    { color: '#262626', label: '黑色', value: 'black' },
+    { color: '#704128', label: '棕色', value: 'brown' },
+    { color: '#d5a23d', label: '金色', value: 'blonde' },
+    { color: '#ae4b59', label: '红色', value: 'red' },
+    { color: '#526c9e', label: '蓝色', value: 'blue' },
+  ],
+  clothingStyle: [
+    { label: '休闲', value: 'casual' },
+    { label: '通勤', value: 'smart casual' },
+    { label: '学院', value: 'preppy' },
+    { label: '运动', value: 'sportswear' },
+    { label: '传统', value: 'traditional inspired' },
+  ],
+  bottomsStyle: [
+    { label: '长裤', value: 'straight trousers' },
+    { label: '短裤', value: 'shorts' },
+    { label: '半身裙', value: 'midi skirt' },
+    { label: '长裙', value: 'long skirt' },
+    { label: '背带裤', value: 'overalls' },
+  ],
+  characterMood: [
+    { label: '亲和', value: 'friendly and warm' },
+    { label: '沉稳', value: 'calm and composed' },
+    { label: '元气', value: 'energetic and optimistic' },
+    { label: '酷感', value: 'confident and cool' },
+    { label: '文静', value: 'gentle and reserved' },
+  ],
+  primaryColor: [
+    { color: '#e15d4a', label: '珊瑚红', value: 'coral red' },
+    { color: '#e5ac3f', label: '琥珀黄', value: 'amber yellow' },
+    { color: '#468b65', label: '森林绿', value: 'forest green' },
+    { color: '#4b76b8', label: '海军蓝', value: 'navy blue' },
+    { color: '#8e609f', label: '葡萄紫', value: 'grape purple' },
+  ],
+};
 
 export function createEmptyCharacterPromptDraft(): CharacterPromptDraft {
   return {
@@ -60,13 +137,13 @@ export const CHARACTER_WORKFLOW_STEPS = [
   },
   {
     number: 3,
-    label: '完善形象',
-    description: '和助手聊清楚人物细节与画面方向，再整理出最终提示词。',
+    label: '选择形象',
+    description: '点选核心方向，一次生成四张候选整图，再选出最接近的一张。',
   },
   {
     number: 4,
-    label: '生成图片',
-    description: '生成这个角色的第一个正式形象；满意后保存并回到角色管理。',
+    label: '精修定稿',
+    description: '用选中的候选图进行 2k 精修，确认后保存为角色正式视觉。',
   },
 ] as const;
 

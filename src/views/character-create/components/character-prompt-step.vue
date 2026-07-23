@@ -1,179 +1,171 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { ChatStatus } from 'ai';
-import { Bot, Check, PencilLine, WandSparkles } from '@lucide/vue';
-import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-} from '@/components/ai-elements/conversation';
-import { Loader } from '@/components/ai-elements/loader';
-import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
-import { Tool, ToolContent, ToolHeader } from '@/components/ai-elements/tool';
-import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
-import {
-  PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputTextarea,
-} from '@/components/ai-elements/prompt-input';
-import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
+import { Check, Sparkles } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import CharacterPromptDraftPanel from './character-prompt-draft-panel.vue';
-import type { CharacterCreateAgentMessage } from '@/types';
-import type { CharacterPromptDraft } from '../workflow-data';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { CharacterPortraitImage } from '@/types';
+import {
+  CHARACTER_DRAFT_PRESETS,
+  CORE_DRAFT_FIELDS,
+  type CharacterPromptDraft,
+  type CoreDraftField,
+} from '../workflow-data';
 
 const props = defineProps<{
-  isResponding: boolean;
+  candidates: CharacterPortraitImage[];
+  candidateExpectedCount: number;
   draft: CharacterPromptDraft;
-  messages: CharacterCreateAgentMessage[];
-  modelValue: string;
+  isGenerating: boolean;
+  selectedCandidate: CharacterPortraitImage | null;
   styleName: string;
-  suggestions: string[];
 }>();
 
 const emit = defineEmits<{
-  (event: 'compile'): void;
-  (event: 'send', value: string): void;
-  (event: 'update:modelValue', value: string): void;
+  (event: 'generate'): void;
+  (event: 'selectCandidate', image: CharacterPortraitImage): void;
+  (event: 'update:draft', value: CharacterPromptDraft): void;
 }>();
 
-const chatStatus = computed<ChatStatus>(() => (props.isResponding ? 'submitted' : 'ready'));
-const userAnswerCount = computed(
-  () => props.messages.filter(message => message.role === 'user').length,
+const selectableFields = computed(() =>
+  CORE_DRAFT_FIELDS.filter(
+    (field): field is Exclude<CoreDraftField, 'overallStyleKeywords'> =>
+      field !== 'overallStyleKeywords',
+  ),
 );
 
-function handleSubmit(message: PromptInputMessage): void {
-  const text = message.text.trim();
-  if (!text || props.isResponding) return;
-  emit('send', text);
+const fieldLabels: Record<Exclude<CoreDraftField, 'overallStyleKeywords'>, string> = {
+  gender: '性别气质',
+  age: '年龄段',
+  hairstyle: '发型',
+  hairColor: '发色',
+  clothingStyle: '上装风格',
+  bottomsStyle: '下装风格',
+  characterMood: '角色气质',
+  primaryColor: '主色',
+};
+
+function updateField(field: keyof CharacterPromptDraft, value: string): void {
+  emit('update:draft', { ...props.draft, [field]: value });
 }
 </script>
 
 <template>
-  <section class="w-full" aria-labelledby="prompt-heading">
-    <div class="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
-      <div class="flex h-[32rem] min-h-0 flex-col overflow-hidden rounded-lg border bg-background">
-        <header class="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
-          <div class="flex min-w-0 items-center gap-3">
-            <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-              <Bot class="size-4" />
-            </div>
-            <div class="min-w-0">
-              <h3 id="prompt-heading" class="truncate text-sm font-medium">形象访谈</h3>
-              <p class="truncate text-xs text-muted-foreground">当前风格：{{ styleName }}</p>
-            </div>
-          </div>
+  <section class="w-full space-y-7" aria-labelledby="prompt-heading">
+    <div class="flex flex-col justify-between gap-3 border-b pb-5 sm:flex-row sm:items-end">
+      <div>
+        <p class="text-xs font-medium text-muted-foreground">当前画法：{{ styleName }}</p>
+        <h3 id="prompt-heading" class="mt-1 text-lg font-semibold">选择人物的大方向</h3>
+        <p class="mt-1 text-sm text-muted-foreground">未选择的细节会由系统补全，不需要逐项填写。</p>
+      </div>
+      <span class="text-xs text-muted-foreground">一次生成 4 张候选</span>
+    </div>
+
+    <div class="grid gap-x-8 gap-y-6 lg:grid-cols-2">
+      <div v-for="field in selectableFields" :key="field" class="space-y-2.5">
+        <Label class="text-sm">{{ fieldLabels[field] }}</Label>
+        <div class="flex flex-wrap gap-2">
           <Button
+            v-for="option in CHARACTER_DRAFT_PRESETS[field]"
+            :key="option.value"
+            type="button"
             variant="outline"
             size="sm"
-            class="shrink-0 gap-2"
-            :disabled="userAnswerCount === 0 || isResponding"
-            @click="emit('compile')"
+            class="h-8 gap-1.5 rounded-md px-2.5"
+            :class="draft[field] === option.value && 'border-primary bg-primary/5 text-primary'"
+            :aria-pressed="draft[field] === option.value"
+            @click="updateField(field, draft[field] === option.value ? '' : option.value)"
           >
-            <WandSparkles class="size-3.5" />
-            {{ modelValue ? '重新整理' : '整理提示词' }}
+            <span
+              v-if="option.color"
+              class="size-3 rounded-full border border-black/10"
+              :style="{ backgroundColor: option.color }"
+              aria-hidden="true"
+            />
+            {{ option.label }}
           </Button>
-        </header>
-
-        <Conversation class="min-h-0 flex-1">
-          <ConversationContent class="w-full gap-5 px-4 py-5 sm:px-5">
-            <Message
-              v-for="message in messages"
-              :key="message.id"
-              :from="message.role === 'user' ? 'user' : 'assistant'"
-            >
-              <MessageContent class="w-full">
-                <template v-for="(part, index) in message.parts" :key="`${message.id}-${index}`">
-                  <MessageResponse v-if="part.type === 'text'" :content="part.text" />
-                  <Tool v-else-if="part.type === 'tool-updateCharacterDraft'" class="mb-0">
-                    <ToolHeader :type="part.type" :state="part.state" title="同步形象草稿" />
-                    <ToolContent>
-                      <div
-                        class="flex items-start gap-2 border-t px-3 py-3 text-sm text-muted-foreground"
-                      >
-                        <PencilLine class="mt-0.5 size-4 shrink-0" />
-                        <span v-if="part.state === 'output-available'">右侧形象草稿已更新</span>
-                        <span v-else>正在整理已确认的人物信息</span>
-                      </div>
-                    </ToolContent>
-                  </Tool>
-                  <Tool v-else-if="part.type === 'tool-finalizeCharacterPrompt'" class="mb-0">
-                    <ToolHeader :type="part.type" :state="part.state" title="整理最终提示词" />
-                    <ToolContent>
-                      <div
-                        class="flex items-start gap-2 border-t px-3 py-3 text-sm text-muted-foreground"
-                      >
-                        <Check class="mt-0.5 size-4 shrink-0" />
-                        <span v-if="part.state === 'output-available'">最终提示词已整理完成</span>
-                        <span v-else>正在融合人物细节和画法约束</span>
-                      </div>
-                    </ToolContent>
-                  </Tool>
-                </template>
-              </MessageContent>
-            </Message>
-
-            <div v-if="isResponding" class="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader />
-              正在整理你的回答
-            </div>
-
-            <Suggestions
-              v-else-if="suggestions.length"
-              class="w-full flex-wrap"
-              aria-label="快捷回答"
-            >
-              <Suggestion
-                v-for="suggestion in suggestions"
-                :key="suggestion"
-                :suggestion="suggestion"
-                @click="emit('send', $event)"
-              />
-            </Suggestions>
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
-
-        <div class="shrink-0 border-t p-3 sm:p-4">
-          <PromptInput class="w-full" @submit="handleSubmit">
-            <PromptInputBody>
-              <PromptInputTextarea
-                class="min-h-14"
-                placeholder="回答助手的问题，或者补充你在意的形象细节…"
-                :disabled="isResponding"
-              />
-            </PromptInputBody>
-            <PromptInputFooter class="flex items-center justify-between gap-3">
-              <span class="text-xs text-muted-foreground">
-                已记录 {{ userAnswerCount }} 条回答
-              </span>
-              <PromptInputSubmit :status="chatStatus" :disabled="isResponding" />
-            </PromptInputFooter>
-          </PromptInput>
         </div>
       </div>
 
-      <CharacterPromptDraftPanel :draft="draft" />
+      <div class="space-y-2.5 lg:col-span-2">
+        <Label for="character-style-detail" class="text-sm"
+          >一句话补充 <span class="text-muted-foreground">（可选）</span></Label
+        >
+        <Input
+          id="character-style-detail"
+          :model-value="draft.overallStyleKeywords"
+          maxlength="200"
+          placeholder="例如：戴圆框眼镜，整体更有书卷气"
+          @update:model-value="updateField('overallStyleKeywords', String($event))"
+        />
+      </div>
     </div>
 
-    <div v-if="modelValue" class="mt-6">
-      <div class="mb-3 flex items-center justify-between gap-3">
+    <div class="flex justify-end border-t pt-5">
+      <Button class="min-w-36 gap-2" :disabled="isGenerating" @click="emit('generate')">
+        <Sparkles class="size-4" :class="isGenerating && 'animate-spin'" />
+        {{ isGenerating ? '正在生成候选' : '生成 4 张候选' }}
+      </Button>
+    </div>
+
+    <section
+      v-if="isGenerating || candidates.length"
+      class="border-t pt-7"
+      aria-labelledby="candidate-heading"
+    >
+      <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <Label for="character-prompt">最终提示词</Label>
-          <p class="mt-1 text-xs text-muted-foreground">已融合人物访谈与风格设定，可以继续微调</p>
+          <h3 id="candidate-heading" class="text-base font-semibold">选择一张作为基底</h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{
+              isGenerating
+                ? `已生成 ${candidates.length} / ${candidateExpectedCount} 张，后续结果会自动补齐。`
+                : '选中后进入精修定稿。'
+            }}
+          </p>
         </div>
-        <span class="shrink-0 text-xs text-muted-foreground"> {{ modelValue.length }} / 5000 </span>
+        <span
+          v-if="selectedCandidate"
+          class="inline-flex items-center gap-1 text-xs font-medium text-primary"
+        >
+          <Check class="size-3.5" /> 已选基底
+        </span>
       </div>
-      <Textarea
-        id="character-prompt"
-        :model-value="modelValue"
-        class="min-h-56 resize-y bg-background leading-6"
-        @update:model-value="emit('update:modelValue', String($event).slice(0, 5000))"
-      />
-    </div>
+
+      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Skeleton
+          v-for="index in isGenerating
+            ? Math.max(0, candidateExpectedCount - candidates.length)
+            : 0"
+          :key="`loading-${index}`"
+          class="aspect-[3/4] w-full"
+        />
+        <Button
+          v-for="(image, index) in candidates"
+          :key="image.fileName"
+          type="button"
+          variant="outline"
+          class="group h-auto min-h-0 w-full overflow-hidden rounded-md p-0 text-left"
+          :class="
+            selectedCandidate?.fileName === image.fileName &&
+            'border-primary ring-2 ring-primary/20'
+          "
+          :aria-pressed="selectedCandidate?.fileName === image.fileName"
+          :aria-label="`选择第 ${index + 1} 张候选图作为精修基底`"
+          @click="emit('selectCandidate', image)"
+        >
+          <span class="relative block aspect-[3/4] w-full bg-muted/20">
+            <img :src="image.url" :alt="`角色候选图 ${index + 1}`" class="size-full object-cover" />
+            <span
+              v-if="selectedCandidate?.fileName === image.fileName"
+              class="absolute right-3 top-3 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground"
+            >
+              <Check class="size-3.5" />
+            </span>
+          </span>
+        </Button>
+      </div>
+    </section>
   </section>
 </template>

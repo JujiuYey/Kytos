@@ -20,6 +20,7 @@ import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {
   CharacterCreateAgentMessage,
+  CharacterPortraitImage,
   CharacterVisualGeneration,
   SaveFileRequest,
   SavedFileResult,
@@ -31,7 +32,6 @@ import CharacterPromptStep from './components/character-prompt-step.vue';
 import CharacterSourceStep from './components/character-source-step.vue';
 import CharacterStyleStep from './components/character-style-step.vue';
 import CharacterSummaryStart from './components/character-summary-start.vue';
-import { getPromptSuggestions } from './prompt-interview';
 import {
   CHARACTER_STYLES,
   CHARACTER_WORKFLOW_STEPS,
@@ -58,12 +58,16 @@ const summaryInitialName = ref('');
 const summaryTargetId = ref('');
 const prompt = ref('');
 const promptDraft = ref<CharacterPromptDraft>(createEmptyCharacterPromptDraft());
-const isGenerating = ref(false);
+const candidateGeneration = ref<CharacterVisualGeneration | null>(null);
+const pendingFinalGeneration = ref<CharacterVisualGeneration | null>(null);
+const finalVersions = ref<CharacterVisualGeneration[]>([]);
+const selectedFinalGenerationId = ref('');
+const baseImage = ref<CharacterPortraitImage | null>(null);
+const isCandidateGenerating = ref(false);
+const isFinalGenerating = ref(false);
+const skipRefinement = ref(false);
 const isSaving = ref(false);
-const hasGenerated = ref(false);
 const isSaved = ref(false);
-const generationCount = ref(0);
-const activeGeneration = ref<CharacterVisualGeneration | null>(null);
 let generationTimer: ReturnType<typeof setTimeout> | null = null;
 
 const model = computed(() => appStore.settings.deepseekModel);
@@ -80,6 +84,15 @@ const {
 const isPromptAssistantResponding = computed(
   () => chatStatus.value === 'submitted' || chatStatus.value === 'streaming',
 );
+const isGenerating = computed(() => isCandidateGenerating.value || isFinalGenerating.value);
+const selectedFinalGeneration = computed(
+  () =>
+    finalVersions.value.find(generation => generation.id === selectedFinalGenerationId.value) ??
+    null,
+);
+const displayedFinalImage = computed(
+  () => pendingFinalGeneration.value?.image ?? selectedFinalGeneration.value?.image ?? null,
+);
 
 const selectedStyleDetails = computed(() =>
   CHARACTER_STYLES.find(style => style.id === selectedStyle.value),
@@ -91,12 +104,7 @@ const currentStepDetails = computed(() => CHARACTER_WORKFLOW_STEPS[currentStep.v
 const canContinue = computed(() => {
   if (currentStep.value === 1) return true;
   if (currentStep.value === 2) return true;
-  if (currentStep.value === 3) return Boolean(prompt.value.trim());
-  return !isGenerating.value;
-});
-const promptSuggestions = computed(() => {
-  const answerCount = messages.value.filter(message => message.role === 'user').length;
-  return getPromptSuggestions(answerCount, selectedStyleDetails.value?.name);
+  return Boolean(baseImage.value) && !isGenerating.value;
 });
 
 function selectStyle(styleId: StyleId | null): void {
@@ -104,6 +112,7 @@ function selectStyle(styleId: StyleId | null): void {
   const style = CHARACTER_STYLES.find(option => option.id === styleId);
   promptDraft.value.overallStyleKeywords = style ? [style.name, ...style.tags].join('、') : '';
   prompt.value = '';
+  resetGeneratedVisuals();
 }
 
 function agentBody() {
@@ -115,22 +124,14 @@ function agentBody() {
   };
 }
 
-async function sendPromptAnswer(answer: string): Promise<void> {
-  const text = answer.trim();
-  if (!text || isPromptAssistantResponding.value) return;
-  hasGenerated.value = false;
-  isSaved.value = false;
-  await sendMessage({ text }, { body: agentBody() });
-}
-
 async function compilePrompt(): Promise<void> {
   if (isPromptAssistantResponding.value) return;
-  hasGenerated.value = false;
-  isSaved.value = false;
+  prompt.value = '';
   await sendMessage(
-    { text: '请根据目前已经确认的人物信息调用 finalizeCharacterPrompt，整理出最终生图提示词。' },
+    { text: '请立即调用 finalizeCharacterPrompt，根据当前草稿整理最终生图提示词。' },
     { body: agentBody() },
   );
+  syncAgentOutputs();
 }
 
 function syncAgentOutputs(): void {
@@ -152,20 +153,15 @@ function goToStep(step: Step): void {
   currentStep.value = step;
 }
 
-function validateStep(): boolean {
-  if (currentStep.value === 3 && !prompt.value.trim()) {
-    toast.error('先和助手聊出人物细节，再整理最终提示词');
-    return false;
-  }
-  return true;
-}
-
 function nextStep(): void {
-  if (currentStep.value === 4) {
-    generateImage();
+  if (currentStep.value === 3) {
+    void generateCandidates();
     return;
   }
-  if (!validateStep()) return;
+  if (currentStep.value === 4) {
+    void generateFinalImage();
+    return;
+  }
   const next = (currentStep.value + 1) as Step;
   currentStep.value = next;
   furthestStep.value = Math.max(furthestStep.value, next) as Step;
@@ -196,61 +192,156 @@ function resetSource(): void {
   sourceImageFile.value = null;
 }
 
-async function generateImage(): Promise<void> {
-  if (isGenerating.value || !prompt.value.trim()) return;
-  isGenerating.value = true;
-  hasGenerated.value = false;
+function resetGeneratedVisuals(): void {
+  if (generationTimer) {
+    clearTimeout(generationTimer);
+    generationTimer = null;
+  }
+  candidateGeneration.value = null;
+  pendingFinalGeneration.value = null;
+  finalVersions.value = [];
+  selectedFinalGenerationId.value = '';
+  baseImage.value = null;
+  isCandidateGenerating.value = false;
+  isFinalGenerating.value = false;
   isSaved.value = false;
-  generationCount.value += 1;
+}
+
+function updatePromptDraft(draft: CharacterPromptDraft): void {
+  promptDraft.value = draft;
+  prompt.value = '';
+  resetGeneratedVisuals();
+}
+
+async function generateCandidates(): Promise<void> {
+  if (isGenerating.value || isPromptAssistantResponding.value) return;
+  isCandidateGenerating.value = true;
+  isSaved.value = false;
   try {
-    activeGeneration.value = await window.desktop.character.visual.generateCharacterVisual({
+    await compilePrompt();
+    if (!prompt.value.trim()) throw new Error('提示词整理失败，请重试');
+    candidateGeneration.value = await window.desktop.character.visual.generateCharacterVisual({
       prompt: prompt.value,
-      referenceImage: sourceImageFile.value
-        ? {
-            fileData: sourceImageFile.value.fileData,
-            fileName: sourceImageFile.value.fileName,
-            mimeType: sourceImageFile.value.mimeType,
-          }
-        : undefined,
+      n: 4,
+      resolution: '1k',
+      size: '3:4',
     });
-    await pollGeneration(activeGeneration.value.id);
+    await pollGeneration(candidateGeneration.value.id, 'candidates');
   } catch (error: unknown) {
-    isGenerating.value = false;
+    isCandidateGenerating.value = false;
     toast.error(error instanceof Error ? error.message : String(error));
   }
 }
 
-async function pollGeneration(generationId: string): Promise<void> {
+function selectCandidate(image: CharacterPortraitImage): void {
+  baseImage.value = image;
+  pendingFinalGeneration.value = null;
+  finalVersions.value = [];
+  selectedFinalGenerationId.value = '';
+  isSaved.value = false;
+  currentStep.value = 4;
+  furthestStep.value = 4;
+}
+
+async function imageUrlToDataUrl(imageUrl: string): Promise<string> {
+  const response = await fetch(imageUrl);
+  if (!response.ok) throw new Error('无法读取候选图用于精修');
+  return blobToDataUrl(await response.blob());
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      typeof reader.result === 'string'
+        ? resolve(reader.result)
+        : reject(new Error('候选图转换失败'));
+    reader.onerror = () => reject(new Error('候选图转换失败'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function referenceImageToDataUrl(referenceImage: SaveFileRequest): Promise<string> {
+  return blobToDataUrl(new Blob([referenceImage.fileData], { type: referenceImage.mimeType }));
+}
+
+async function generateFinalImage(): Promise<void> {
+  if (!baseImage.value || isGenerating.value) return;
+  if (skipRefinement.value) return;
+  isFinalGenerating.value = true;
+  isSaved.value = false;
+  try {
+    const imageUrls = [await imageUrlToDataUrl(baseImage.value.url)];
+    if (sourceImageFile.value) imageUrls.push(await referenceImageToDataUrl(sourceImageFile.value));
+    pendingFinalGeneration.value = await window.desktop.character.visual.generateCharacterVisual({
+      imageUrls,
+      n: 1,
+      prompt: `${prompt.value}\n\nKeep the same character identity, face shape, hairstyle and art style from the reference image. One single full-body character, centered, pure white background, no shadow, refined high-definition character design sheet.`,
+      resolution: '2k',
+      size: '3:4',
+    });
+    await pollGeneration(pendingFinalGeneration.value.id, 'final');
+  } catch (error: unknown) {
+    isFinalGenerating.value = false;
+    toast.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function pollGeneration(generationId: string, phase: 'candidates' | 'final'): Promise<void> {
   try {
     const generation = await window.desktop.character.visual.getCharacterVisualGeneration({
       generationId,
     });
-    activeGeneration.value = generation;
+    if (phase === 'candidates') candidateGeneration.value = generation;
+    else updateFinalGeneration(generation);
     if (['submitted', 'pending', 'processing'].includes(generation.status)) {
-      generationTimer = setTimeout(() => void pollGeneration(generationId), 2500);
+      generationTimer = setTimeout(() => void pollGeneration(generationId, phase), 2500);
       return;
     }
-    isGenerating.value = false;
+    if (phase === 'candidates') isCandidateGenerating.value = false;
+    else isFinalGenerating.value = false;
     if (generation.status === 'completed') {
-      hasGenerated.value = true;
-      toast.success('角色形象已生成，可以继续调整或保存');
+      toast.success(phase === 'candidates' ? '候选图已生成，请选择一张作为基底' : '正式视觉已生成');
     } else {
       toast.error(generation.errorMessage || '角色形象生成失败');
     }
   } catch (error: unknown) {
-    isGenerating.value = false;
+    if (phase === 'candidates') isCandidateGenerating.value = false;
+    else isFinalGenerating.value = false;
     toast.error(error instanceof Error ? error.message : String(error));
   }
 }
 
+function updateFinalGeneration(generation: CharacterVisualGeneration): void {
+  if (generation.status !== 'completed' || !generation.image) {
+    pendingFinalGeneration.value = generation;
+    return;
+  }
+  const versionIndex = finalVersions.value.findIndex(version => version.id === generation.id);
+  if (versionIndex === -1) finalVersions.value = [...finalVersions.value, generation];
+  else finalVersions.value[versionIndex] = generation;
+  selectedFinalGenerationId.value = generation.id;
+  pendingFinalGeneration.value = null;
+}
+
+function selectFinalVersion(generationId: string): void {
+  if (!finalVersions.value.some(generation => generation.id === generationId)) return;
+  selectedFinalGenerationId.value = generationId;
+  skipRefinement.value = false;
+  isSaved.value = false;
+}
+
 async function saveImage(): Promise<void> {
-  if (isSaving.value || !hasGenerated.value || !characterId.value) return;
+  const generation = skipRefinement.value
+    ? candidateGeneration.value
+    : selectedFinalGeneration.value;
+  if (isSaving.value || !generation || !baseImage.value || !characterId.value) return;
   isSaving.value = true;
   try {
-    if (!activeGeneration.value?.image) throw new Error('未找到当前生成结果');
     await window.desktop.character.visual.saveCharacterVisual({
       characterId: characterId.value,
-      generationId: activeGeneration.value.id,
+      generationId: generation.id,
+      imageFileName: skipRefinement.value ? baseImage.value.fileName : generation.image?.fileName,
     });
     isSaved.value = true;
     toast.success('第一个正式角色视觉已保存');
@@ -262,9 +353,7 @@ async function saveImage(): Promise<void> {
 }
 
 function startOver(): void {
-  activeGeneration.value = null;
-  hasGenerated.value = false;
-  isSaved.value = false;
+  resetGeneratedVisuals();
   currentStep.value = 1;
   furthestStep.value = 1;
 }
@@ -290,12 +379,16 @@ function resetCreationSession(): void {
   characterName.value = '';
   prompt.value = '';
   promptDraft.value = createEmptyCharacterPromptDraft();
-  isGenerating.value = false;
+  isCandidateGenerating.value = false;
+  isFinalGenerating.value = false;
   isSaving.value = false;
-  hasGenerated.value = false;
   isSaved.value = false;
-  generationCount.value = 0;
-  activeGeneration.value = null;
+  candidateGeneration.value = null;
+  pendingFinalGeneration.value = null;
+  finalVersions.value = [];
+  selectedFinalGenerationId.value = '';
+  baseImage.value = null;
+  skipRefinement.value = false;
   needsSummary.value = false;
   summaryInitialName.value = '';
   summaryTargetId.value = '';
@@ -380,13 +473,6 @@ async function initialize(): Promise<void> {
     isInitializing.value = false;
   }
 }
-
-watch([selectedStyle, sourceImageUrl, prompt], () => {
-  if (!isGenerating.value) {
-    hasGenerated.value = false;
-    isSaved.value = false;
-  }
-});
 
 watch(messages, syncAgentOutputs, { deep: true });
 watch(chatError, error => {
@@ -497,25 +583,28 @@ onBeforeUnmount(() => {
             />
             <CharacterPromptStep
               v-else-if="currentStep === 3"
+              :candidates="candidateGeneration?.images || []"
+              :candidate-expected-count="4"
               :draft="promptDraft"
-              :is-responding="isPromptAssistantResponding"
-              :messages="messages"
-              :model-value="prompt"
-              :style-name="selectedStyleDetails?.name || '由访谈决定'"
-              :suggestions="promptSuggestions"
-              @compile="compilePrompt"
-              @send="sendPromptAnswer"
-              @update:model-value="prompt = $event"
+              :is-generating="isCandidateGenerating"
+              :selected-candidate="baseImage"
+              :style-name="selectedStyleDetails?.name || '由系统补全'"
+              @generate="generateCandidates"
+              @select-candidate="selectCandidate"
+              @update:draft="updatePromptDraft"
             />
             <CharacterGenerationStep
-              v-else
-              :generation-count="generationCount"
-              :generated-image="activeGeneration?.image?.url || ''"
-              :has-generated="hasGenerated"
-              :is-generating="isGenerating"
+              v-else-if="baseImage"
+              :base-image="baseImage"
+              :final-image="displayedFinalImage"
+              :final-versions="finalVersions"
+              :is-generating="isFinalGenerating"
               :is-saved="isSaved"
-              :progress="activeGeneration?.progress || 0"
-              :selected-style-name="selectedStyleDetails?.name || '访谈生成风格'"
+              :progress="pendingFinalGeneration?.progress || 0"
+              :selected-final-generation-id="selectedFinalGenerationId"
+              :skip-refinement="skipRefinement"
+              @select-final-version="selectFinalVersion"
+              @update:skip-refinement="skipRefinement = $event"
             />
           </Transition>
         </section>
@@ -541,7 +630,7 @@ onBeforeUnmount(() => {
             完成，返回角色管理
           </Button>
           <Button
-            v-else-if="currentStep === 4 && hasGenerated"
+            v-else-if="currentStep === 4 && (skipRefinement || selectedFinalGeneration?.image)"
             variant="ghost"
             class="gap-2"
             @click="startOver"
@@ -549,16 +638,21 @@ onBeforeUnmount(() => {
             重新开始
           </Button>
           <Button
-            v-if="currentStep === 4 && hasGenerated && !isSaved"
+            v-if="
+              currentStep === 4 && !skipRefinement && selectedFinalGeneration?.image && !isSaved
+            "
             variant="outline"
             class="min-w-32 justify-center gap-2"
+            :disabled="isGenerating"
             @click="nextStep"
           >
-            再生成一张
+            重新精修
             <RotateCcw class="size-4" />
           </Button>
           <Button
-            v-if="currentStep === 4 && hasGenerated && !isSaved"
+            v-if="
+              currentStep === 4 && (skipRefinement || selectedFinalGeneration?.image) && !isSaved
+            "
             class="min-w-40 justify-center gap-2"
             :disabled="isSaving"
             @click="saveImage"
@@ -567,18 +661,26 @@ onBeforeUnmount(() => {
             {{ isSaving ? '保存中' : '满意，设为正式视觉' }}
           </Button>
           <Button
-            v-if="!(currentStep === 4 && hasGenerated) && !isSaved"
+            v-if="currentStep < 3 && !isSaved"
             class="min-w-32 justify-center gap-2"
             :disabled="!canContinue || isGenerating"
             @click="nextStep"
           >
             <LoaderCircle v-if="isGenerating" class="size-4 animate-spin" />
-            <template v-else-if="currentStep < 4">
-              下一步
-              <ArrowRight class="size-4" />
-            </template>
+            下一步
+            <ArrowRight class="size-4" />
+          </Button>
+          <Button
+            v-if="
+              currentStep === 4 && !skipRefinement && !selectedFinalGeneration?.image && !isSaved
+            "
+            class="min-w-36 justify-center gap-2"
+            :disabled="isGenerating"
+            @click="generateFinalImage"
+          >
+            <LoaderCircle v-if="isGenerating" class="size-4 animate-spin" />
             <template v-else>
-              生成图片
+              精修定稿
               <WandSparkles class="size-4" />
             </template>
           </Button>

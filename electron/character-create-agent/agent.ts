@@ -39,10 +39,7 @@ const draftPatchSchema = z
   .object(draftFields)
   .refine(value => Object.keys(value).length > 0, '至少更新一个人物字段');
 
-const finalPromptSchema = z.object({
-  draft: z.object(draftFields).partial(),
-  prompt: z.string().min(40).max(20_000),
-});
+const finalPromptSchema = z.object({ draft: z.object(draftFields).partial() });
 
 function mergeDraft(
   draft: CharacterCreateDraft,
@@ -54,6 +51,37 @@ function mergeDraft(
     if (typeof value === 'string') merged[field] = value;
   }
   return merged;
+}
+
+function valueOrDefault(value: string, fallback: string): string {
+  return value.trim() || fallback;
+}
+
+export function buildCharacterCreatePrompt(
+  draft: CharacterCreateDraft,
+  stylePrompt: string,
+): string {
+  const forbiddenColors = draft.forbiddenColors.trim()
+    ? `, forbidden colors ${draft.forbiddenColors.trim()}`
+    : '';
+  const positivePrompt = [
+    `one single ${valueOrDefault(draft.gender, 'person')}`,
+    valueOrDefault(draft.age, 'young adult'),
+    'full body, centered',
+    `${valueOrDefault(draft.hairstyle, 'natural')} hairstyle`,
+    `${valueOrDefault(draft.hairColor, 'natural dark')} hair`,
+    `${valueOrDefault(draft.clothingStyle, 'casual')} top`,
+    `${valueOrDefault(draft.bottomsStyle, 'simple')} bottoms`,
+    valueOrDefault(draft.characterMood, 'friendly and composed mood'),
+    `main color ${valueOrDefault(draft.primaryColor, 'balanced neutral colors')}`,
+    draft.overallStyleKeywords.trim(),
+    stylePrompt.trim(),
+    'pure white background, no shadow, character design sheet',
+  ].filter(Boolean);
+  const negativePrompt =
+    `no props, no scene, no background decoration, no text, no logo, ` +
+    `no watermark, no second person${forbiddenColors}`;
+  return `${positivePrompt.join(', ')}.\n\nNegative prompt: ${negativePrompt}.`;
 }
 
 export function createCharacterCreateAgent(options: {
@@ -77,7 +105,7 @@ export function createCharacterCreateAgent(options: {
     stopWhen: isStepCount(5),
     tools: {
       updateCharacterDraft: tool({
-        description: '保存用户已经明确说出的角色事实，并同步到右侧角色草稿。',
+        description: '仅在用户补充信息时更新角色草稿。',
         inputSchema: draftPatchSchema,
         execute: async patch => {
           const updatedFields = Object.keys(patch) as Array<keyof CharacterCreateDraft>;
@@ -86,13 +114,13 @@ export function createCharacterCreateAgent(options: {
         },
       }),
       finalizeCharacterPrompt: tool({
-        description: '把已确认的人物事实和画法整理成最终生图提示词，不保存角色档案。',
+        description: '根据当前草稿和已选画风，按固定模板组装最终生图提示词，不保存角色档案。',
         inputSchema: finalPromptSchema,
         execute: async input => {
           currentDraft = mergeDraft(currentDraft, input.draft);
           const result: CharacterCreatePromptResult = {
             draft: currentDraft,
-            prompt: input.prompt,
+            prompt: buildCharacterCreatePrompt(currentDraft, options.stylePrompt),
             ready: true,
           };
           return result;
