@@ -3,6 +3,8 @@ export type {
   CredentialStatus,
   DesktopApi,
   DesktopSettings,
+  ExportFileRequest,
+  ExportFileResult,
   SavedFileResult,
   SaveFileRequest,
   SetCredentialRequest,

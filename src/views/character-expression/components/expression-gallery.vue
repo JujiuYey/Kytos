@@ -31,6 +31,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'delete', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
+  (event: 'edit', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
   (event: 'rename', record: CharacterExpressionRecord): void;
   (event: 'update:selectedCharacterId', value: string): void;
 }>();
@@ -85,7 +86,8 @@ const filteredRecords = computed(() => {
         :deleting-file-name="deletingFileName"
         :renaming-task-id="renamingTaskId"
         @delete="(deletedRecord, deletedImage) => emit('delete', deletedRecord, deletedImage)"
-        @rename="(renamedRecord) => emit('rename', renamedRecord)"
+        @edit="(editedRecord, editedImage) => emit('edit', editedRecord, editedImage)"
+        @rename="renamedRecord => emit('rename', renamedRecord)"
       />
 
       <div v-else class="flex min-h-full items-center justify-center px-6 py-12">

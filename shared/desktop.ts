@@ -6,7 +6,14 @@ import type { CharacterPortraitApi } from './character-portrait';
 import type { CharacterExpressionApi } from './character-expression';
 import type { CharacterVisualApi } from './character-create';
 
-export type { StoryApi, IllustrationApi, CharacterLibraryApi, CharacterPortraitApi, CharacterExpressionApi, CharacterVisualApi };
+export type {
+  StoryApi,
+  IllustrationApi,
+  CharacterLibraryApi,
+  CharacterPortraitApi,
+  CharacterExpressionApi,
+  CharacterVisualApi,
+};
 
 // 凭据服务类型
 export type CredentialService = 'apimart' | 'deepseek';
@@ -63,6 +70,19 @@ export interface SavedFileResult {
   mimeType: string;
 }
 
+// 导出文件请求
+export interface ExportFileRequest {
+  fileName: string;
+  fileData: Uint8Array;
+  mimeType: string;
+}
+
+// 导出文件结果
+export interface ExportFileResult {
+  canceled: boolean;
+  filePath: string | null;
+}
+
 // 设置与凭据 API
 export interface SettingsApi {
   // 删除凭据
@@ -87,6 +107,8 @@ export interface SettingsApi {
 
 // 文件 API
 export interface FileApi {
+  // 导出文件到用户选择的位置
+  exportFile: (request: ExportFileRequest) => Promise<ExportFileResult>;
   // 保存文件
   saveFile: (request: SaveFileRequest) => Promise<SavedFileResult>;
 }

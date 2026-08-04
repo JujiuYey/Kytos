@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { toast } from 'vue-sonner';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { ImageReferencePickerDialog } from '@/components/sag/image-reference-picker-dialog';
@@ -30,6 +31,7 @@ import ExpressionUploadDialog from './components/expression-upload-dialog.vue';
 import type { ExpressionReferenceOption } from './expression-reference';
 
 const appStore = useAppStore();
+const router = useRouter();
 const library = ref<CharacterLibraryState | null>(null);
 const selectedCharacterId = ref('');
 const records = ref<CharacterExpressionRecord[]>([]);
@@ -175,6 +177,17 @@ const isGenerateDisabled = computed(
 
 function referenceAssetKey(selection: CharacterExpressionReferenceSelection): string {
   return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
+}
+
+function editExpression(record: CharacterExpressionRecord, image: CharacterPortraitImage): void {
+  void router.push({
+    name: 'character-expression-editor',
+    query: {
+      characterId: selectedCharacterId.value,
+      fileName: image.fileName,
+      taskId: record.id,
+    },
+  });
 }
 
 function selectReferenceAssets(keys: string[]): void {
@@ -592,6 +605,7 @@ onBeforeUnmount(() => {
           :selected-character-id="selectedCharacterId"
           class="min-h-0 min-w-0 flex-1"
           @delete="requestDelete"
+          @edit="editExpression"
           @rename="requestRename"
           @update:selected-character-id="selectCharacter"
         />

@@ -189,7 +189,7 @@ watch(
       <div
         ref="viewport"
         tabindex="0"
-        class="relative flex min-h-0 flex-1 touch-none select-none items-center justify-center overflow-hidden p-12 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        class="relative flex min-h-0 flex-1 touch-none select-none items-center justify-center overflow-hidden p-12 pb-20 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         :class="scale > 1 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-zoom-in'"
         aria-label="图片缩放区域"
         @dblclick="handleDoubleClick"

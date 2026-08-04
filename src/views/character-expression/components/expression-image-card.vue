@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, Clock3, Pencil, Trash2 } from '@lucide/vue';
+import { Check, Clock3, Crop, Pencil, Trash2 } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -18,6 +18,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'delete', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
+  (event: 'edit', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
   (event: 'rename', record: CharacterExpressionRecord): void;
 }>();
 
@@ -102,9 +103,7 @@ function formatDate(value: string): string {
         {{ props.record.description }}
       </p>
 
-      <div
-        class="flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground"
-      >
+      <div class="flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground">
         <span class="min-w-0 truncate">
           {{ props.record.source === 'uploaded' ? '上传图片' : `候选 ${props.imageIndex + 1}` }}
           <template v-if="props.record.source === 'generated'">
@@ -117,7 +116,23 @@ function formatDate(value: string): string {
         </span>
       </div>
 
-      <div class="flex justify-end">
+      <div class="flex justify-end gap-1">
+        <TooltipProvider :delay-duration="300">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                size="icon"
+                variant="ghost"
+                class="size-8 text-muted-foreground"
+                :aria-label="`编辑${props.record.name}的第 ${props.imageIndex + 1} 张表情`"
+                @click="emit('edit', props.record, props.image)"
+              >
+                <Crop class="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>编辑图片</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <TooltipProvider :delay-duration="300">
           <Tooltip>
             <TooltipTrigger as-child>

@@ -22,7 +22,11 @@ function handleClick(menu: MenuItem) {
 
 const currentKey = computed(() => {
   const pathParts = route.path.split('/').filter(Boolean);
-  const key = pathParts.length > 1 ? (pathParts[1] ?? 'home') : (pathParts[0] ?? 'home');
+  const rootKey = pathParts[0] ?? 'home';
+  if (rootKey === 'character-expression') {
+    return rootKey;
+  }
+  const key = pathParts.length > 1 ? (pathParts[1] ?? 'home') : rootKey;
   return key === 'character' ? 'characters' : key;
 });
 

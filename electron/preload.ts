@@ -182,6 +182,8 @@ const settingsApi: SettingsApi = {
 
 // 文件 IPC 桥接
 const fileApi: FileApi = {
+  // 导出文件到用户选择的位置
+  exportFile: request => ipcRenderer.invoke('file:export', request),
   // 保存文件
   saveFile: request => ipcRenderer.invoke('file:save', request),
 };
