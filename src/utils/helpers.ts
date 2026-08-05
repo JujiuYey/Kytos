@@ -3,7 +3,7 @@ import { toast } from 'vue-sonner';
 /**
  * 将未知错误转换为可展示的消息
  */
-export function getErrorMessage(error: unknown): string {
+export function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 

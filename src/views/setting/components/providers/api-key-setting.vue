@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { CredentialService, CredentialStatus } from '@/types';
-import { getErrorMessage } from '@/utils/helpers';
+import { toErrorMessage } from '@/utils/helpers';
 
 interface Props {
   description: string;
@@ -57,7 +57,7 @@ async function refreshStatus() {
   try {
     status.value = await window.desktop.settings.getCredentialStatus(props.service);
   } catch (error: unknown) {
-    errorMessage.value = getErrorMessage(error);
+    errorMessage.value = toErrorMessage(error);
   } finally {
     isLoading.value = false;
   }
@@ -79,7 +79,7 @@ async function saveCredential() {
     isVisible.value = false;
     toast.success(`${props.title} 已安全保存`);
   } catch (error: unknown) {
-    errorMessage.value = getErrorMessage(error);
+    errorMessage.value = toErrorMessage(error);
   } finally {
     isSaving.value = false;
   }
@@ -93,7 +93,7 @@ async function clearCredential() {
     isClearDialogOpen.value = false;
     toast.success(`${props.title} 已清除`);
   } catch (error: unknown) {
-    errorMessage.value = getErrorMessage(error);
+    errorMessage.value = toErrorMessage(error);
   } finally {
     isClearing.value = false;
   }

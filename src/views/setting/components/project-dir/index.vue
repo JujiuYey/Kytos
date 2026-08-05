@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import { useAppStore } from '@/stores/app';
-import { getErrorMessage } from '@/utils/helpers';
+import { toErrorMessage } from '@/utils/helpers';
 
 const appStore = useAppStore();
 const errorMessage = ref('');
@@ -33,7 +33,7 @@ async function chooseProjectDir() {
       isSwitchDialogOpen.value = true;
     }
   } catch (error: unknown) {
-    errorMessage.value = getErrorMessage(error);
+    errorMessage.value = toErrorMessage(error);
   } finally {
     isSelecting.value = false;
   }
@@ -52,7 +52,7 @@ async function switchWorkspace() {
     pendingPath.value = '';
     toast.success('作品工作区已切换');
   } catch (error: unknown) {
-    errorMessage.value = getErrorMessage(error);
+    errorMessage.value = toErrorMessage(error);
   } finally {
     isSwitching.value = false;
   }
@@ -64,7 +64,7 @@ async function openWorkspace() {
   try {
     await window.desktop.settings.openWorkspaceDirectory();
   } catch (error: unknown) {
-    errorMessage.value = getErrorMessage(error);
+    errorMessage.value = toErrorMessage(error);
   } finally {
     isOpening.value = false;
   }

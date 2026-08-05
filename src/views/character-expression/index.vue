@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Laugh } from '@lucide/vue';
 import { toast } from 'vue-sonner';
-import { Badge } from '@/components/ui/badge';
+import { useCredentialStatus } from '@/composables/use-credential-status';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { ImageReferencePickerDialog } from '@/components/sag/image-reference-picker-dialog';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
@@ -20,7 +20,6 @@ import type {
   CharacterPortraitImage,
   CharacterPortraitResolution,
   CharacterPortraitWorkspaceState,
-  CredentialStatus,
   SaveFileRequest,
   SavedFileResult,
 } from '@/types';
@@ -30,66 +29,72 @@ import ExpressionGeneratorPanel from './components/expression-generator-panel.vu
 import ExpressionPageHeader from './components/expression-page-header.vue';
 import ExpressionRenameDialog from './components/expression-rename-dialog.vue';
 import ExpressionUploadDialog from './components/expression-upload-dialog.vue';
+import { useGeneratorOpen } from './composables/use-generator-open';
+import { useUpload } from './composables/use-upload';
 import type { ExpressionReferenceOption } from './expression-reference';
+import { toErrorMessage } from '@/utils/helpers';
+import {
+  DEFAULT_EXPRESSION_NAME,
+  DEFAULT_EXPRESSION_DESCRIPTION,
+  ACTIVE_STATUSES,
+  REFERENCE_FILTERS,
+} from './constants/index';
 
 const appStore = useAppStore();
 const router = useRouter();
+
+const { uploadDialogOpen, openUploadDialog } = useUpload();
+const { generatorOpen, openGenerator, closeGenerator } = useGeneratorOpen();
+const {
+  apimartConfigured,
+  deepseekConfigured,
+  minimaxConfigured,
+  refresh: refreshCredentialStatus,
+} = useCredentialStatus();
+
 const library = ref<CharacterLibraryState | null>(null);
 const selectedCharacterId = ref('');
 const records = ref<CharacterExpressionRecord[]>([]);
 const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
 const selectedReferenceAssets = ref<CharacterExpressionReferenceSelection[]>([]);
-const credentialStatus = ref<CredentialStatus | null>(null);
-const deepseekStatus = ref<CredentialStatus | null>(null);
-const minimaxStatus = ref<CredentialStatus | null>(null);
-const name = ref('开心');
-const description = ref('眼睛明亮，嘴角自然上扬，带有真诚而有感染力的笑意。');
+const referenceDialogOpen = ref(false);
+
+const name = ref(DEFAULT_EXPRESSION_NAME);
+const description = ref(DEFAULT_EXPRESSION_DESCRIPTION);
 const size = ref<CharacterExpressionSize>('1:1');
 const resolution = ref<CharacterPortraitResolution>('1k');
 const count = ref(2);
 const errorMessage = ref('');
 const isInitializing = ref(true);
 const isSubmitting = ref(false);
+const isGeneratingPrompt = ref(false);
+
 const isPolling = ref(false);
 const pollingState = ref<GenerationTaskPollingState>({ attempt: 0, phase: 'idle', taskId: '' });
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let isDisposed = false;
+let loadRequestId = 0;
+
 const deletingFileName = ref('');
-const renamingTaskId = ref('');
 const deleteDialogOpen = ref(false);
 const deleteTarget = ref<{
   image: CharacterPortraitImage;
   record: CharacterExpressionRecord;
 } | null>(null);
+const renamingTaskId = ref('');
 const renameDialogOpen = ref(false);
 const renameTarget = ref<CharacterExpressionRecord | null>(null);
-const uploadDialogOpen = ref(false);
-const referenceDialogOpen = ref(false);
-const generatorOpen = ref(false);
-const isGeneratingPrompt = ref(false);
-const mobilePane = ref<'settings' | 'gallery'>('gallery');
 
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
-let isDisposed = false;
-let loadRequestId = 0;
-
-const activeStatuses = ['submitted', 'pending', 'processing'];
-const defaultExpressionName = '开心';
-const defaultExpressionDescription = '眼睛明亮，嘴角自然上扬，带有真诚而有感染力的笑意。';
-const referenceFilters = [
-  { label: '视觉资产', value: 'visual' },
-  { label: '已有表情', value: 'expression' },
-];
 const characters = computed(() => library.value?.characters ?? []);
 const activeRecord = computed(() =>
-  records.value.find(record => activeStatuses.includes(record.status)),
+  records.value.find(record => ACTIVE_STATUSES.includes(record.status)),
 );
-const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
+const keyConfigured = apimartConfigured;
 const fastModelProvider = computed(
   () => getChatModelDefinition(appStore.settings.fastModel).provider,
 );
 const promptGenerationAvailable = computed(() =>
-  fastModelProvider.value === 'minimax'
-    ? Boolean(minimaxStatus.value?.configured)
-    : Boolean(deepseekStatus.value?.configured),
+  fastModelProvider.value === 'minimax' ? minimaxConfigured.value : deepseekConfigured.value,
 );
 const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
 const characterSelectionDisabled = computed(
@@ -189,18 +194,6 @@ function referenceAssetKey(selection: CharacterExpressionReferenceSelection): st
   return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
 }
 
-function editExpression(record: CharacterExpressionRecord, image: CharacterPortraitImage): void {
-  void router.push({
-    name: 'image-editor',
-    query: {
-      fileName: record.name || image.fileName,
-      mimeType: image.mimeType,
-      returnTo: 'character-expression',
-      sourceUrl: image.url,
-    },
-  });
-}
-
 function selectReferenceAssets(keys: string[]): void {
   const selectedKeySet = new Set(keys);
   selectedReferenceAssets.value = referenceOptions.value
@@ -219,10 +212,6 @@ function replaceRecord(updatedRecord: CharacterExpressionRecord): void {
   ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-function applyWorkspace(workspace: CharacterExpressionWorkspaceState): void {
-  records.value = workspace.records;
-}
-
 function clearPollTimer(): void {
   if (pollTimer) {
     clearTimeout(pollTimer);
@@ -230,7 +219,9 @@ function clearPollTimer(): void {
   }
 }
 
-function resetPollingState(): void {
+function resetPolling(): void {
+  clearPollTimer();
+  isPolling.value = false;
   pollingState.value = { attempt: 0, phase: 'idle', taskId: '' };
 }
 
@@ -266,14 +257,13 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
     }
     replaceRecord(record);
     errorMessage.value = '';
-    if (activeStatuses.includes(record.status)) {
+    if (ACTIVE_STATUSES.includes(record.status)) {
       schedulePoll(taskId, characterId);
       return;
     }
-    resetPollingState();
+    pollingState.value = { attempt: 0, phase: 'idle', taskId: '' };
     if (record.status === 'completed') {
       toast.success(`“${record.name}”表情已生成并保存到工作区`);
-      mobilePane.value = 'gallery';
     } else {
       errorMessage.value = record.errorMessage || '表情生成任务未完成';
     }
@@ -282,7 +272,7 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
       return;
     }
     pollingState.value = { ...pollingState.value, phase: 'paused' };
-    errorMessage.value = pollError instanceof Error ? pollError.message : String(pollError);
+    errorMessage.value = toErrorMessage(pollError);
   } finally {
     isPolling.value = false;
   }
@@ -292,34 +282,28 @@ function applyCharacterWorkspace(
   expressionWorkspace: CharacterExpressionWorkspaceState,
   currentPortraitWorkspace: CharacterPortraitWorkspaceState,
 ): void {
-  applyWorkspace(expressionWorkspace);
+  records.value = expressionWorkspace.records;
   portraitWorkspace.value = currentPortraitWorkspace;
   selectedReferenceAssets.value = [];
 
   const latestGeneratedRecord = expressionWorkspace.records.find(
     record => record.source === 'generated',
   );
-  name.value = latestGeneratedRecord?.name ?? defaultExpressionName;
-  description.value = latestGeneratedRecord?.description ?? defaultExpressionDescription;
+  name.value = latestGeneratedRecord?.name ?? DEFAULT_EXPRESSION_NAME;
+  description.value = latestGeneratedRecord?.description ?? DEFAULT_EXPRESSION_DESCRIPTION;
   size.value = latestGeneratedRecord?.size ?? '1:1';
   resolution.value = latestGeneratedRecord?.resolution ?? '1k';
   count.value = latestGeneratedRecord?.count ?? 2;
 
-  const unfinishedRecord = expressionWorkspace.records.find(record =>
-    activeStatuses.includes(record.status),
-  );
-  if (unfinishedRecord) {
-    generatorOpen.value = true;
-    mobilePane.value = 'gallery';
-    schedulePoll(unfinishedRecord.id, selectedCharacterId.value);
+  if (activeRecord.value) {
+    openGenerator();
+    schedulePoll(activeRecord.value.id, selectedCharacterId.value);
   }
 }
 
 async function loadCharacterWorkspace(characterId: string): Promise<void> {
   const requestId = ++loadRequestId;
-  clearPollTimer();
-  resetPollingState();
-  isPolling.value = false;
+  resetPolling();
   isInitializing.value = true;
   errorMessage.value = '';
   records.value = [];
@@ -338,10 +322,7 @@ async function loadCharacterWorkspace(characterId: string): Promise<void> {
     if (requestId !== loadRequestId) {
       return;
     }
-    errorMessage.value =
-      initializationError instanceof Error
-        ? initializationError.message
-        : String(initializationError);
+    errorMessage.value = toErrorMessage(initializationError);
   } finally {
     if (requestId === loadRequestId) {
       isInitializing.value = false;
@@ -353,23 +334,15 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   try {
-    const [characterLibrary, status, deepseek, minimax] = await Promise.all([
+    const [characterLibrary] = await Promise.all([
       window.desktop.character.library.getCharacterLibrary(),
-      window.desktop.settings.getCredentialStatus('apimart'),
-      window.desktop.settings.getCredentialStatus('deepseek'),
-      window.desktop.settings.getCredentialStatus('minimax'),
+      refreshCredentialStatus(),
     ]);
     library.value = characterLibrary;
-    credentialStatus.value = status;
-    deepseekStatus.value = deepseek;
-    minimaxStatus.value = minimax;
     selectedCharacterId.value = characterLibrary.activeCharacterId;
     await loadCharacterWorkspace(characterLibrary.activeCharacterId);
   } catch (initializationError: unknown) {
-    errorMessage.value =
-      initializationError instanceof Error
-        ? initializationError.message
-        : String(initializationError);
+    errorMessage.value = toErrorMessage(initializationError);
     isInitializing.value = false;
   }
 }
@@ -409,11 +382,9 @@ async function generateExpression(): Promise<void> {
       size: size.value,
     });
     replaceRecord(record);
-    mobilePane.value = 'gallery';
     await pollExpressionTask(record.id, characterId);
   } catch (generationError: unknown) {
-    errorMessage.value =
-      generationError instanceof Error ? generationError.message : String(generationError);
+    errorMessage.value = toErrorMessage(generationError);
   } finally {
     isSubmitting.value = false;
   }
@@ -425,11 +396,6 @@ function retryPolling(): void {
   }
   errorMessage.value = '';
   void pollExpressionTask(activeRecord.value.id, selectedCharacterId.value);
-}
-
-function closeGenerator(): void {
-  generatorOpen.value = false;
-  mobilePane.value = 'gallery';
 }
 
 async function generateExpressionPrompt(): Promise<void> {
@@ -446,10 +412,22 @@ async function generateExpressionPrompt(): Promise<void> {
     );
     toast.success('表情提示词已生成');
   } catch (promptError: unknown) {
-    toast.error(promptError instanceof Error ? promptError.message : String(promptError));
+    toast.error(toErrorMessage(promptError));
   } finally {
     isGeneratingPrompt.value = false;
   }
+}
+
+function editExpression(record: CharacterExpressionRecord, image: CharacterPortraitImage): void {
+  void router.push({
+    name: 'image-editor',
+    query: {
+      fileName: record.name || image.fileName,
+      mimeType: image.mimeType,
+      returnTo: 'character-expression',
+      sourceUrl: image.url,
+    },
+  });
 }
 
 function uploadExpression(
@@ -463,26 +441,16 @@ function uploadExpression(
   });
 }
 
-async function handleUploaded(): Promise<void> {
+async function refreshExpressionsAfterUpload(): Promise<void> {
   try {
-    applyWorkspace(
-      await window.desktop.character.expression.getCharacterExpressionWorkspace({
-        characterId: selectedCharacterId.value,
-      }),
-    );
-    mobilePane.value = 'gallery';
+    const workspace = await window.desktop.character.expression.getCharacterExpressionWorkspace({
+      characterId: selectedCharacterId.value,
+    });
+    records.value = workspace.records;
     toast.success('表情已上传并保存到工作区');
   } catch (uploadError: unknown) {
-    toast.error(uploadError instanceof Error ? uploadError.message : String(uploadError));
+    toast.error(toErrorMessage(uploadError));
   }
-}
-
-function requestDelete(record: CharacterExpressionRecord, image: CharacterPortraitImage): void {
-  if (deletingFileName.value || renamingTaskId.value) {
-    return;
-  }
-  deleteTarget.value = { image, record };
-  deleteDialogOpen.value = true;
 }
 
 function requestRename(record: CharacterExpressionRecord): void {
@@ -499,21 +467,28 @@ async function renameExpression(nextName: string): Promise<void> {
   }
   renamingTaskId.value = renameTarget.value.id;
   try {
-    applyWorkspace(
-      await window.desktop.character.expression.renameCharacterExpression({
-        characterId: selectedCharacterId.value,
-        name: nextName,
-        taskId: renameTarget.value.id,
-      }),
-    );
+    const workspace = await window.desktop.character.expression.renameCharacterExpression({
+      characterId: selectedCharacterId.value,
+      name: nextName,
+      taskId: renameTarget.value.id,
+    });
+    records.value = workspace.records;
     renameDialogOpen.value = false;
     renameTarget.value = null;
     toast.success('表情名称已更新');
   } catch (renameError: unknown) {
-    toast.error(renameError instanceof Error ? renameError.message : String(renameError));
+    toast.error(toErrorMessage(renameError));
   } finally {
     renamingTaskId.value = '';
   }
+}
+
+function requestDelete(record: CharacterExpressionRecord, image: CharacterPortraitImage): void {
+  if (deletingFileName.value || renamingTaskId.value) {
+    return;
+  }
+  deleteTarget.value = { image, record };
+  deleteDialogOpen.value = true;
 }
 
 async function deleteExpression(): Promise<void> {
@@ -523,18 +498,17 @@ async function deleteExpression(): Promise<void> {
   const { image, record } = deleteTarget.value;
   deletingFileName.value = image.fileName;
   try {
-    applyWorkspace(
-      await window.desktop.character.expression.deleteCharacterExpression({
-        characterId: selectedCharacterId.value,
-        fileName: image.fileName,
-        taskId: record.id,
-      }),
-    );
+    const workspace = await window.desktop.character.expression.deleteCharacterExpression({
+      characterId: selectedCharacterId.value,
+      fileName: image.fileName,
+      taskId: record.id,
+    });
+    records.value = workspace.records;
     deleteDialogOpen.value = false;
     deleteTarget.value = null;
     toast.success('表情已删除');
   } catch (deletionError: unknown) {
-    toast.error(deletionError instanceof Error ? deletionError.message : String(deletionError));
+    toast.error(toErrorMessage(deletionError));
   } finally {
     deletingFileName.value = '';
   }
@@ -552,23 +526,11 @@ onBeforeUnmount(() => {
 
 <template>
   <SagPage title="表情管理" description="基于正式角色资产生成与管理表情" :icon="Laugh">
-    <template #header-leading>
-      <Badge variant="outline" class="hidden shrink-0 sm:inline-flex">GPT-Image-2</Badge>
-    </template>
-
     <template #header-actions>
       <ExpressionPageHeader
-        v-model:mobile-pane="mobilePane"
         :generator-open="generatorOpen"
-        @ai-create="
-          generatorOpen = true;
-          mobilePane = 'settings';
-        "
-        @upload="
-          uploadDialogOpen = true;
-          generatorOpen = false;
-          mobilePane = 'gallery';
-        "
+        @ai-create="openGenerator"
+        @upload="openUploadDialog"
       />
     </template>
 
@@ -606,12 +568,7 @@ onBeforeUnmount(() => {
         generatorOpen && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
       ]"
     >
-      <div
-        :class="[
-          'min-h-0 min-w-0 lg:flex',
-          !generatorOpen || mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex',
-        ]"
-      >
+      <div class="flex min-h-0 min-w-0">
         <ExpressionGallery
           :characters="characters"
           :character-selection-disabled="characterSelectionDisabled"
@@ -628,13 +585,7 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div
-        v-if="generatorOpen"
-        :class="[
-          'min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5',
-          mobilePane === 'settings' ? 'flex' : 'hidden lg:flex',
-        ]"
-      >
+      <div v-if="generatorOpen" class="flex min-h-0 min-w-0 p-3 sm:p-4 lg:p-5">
         <ExpressionGeneratorPanel
           v-model:count="count"
           v-model:description="description"
@@ -657,15 +608,15 @@ onBeforeUnmount(() => {
 
     <ExpressionUploadDialog
       v-model:open="uploadDialogOpen"
-      :upload-handler="uploadExpression"
-      @uploaded="handleUploaded"
+      :character-id="selectedCharacterId"
+      @uploaded="refreshExpressionsAfterUpload"
     />
 
     <ImageReferencePickerDialog
       v-model:open="referenceDialogOpen"
       :busy="isSubmitting"
       description="可以混选当前角色的视觉资产和已有表情，生成时只使用这里确认的图片。"
-      :filters="referenceFilters"
+      :filters="REFERENCE_FILTERS"
       :max-selection="MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES"
       :options="referenceOptions"
       :selected-keys="selectedReferenceKeys"

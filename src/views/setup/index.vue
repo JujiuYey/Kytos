@@ -5,7 +5,7 @@ import { AlertCircle, FolderOpen, HardDrive, Loader2, ShieldCheck } from '@lucid
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/app';
-import { getErrorMessage } from '@/utils/helpers';
+import { toErrorMessage } from '@/utils/helpers';
 
 const appStore = useAppStore();
 const router = useRouter();
@@ -23,7 +23,7 @@ async function finishSetup(action: () => Promise<void>) {
     await action();
     await router.replace('/character-create');
   } catch (error: unknown) {
-    errorMessage.value = getErrorMessage(error);
+    errorMessage.value = toErrorMessage(error);
   } finally {
     isSaving.value = false;
   }
@@ -45,7 +45,7 @@ async function chooseWorkspace() {
       await finishSetup(() => appStore.setWorkspaceDirectory(selectedPath));
     }
   } catch (error: unknown) {
-    errorMessage.value = getErrorMessage(error);
+    errorMessage.value = toErrorMessage(error);
   }
 }
 </script>

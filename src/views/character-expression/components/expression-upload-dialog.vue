@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
 import {
   Dialog,
   DialogContent,
@@ -11,32 +10,26 @@ import { LocalFileUpload } from '@/components/sag/local-file-upload';
 import type { SaveFileRequest, SavedFileResult } from '@/types';
 
 const props = defineProps<{
-  open: boolean;
-  uploadHandler: (name: string, request: SaveFileRequest) => Promise<SavedFileResult>;
+  characterId: string;
 }>();
+
+const open = defineModel<boolean>('open', { required: true });
 
 const emit = defineEmits<{
   (event: 'uploaded', result: SavedFileResult): void;
-  (event: 'update:open', value: boolean): void;
 }>();
-
-const uploadKey = ref(0);
-
-watch(
-  () => props.open,
-  open => {
-    if (open) {
-      uploadKey.value += 1;
-    }
-  },
-);
 
 function upload(request: SaveFileRequest): Promise<SavedFileResult> {
   const extensionIndex = request.fileName.lastIndexOf('.');
   const fileNameWithoutExtension =
     extensionIndex > 0 ? request.fileName.slice(0, extensionIndex) : request.fileName;
   const expressionName = fileNameWithoutExtension.trim().slice(0, 80).trim() || '未命名表情';
-  return props.uploadHandler(expressionName, request);
+
+  return window.desktop.character.expression.uploadCharacterExpression({
+    ...request,
+    characterId: props.characterId,
+    name: expressionName,
+  });
 }
 
 function handleUploaded(result: SavedFileResult | SavedFileResult[]): void {
@@ -45,12 +38,12 @@ function handleUploaded(result: SavedFileResult | SavedFileResult[]): void {
     return;
   }
   emit('uploaded', target);
-  emit('update:open', false);
+  open.value = false;
 }
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
+  <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
         <DialogTitle>上传表情</DialogTitle>
@@ -60,7 +53,6 @@ function handleUploaded(result: SavedFileResult | SavedFileResult[]): void {
       </DialogHeader>
 
       <LocalFileUpload
-        :key="uploadKey"
         accept="image/png,image/jpeg,image/webp,image/avif"
         :max-file-size="20 * 1024 * 1024"
         :max-files="20"
