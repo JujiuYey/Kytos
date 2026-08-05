@@ -37,10 +37,6 @@ export const useAppStore = defineStore(
       settings.value = { ...settings.value, ...partialSettings };
     };
 
-    const resetSettings = () => {
-      settings.value = defaultSettings;
-    };
-
     const initializeDesktop = async () => {
       if (isInitialized.value || isInitializing.value) {
         return;
@@ -85,25 +81,16 @@ export const useAppStore = defineStore(
       desktopSettings.value = await window.desktop.settings.useSuggestedWorkspace();
     };
 
-    const openWorkspaceDirectory = async () => {
-      await window.desktop.settings.openWorkspaceDirectory();
-    };
-
     return {
-      desktopSettings,
       initializationError,
       initializeDesktop,
-      isInitialized,
-      isInitializing,
       isWorkspaceConfigured,
-      openWorkspaceDirectory,
       settings,
       setWorkspaceDirectory,
       suggestedWorkspacePath,
       useSuggestedWorkspace,
       workspacePath,
       updateSettings,
-      resetSettings,
     };
   },
   {

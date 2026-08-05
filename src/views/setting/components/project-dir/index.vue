@@ -62,7 +62,7 @@ async function openWorkspace() {
   isOpening.value = true;
   errorMessage.value = '';
   try {
-    await appStore.openWorkspaceDirectory();
+    await window.desktop.settings.openWorkspaceDirectory();
   } catch (error: unknown) {
     errorMessage.value = getErrorMessage(error);
   } finally {
