@@ -22,7 +22,7 @@ import type {
   SaveFileRequest,
   SavedFileResult,
 } from '@/types';
-import { MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
+import { getChatModelDefinition, MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
 import ExpressionGallery from './components/expression-gallery.vue';
 import ExpressionGeneratorPanel from './components/expression-generator-panel.vue';
 import ExpressionPageHeader from './components/expression-page-header.vue';
@@ -39,6 +39,7 @@ const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
 const selectedReferenceAssets = ref<CharacterExpressionReferenceSelection[]>([]);
 const credentialStatus = ref<CredentialStatus | null>(null);
 const deepseekStatus = ref<CredentialStatus | null>(null);
+const minimaxStatus = ref<CredentialStatus | null>(null);
 const name = ref('开心');
 const description = ref('眼睛明亮，嘴角自然上扬，带有真诚而有感染力的笑意。');
 const size = ref<CharacterExpressionSize>('1:1');
@@ -80,7 +81,14 @@ const activeRecord = computed(() =>
   records.value.find(record => activeStatuses.includes(record.status)),
 );
 const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
-const promptGenerationAvailable = computed(() => Boolean(deepseekStatus.value?.configured));
+const fastModelProvider = computed(
+  () => getChatModelDefinition(appStore.settings.fastModel).provider,
+);
+const promptGenerationAvailable = computed(() =>
+  fastModelProvider.value === 'minimax'
+    ? Boolean(minimaxStatus.value?.configured)
+    : Boolean(deepseekStatus.value?.configured),
+);
 const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
 const characterSelectionDisabled = computed(
   () =>
@@ -342,14 +350,16 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   try {
-    const [characterLibrary, status, deepseek] = await Promise.all([
+    const [characterLibrary, status, deepseek, minimax] = await Promise.all([
       window.desktop.character.library.getCharacterLibrary(),
       window.desktop.settings.getCredentialStatus('apimart'),
       window.desktop.settings.getCredentialStatus('deepseek'),
+      window.desktop.settings.getCredentialStatus('minimax'),
     ]);
     library.value = characterLibrary;
     credentialStatus.value = status;
     deepseekStatus.value = deepseek;
+    minimaxStatus.value = minimax;
     selectedCharacterId.value = characterLibrary.activeCharacterId;
     await loadCharacterWorkspace(characterLibrary.activeCharacterId);
   } catch (initializationError: unknown) {
@@ -427,7 +437,7 @@ async function generateExpressionPrompt(): Promise<void> {
   try {
     description.value = await window.desktop.character.expression.generateCharacterExpressionPrompt(
       {
-        model: appStore.settings.deepseekModel,
+        model: appStore.settings.fastModel,
         name: name.value.trim(),
       },
     );

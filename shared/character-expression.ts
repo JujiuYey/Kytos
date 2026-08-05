@@ -6,7 +6,7 @@ import type {
   CharacterVisualAssetKind,
 } from './character-portrait';
 import type { CharacterScopeRequest } from './character-library';
-import type { DeepSeekModel } from './character';
+import type { ChatModel } from './character';
 import type { SavedFileResult } from './desktop';
 
 // 角色表情支持的尺寸
@@ -93,7 +93,7 @@ export type GetCharacterExpressionWorkspaceRequest = CharacterScopeRequest;
 // 生成角色表情提示词请求
 export interface GenerateCharacterExpressionPromptRequest {
   // 使用的模型
-  model: DeepSeekModel;
+  model: ChatModel;
   // 表情名称
   name: string;
 }

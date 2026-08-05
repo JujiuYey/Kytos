@@ -1,11 +1,9 @@
 import { ToolLoopAgent, isStepCount, tool } from 'ai';
 import { z } from 'zod';
+import type { ChatModel } from '../../shared/character';
 import type { IllustrationBrief, IllustrationTopic } from '../../shared/illustration';
+import { createChatLanguageModel, getChatProviderOptions } from '../services/chat-provider';
 import { updateIllustrationBrief } from '../services/illustration';
-import {
-  createDeepSeekCompatibleProvider,
-  DEEPSEEK_PROVIDER_OPTIONS,
-} from '../services/deepseek-provider';
 import { buildIllustrationInstructions } from './instructions';
 
 const briefFields = {
@@ -38,11 +36,11 @@ const illustrationPlanSchema = z.object({
 
 export function createIllustrationAgent(options: {
   apiKey: string;
-  model: string;
+  model: ChatModel;
   topic: IllustrationTopic;
 }) {
-  const deepSeek = createDeepSeekCompatibleProvider(options.apiKey);
   let currentBrief = options.topic.brief;
+  const providerOptions = getChatProviderOptions(options.model);
 
   async function saveBrief(patch: Partial<IllustrationBrief> & { title?: string }, ready: boolean) {
     const result = await updateIllustrationBrief(options.topic.id, patch, ready);
@@ -51,8 +49,8 @@ export function createIllustrationAgent(options: {
   }
 
   return new ToolLoopAgent({
-    model: deepSeek(options.model),
-    providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
+    model: createChatLanguageModel(options.apiKey, options.model),
+    ...(providerOptions ? { providerOptions } : {}),
     instructions: buildIllustrationInstructions({
       brief: currentBrief,
       useCharacter: options.topic.useCharacter,

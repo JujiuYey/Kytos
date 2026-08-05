@@ -1,6 +1,6 @@
 import { createAgentUIStreamResponse } from 'ai';
-import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel } from '../../shared/character';
-import type { DeepSeekModel } from '../../shared/character';
+import { DEFAULT_CHAT_MODEL, getChatModelDefinition, isChatModel } from '../../shared/character';
+import type { ChatModel } from '../../shared/character';
 import { getCredentialValue } from '../services/credentials';
 import { getIllustrationTopic } from '../services/illustration';
 import { createIllustrationAgent } from './agent';
@@ -8,7 +8,7 @@ import { isPlainObject } from 'es-toolkit';
 
 interface IllustrationAgentRequestBody {
   messages: unknown[];
-  model?: DeepSeekModel;
+  model?: ChatModel;
   topicId: string;
 }
 
@@ -34,10 +34,10 @@ function parseRequestBody(value: unknown): IllustrationAgentRequestBody {
   }
   const normalizedModel =
     'model' in value && typeof value.model === 'string' ? value.model.trim() : '';
-  if (normalizedModel && !isDeepSeekModel(normalizedModel)) {
+  if (normalizedModel && !isChatModel(normalizedModel)) {
     throw new Error('模型标识无效');
   }
-  const model = isDeepSeekModel(normalizedModel) ? normalizedModel : undefined;
+  const model = isChatModel(normalizedModel) ? normalizedModel : undefined;
   return { messages, model: model || undefined, topicId };
 }
 
@@ -62,13 +62,14 @@ export async function handleIllustrationAgentRequest(request: Request): Promise<
       throw new Error('插画对话请求过大');
     }
     const body = parseRequestBody(await request.json());
+    const model = body.model ?? DEFAULT_CHAT_MODEL;
     const [apiKey, topic] = await Promise.all([
-      getCredentialValue('deepseek'),
+      getCredentialValue(getChatModelDefinition(model).provider),
       getIllustrationTopic(body.topicId),
     ]);
     const agent = createIllustrationAgent({
       apiKey,
-      model: body.model ?? DEFAULT_DEEPSEEK_MODEL,
+      model,
       topic,
     });
     return await createAgentUIStreamResponse({

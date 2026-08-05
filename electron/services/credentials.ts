@@ -13,7 +13,13 @@ interface StoredSecrets {
   version: 1;
 }
 
-const credentialServices: CredentialService[] = ['apimart', 'deepseek'];
+const credentialServices: CredentialService[] = ['apimart', 'deepseek', 'minimax'];
+
+const credentialServiceLabels: Record<CredentialService, string> = {
+  apimart: 'APIMart',
+  deepseek: 'DeepSeek',
+  minimax: 'MiniMax',
+};
 
 function getSecretsFilePath(): string {
   return path.join(app.getPath('userData'), 'secrets.json');
@@ -44,7 +50,7 @@ export async function getCredentialValue(service: CredentialService): Promise<st
   const secrets = await loadStoredSecrets();
   const encryptedValue = secrets.credentials[service];
   if (!encryptedValue) {
-    throw new Error(`尚未配置 ${service === 'apimart' ? 'APIMart' : 'DeepSeek'} API Key`);
+    throw new Error(`尚未配置 ${credentialServiceLabels[service]} API Key`);
   }
   if (!(await safeStorage.isAsyncEncryptionAvailable())) {
     throw new Error('系统安全存储不可用，无法读取 API Key');

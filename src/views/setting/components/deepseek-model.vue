@@ -21,10 +21,10 @@ const modelLabels: Record<DeepSeekModel, string> = {
 };
 
 const deepseekModel = computed({
-  get: () => appStore.settings.deepseekModel,
+  get: () => appStore.settings.generalModel,
   set: (value: string | number) => {
     if (isDeepSeekModel(value)) {
-      appStore.updateSettings({ deepseekModel: value });
+      appStore.updateSettings({ generalModel: value, deepseekModel: value });
     }
   },
 });

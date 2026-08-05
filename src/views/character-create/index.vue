@@ -70,7 +70,7 @@ const isSaving = ref(false);
 const isSaved = ref(false);
 let generationTimer: ReturnType<typeof setTimeout> | null = null;
 
-const model = computed(() => appStore.settings.deepseekModel);
+const model = computed(() => appStore.settings.generalModel);
 const transport = new DefaultChatTransport<CharacterCreateAgentMessage>({
   api: CHARACTER_CREATE_AGENT_ENDPOINT,
 });

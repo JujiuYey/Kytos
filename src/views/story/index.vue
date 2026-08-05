@@ -27,6 +27,8 @@ import type {
 } from '@/types';
 import { STORY_AGENT_ENDPOINT } from '@/types';
 import { cloneJsonData } from '@/utils/serialization';
+import { getChatModelDefinition } from '@/types';
+import type { FileUIPart } from 'ai';
 import StoryChatInput from './components/story-chat-input.vue';
 import StoryChatMessages from './components/story-chat-messages.vue';
 import StoryHeader from './components/story-header.vue';
@@ -39,6 +41,7 @@ const router = useRouter();
 const stories = ref<StoryProject[]>([]);
 const activeStoryId = ref('');
 const deepseekStatus = ref<CredentialStatus | null>(null);
+const minimaxStatus = ref<CredentialStatus | null>(null);
 const apimartStatus = ref<CredentialStatus | null>(null);
 const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
 const initializationError = ref('');
@@ -60,11 +63,17 @@ const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pollingStates = ref<GenerationPollingStateMap>({});
 let disposed = false;
 
-const model = computed(() => appStore.settings.deepseekModel);
+const model = computed(() => appStore.settings.generalModel);
+const chatProvider = computed(() => getChatModelDefinition(model.value).provider);
+const chatProviderConfigured = computed(() =>
+  chatProvider.value === 'minimax'
+    ? Boolean(minimaxStatus.value?.configured)
+    : Boolean(deepseekStatus.value?.configured),
+);
+const supportsImageInput = computed(() => getChatModelDefinition(model.value).supportsImageInput);
 const activeStory = computed(
   () => stories.value.find(story => story.id === activeStoryId.value) ?? null,
 );
-const deepseekConfigured = computed(() => Boolean(deepseekStatus.value?.configured));
 const apimartConfigured = computed(() => Boolean(apimartStatus.value?.configured));
 const characterAssetsReady = computed(() =>
   Boolean(portraitWorkspace.value?.officialAssets.length),
@@ -108,7 +117,7 @@ const inputDisabled = computed(
   () =>
     isInitializing.value ||
     !activeStory.value ||
-    !deepseekConfigured.value ||
+    !chatProviderConfigured.value ||
     hasActiveGeneration.value ||
     isSavingConversation.value ||
     isDeleting.value ||
@@ -265,14 +274,16 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   initializationError.value = '';
   try {
-    const [workspace, deepseek, apimart, portraits] = await Promise.all([
+    const [workspace, deepseek, minimax, apimart, portraits] = await Promise.all([
       window.desktop.story.getStoryWorkspace(),
       window.desktop.settings.getCredentialStatus('deepseek'),
+      window.desktop.settings.getCredentialStatus('minimax'),
       window.desktop.settings.getCredentialStatus('apimart'),
       window.desktop.character.portrait.getCharacterPortraitWorkspace(),
     ]);
     stories.value = workspace.stories;
     deepseekStatus.value = deepseek;
+    minimaxStatus.value = minimax;
     apimartStatus.value = apimart;
     portraitWorkspace.value = portraits;
 
@@ -326,12 +337,16 @@ async function persistFinishedConversation(): Promise<void> {
   }
 }
 
-async function send(text: string): Promise<void> {
+async function send(input: string | { files: FileUIPart[]; text: string }): Promise<void> {
+  const payload = typeof input === 'string' ? { files: [], text: input } : input;
   const story = activeStory.value;
-  if (!story || !text.trim() || inputDisabled.value || chatBusy.value) {
+  if (!story || !payload.text.trim() || inputDisabled.value || chatBusy.value) {
     return;
   }
-  await sendMessage({ text: text.trim() }, { body: { model: model.value, storyId: story.id } });
+  await sendMessage(
+    { files: payload.files, text: payload.text.trim() },
+    { body: { model: model.value, storyId: story.id } },
+  );
 }
 
 async function retry(): Promise<void> {
@@ -714,7 +729,14 @@ onBeforeUnmount(() => {
         aria-label="故事共创对话"
       >
         <StoryChatMessages :messages="messages" :status="chatStatus" @suggest="send" />
-        <StoryChatInput :disabled="inputDisabled" :status="chatStatus" @send="send" @stop="stop" />
+        <StoryChatInput
+          :disabled="inputDisabled"
+          :provider-name="chatProvider === 'minimax' ? 'MiniMax' : 'DeepSeek'"
+          :supports-image-input="supportsImageInput"
+          :status="chatStatus"
+          @send="send"
+          @stop="stop"
+        />
       </section>
 
       <aside

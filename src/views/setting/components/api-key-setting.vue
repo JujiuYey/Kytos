@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { CredentialService, CredentialStatus } from '@/types';
+import { getErrorMessage } from '@/utils/helpers';
 
 interface Props {
   description: string;
@@ -49,10 +50,6 @@ const status = ref<CredentialStatus | null>(null);
 const canSave = computed(
   () => Boolean(apiKey.value.trim()) && status.value?.secureStorageAvailable && !isSaving.value,
 );
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 async function refreshStatus() {
   isLoading.value = true;

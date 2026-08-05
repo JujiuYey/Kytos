@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { DefaultChatTransport } from 'ai';
-import type { ChatStatus } from 'ai';
+import type { ChatStatus, FileUIPart } from 'ai';
 import { useChat } from '@ai-sdk/vue';
 import { toast } from 'vue-sonner';
 import {
@@ -32,6 +32,7 @@ import type {
 } from '@/types';
 import { ILLUSTRATION_AGENT_ENDPOINT, MAX_ILLUSTRATION_REFERENCE_IMAGES } from '@/types';
 import { cloneJsonData } from '@/utils/serialization';
+import { getChatModelDefinition } from '@/types';
 import IllustrationChatInput from './components/illustration-chat-input.vue';
 import IllustrationChatMessages from './components/illustration-chat-messages.vue';
 import IllustrationHeader from './components/illustration-header.vue';
@@ -68,13 +69,13 @@ const revisionTarget = ref<IllustrationVersion | null>(null);
 const {
   apimartConfigured,
   deepseekConfigured,
+  minimaxConfigured,
   refresh: refreshCredentialStatus,
 } = useCredentialStatus();
 
 const { pollingStates, schedulePoll } = useGenerationPolling<IllustrationVersion>({
   fetchTask: id => window.desktop.illustration.getIllustrationTask(id),
-  isStillRunning: v =>
-    ['submitted', 'pending', 'processing'].includes(v.status),
+  isStillRunning: v => ['submitted', 'pending', 'processing'].includes(v.status),
   isTerminalSuccess: v => v.status === 'completed',
   onPollSuccess: (_id, version) => {
     replaceVersion(version);
@@ -92,7 +93,12 @@ const { pollingStates, schedulePoll } = useGenerationPolling<IllustrationVersion
   },
 });
 
-const model = computed(() => appStore.settings.deepseekModel);
+const model = computed(() => appStore.settings.generalModel);
+const chatProvider = computed(() => getChatModelDefinition(model.value).provider);
+const chatProviderConfigured = computed(() =>
+  chatProvider.value === 'minimax' ? minimaxConfigured.value : deepseekConfigured.value,
+);
+const supportsImageInput = computed(() => getChatModelDefinition(model.value).supportsImageInput);
 const activeTopic = computed(
   () => topics.value.find(topic => topic.id === activeTopicId.value) ?? null,
 );
@@ -205,7 +211,7 @@ const inputDisabled = computed(
   () =>
     isInitializing.value ||
     !activeTopic.value ||
-    !deepseekConfigured.value ||
+    !chatProviderConfigured.value ||
     chatStatus.value === 'error',
 );
 const errorMessage = computed(
@@ -378,12 +384,16 @@ async function persistFinishedConversation(): Promise<void> {
   }
 }
 
-async function send(text: string): Promise<void> {
+async function send(input: string | { files: FileUIPart[]; text: string }): Promise<void> {
+  const payload = typeof input === 'string' ? { files: [], text: input } : input;
   const topic = activeTopic.value;
-  if (!topic || !text.trim() || inputDisabled.value || chatBusy.value) {
+  if (!topic || !payload.text.trim() || inputDisabled.value || chatBusy.value) {
     return;
   }
-  await sendMessage({ text: text.trim() }, { body: { model: model.value, topicId: topic.id } });
+  await sendMessage(
+    { files: payload.files, text: payload.text.trim() },
+    { body: { model: model.value, topicId: topic.id } },
+  );
 }
 
 async function retry(): Promise<void> {
@@ -624,6 +634,8 @@ onMounted(() => {
         <IllustrationChatMessages :messages="messages" :status="chatStatus" @suggest="send" />
         <IllustrationChatInput
           :disabled="inputDisabled"
+          :provider-name="chatProvider === 'minimax' ? 'MiniMax' : 'DeepSeek'"
+          :supports-image-input="supportsImageInput"
           :status="chatStatus"
           @send="send"
           @stop="stop"

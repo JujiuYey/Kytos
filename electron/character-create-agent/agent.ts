@@ -4,10 +4,8 @@ import type {
   CharacterCreateDraft,
   CharacterCreatePromptResult,
 } from '../../shared/character-create';
-import {
-  createDeepSeekCompatibleProvider,
-  DEEPSEEK_PROVIDER_OPTIONS,
-} from '../services/deepseek-provider';
+import type { ChatModel } from '../../shared/character';
+import { createChatLanguageModel, getChatProviderOptions } from '../services/chat-provider';
 import { buildCharacterCreateInstructions } from './instructions';
 
 const draftFields = {
@@ -88,15 +86,15 @@ export function createCharacterCreateAgent(options: {
   apiKey: string;
   draft: CharacterCreateDraft;
   hasReferenceImage: boolean;
-  model: string;
+  model: ChatModel;
   stylePrompt: string;
 }) {
-  const deepSeek = createDeepSeekCompatibleProvider(options.apiKey);
   let currentDraft = options.draft;
+  const providerOptions = getChatProviderOptions(options.model);
 
   return new ToolLoopAgent({
-    model: deepSeek(options.model),
-    providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
+    model: createChatLanguageModel(options.apiKey, options.model),
+    ...(providerOptions ? { providerOptions } : {}),
     instructions: buildCharacterCreateInstructions({
       draft: currentDraft,
       hasReferenceImage: options.hasReferenceImage,

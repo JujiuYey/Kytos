@@ -1,22 +1,29 @@
 <script setup lang="ts">
 import type { ChatStatus } from 'ai';
-import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
+import type { FileUIPart } from 'ai';
 import {
+  PromptInputActionAddAttachments,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuTrigger,
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
   PromptInputProvider,
   PromptInputSubmit,
   PromptInputTextarea,
+  type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
 
 const props = defineProps<{
   disabled: boolean;
+  providerName: string;
+  supportsImageInput: boolean;
   status: ChatStatus;
 }>();
 
 const emit = defineEmits<{
-  (event: 'send', text: string): void;
+  (event: 'send', payload: { files: FileUIPart[]; text: string }): void;
   (event: 'stop'): void;
 }>();
 
@@ -25,7 +32,7 @@ function handleSubmit(message: PromptInputMessage): void {
   if (!text || props.disabled || props.status !== 'ready') {
     return;
   }
-  emit('send', text);
+  emit('send', { files: message.files, text });
 }
 
 function handleSubmitClick(event: MouseEvent): void {
@@ -38,8 +45,19 @@ function handleSubmitClick(event: MouseEvent): void {
 
 <template>
   <div class="shrink-0 bg-background px-4 py-3 sm:px-5">
-    <PromptInputProvider @submit="handleSubmit">
-      <PromptInput class="mx-auto w-full max-w-3xl">
+    <PromptInputProvider
+      :accept="supportsImageInput ? 'image/*' : 'application/none'"
+      :max-file-size="10 * 1024 * 1024"
+      :max-files="4"
+      @submit="handleSubmit"
+    >
+      <PromptInput
+        class="mx-auto w-full max-w-3xl"
+        :accept="supportsImageInput ? 'image/*' : 'application/none'"
+        :max-file-size="10 * 1024 * 1024"
+        :max-files="4"
+        multiple
+      >
         <PromptInputBody>
           <PromptInputTextarea
             class="scrollbar-subtle"
@@ -48,9 +66,17 @@ function handleSubmitClick(event: MouseEvent): void {
           />
         </PromptInputBody>
         <PromptInputFooter class="flex items-center justify-between gap-3">
-          <span class="min-w-0 truncate text-xs text-muted-foreground">
-            {{ disabled ? '请先配置 DeepSeek API Key' : 'Agent 会同步整理右侧画面方案' }}
-          </span>
+          <div class="flex min-w-0 items-center gap-1">
+            <PromptInputActionMenu v-if="supportsImageInput">
+              <PromptInputActionMenuTrigger aria-label="添加图片" />
+              <PromptInputActionMenuContent>
+                <PromptInputActionAddAttachments label="添加图片" />
+              </PromptInputActionMenuContent>
+            </PromptInputActionMenu>
+            <span class="truncate text-xs text-muted-foreground">
+              {{ disabled ? `请先配置 ${providerName} API Key` : 'Agent 会同步整理右侧画面方案' }}
+            </span>
+          </div>
           <PromptInputSubmit :status="status" :disabled="disabled" @click="handleSubmitClick" />
         </PromptInputFooter>
       </PromptInput>

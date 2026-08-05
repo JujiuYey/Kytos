@@ -1,6 +1,6 @@
 import { createAgentUIStreamResponse } from 'ai';
-import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel } from '../../shared/character';
-import type { DeepSeekModel } from '../../shared/character';
+import { DEFAULT_CHAT_MODEL, getChatModelDefinition, isChatModel } from '../../shared/character';
+import type { ChatModel } from '../../shared/character';
 import type { CharacterCreateDraft } from '../../shared/character-create';
 import { getCredentialValue } from '../services/credentials';
 import { createCharacterCreateAgent } from './agent';
@@ -15,7 +15,7 @@ interface CharacterCreateAgentRequestBody {
   // 会话消息列表
   messages: unknown[];
   // 使用的模型
-  model?: DeepSeekModel;
+  model?: ChatModel;
   // 风格提示词
   stylePrompt?: string;
 }
@@ -34,10 +34,10 @@ function parseBody(value: unknown): CharacterCreateAgentRequestBody {
   }
   if (!isPlainObject(body.draft)) throw new Error('角色草稿无效');
   const normalizedModel = typeof body.model === 'string' ? body.model.trim() : '';
-  if (normalizedModel && !isDeepSeekModel(normalizedModel)) {
+  if (normalizedModel && !isChatModel(normalizedModel)) {
     throw new Error('模型标识无效');
   }
-  const model = isDeepSeekModel(normalizedModel) ? normalizedModel : undefined;
+  const model = isChatModel(normalizedModel) ? normalizedModel : undefined;
   return {
     draft: body.draft as CharacterCreateDraft,
     hasReferenceImage: body.hasReferenceImage === true,
@@ -54,11 +54,12 @@ export async function handleCharacterCreateAgentRequest(request: Request): Promi
     return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   try {
     const body = parseBody(await request.json());
+    const model = body.model ?? DEFAULT_CHAT_MODEL;
     const agent = createCharacterCreateAgent({
-      apiKey: await getCredentialValue('deepseek'),
+      apiKey: await getCredentialValue(getChatModelDefinition(model).provider),
       draft: body.draft,
       hasReferenceImage: body.hasReferenceImage,
-      model: body.model || DEFAULT_DEEPSEEK_MODEL,
+      model,
       stylePrompt: body.stylePrompt || '',
     });
     return await createAgentUIStreamResponse({

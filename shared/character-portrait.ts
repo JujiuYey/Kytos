@@ -1,6 +1,6 @@
 // 角色头像与设定图模块的类型定义
 import type { CharacterScopeRequest } from './character-library';
-import type { CharacterWorkspaceState, DeepSeekModel } from './character';
+import type { CharacterWorkspaceState, ChatModel } from './character';
 import type { SaveFileRequest, SavedFileResult } from './desktop';
 
 // 角色头像支持的尺寸
@@ -54,7 +54,7 @@ export interface GenerateCharacterActionPromptRequest {
   // 动作名称
   name: string;
   // 使用的模型
-  model: DeepSeekModel;
+  model: ChatModel;
 }
 
 // 角色头像图片

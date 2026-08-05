@@ -5,7 +5,7 @@ import ApiKeySetting from './api-key-setting.vue';
 <template>
   <ApiKeySetting
     service="deepseek"
-    title="DeepSeek Key"
+    title="DeepSeek"
     description="用于角色对话和内容整理。已保存的 Key 不会回传到界面。"
     placeholder="sk-..."
     docs-url="https://platform.deepseek.com/api_keys"

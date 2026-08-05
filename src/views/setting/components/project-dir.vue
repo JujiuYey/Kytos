@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import { useAppStore } from '@/stores/app';
+import { getErrorMessage } from '@/utils/helpers';
 
 const appStore = useAppStore();
 const errorMessage = ref('');
@@ -21,10 +22,6 @@ const isSelecting = ref(false);
 const isSwitchDialogOpen = ref(false);
 const isSwitching = ref(false);
 const pendingPath = ref('');
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 async function chooseProjectDir() {
   isSelecting.value = true;

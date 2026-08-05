@@ -1,6 +1,13 @@
 import { toast } from 'vue-sonner';
 
 /**
+ * 将未知错误转换为可展示的消息
+ */
+export function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
  * 复制文本到剪贴板
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
@@ -27,7 +34,11 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 /**
  * 下载文件
  */
-export function downloadFile(content: string, filename: string, contentType: string = 'application/json'): void {
+export function downloadFile(
+  content: string,
+  filename: string,
+  contentType: string = 'application/json',
+): void {
   const blob = new Blob([content], { type: contentType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

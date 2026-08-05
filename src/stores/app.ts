@@ -1,11 +1,21 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import type { AppSettings, DesktopSettings } from '@/types';
-import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel } from '@/types';
+import {
+  DEFAULT_CHAT_MODEL,
+  DEFAULT_DEEPSEEK_MODEL,
+  DEFAULT_IMAGE_MODEL,
+  isChatModel,
+  isDeepSeekModel,
+  isImageModel,
+} from '@/types';
 
 const defaultSettings: AppSettings = {
   theme: 'system',
   deepseekModel: DEFAULT_DEEPSEEK_MODEL,
+  fastModel: 'deepseek-v4-flash',
+  generalModel: DEFAULT_CHAT_MODEL,
+  imageModel: DEFAULT_IMAGE_MODEL,
 };
 
 export const useAppStore = defineStore(
@@ -41,10 +51,21 @@ export const useAppStore = defineStore(
       try {
         desktopSettings.value = await window.desktop.settings.getSettings();
 
+        const storedDeepSeekModel = isDeepSeekModel(settings.value.deepseekModel)
+          ? settings.value.deepseekModel
+          : DEFAULT_DEEPSEEK_MODEL;
+
         settings.value = {
-          deepseekModel: isDeepSeekModel(settings.value.deepseekModel)
-            ? settings.value.deepseekModel
-            : DEFAULT_DEEPSEEK_MODEL,
+          deepseekModel: storedDeepSeekModel,
+          fastModel: isChatModel(settings.value.fastModel)
+            ? settings.value.fastModel
+            : 'deepseek-v4-flash',
+          generalModel: isChatModel(settings.value.generalModel)
+            ? settings.value.generalModel
+            : storedDeepSeekModel,
+          imageModel: isImageModel(settings.value.imageModel)
+            ? settings.value.imageModel
+            : DEFAULT_IMAGE_MODEL,
           theme: settings.value.theme ?? defaultSettings.theme,
         };
       } catch (error: unknown) {
@@ -56,7 +77,8 @@ export const useAppStore = defineStore(
     };
 
     const setWorkspaceDirectory = async (workspaceDirectory: string) => {
-      desktopSettings.value = await window.desktop.settings.setWorkspaceDirectory(workspaceDirectory);
+      desktopSettings.value =
+        await window.desktop.settings.setWorkspaceDirectory(workspaceDirectory);
     };
 
     const useSuggestedWorkspace = async () => {

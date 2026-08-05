@@ -16,7 +16,7 @@ export type {
 };
 
 // 凭据服务类型
-export type CredentialService = 'apimart' | 'deepseek';
+export type CredentialService = 'apimart' | 'deepseek' | 'minimax';
 // 桌面主题
 export type DesktopTheme = 'dark' | 'light' | 'system';
 

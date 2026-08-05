@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { generateText } from 'ai';
-import { isDeepSeekModel } from '../../shared/character';
+import { getChatModelDefinition, isChatModel } from '../../shared/character';
+import type { ChatModel } from '../../shared/character';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceSelection,
@@ -30,8 +31,8 @@ import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait'
 import type { SavedFileResult } from '../../shared/desktop';
 import { getCharacterDirectory } from './character-library';
 import { getCharacterPortraitWorkspace } from './character-portrait';
+import { createChatLanguageModel, getChatProviderOptions } from './chat-provider';
 import { getCredentialValue } from './credentials';
-import { createDeepSeekCompatibleProvider, DEEPSEEK_PROVIDER_OPTIONS } from './deepseek-provider';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 import { isPlainObject } from 'es-toolkit';
@@ -277,9 +278,9 @@ function buildExpressionPrompt(request: GenerateCharacterExpressionRequest): str
   ].join('\n');
 }
 
-function resolveDeepSeekModel(value: unknown): string {
-  if (!isDeepSeekModel(value)) {
-    throw new Error('DeepSeek 模型无效');
+function resolveChatModel(value: unknown): ChatModel {
+  if (!isChatModel(value)) {
+    throw new Error('聊天模型无效');
   }
   return value;
 }
@@ -295,13 +296,14 @@ export async function generateCharacterExpressionPrompt(
   ) {
     throw new Error('请先填写有效的表情名称');
   }
-  const apiKey = await getCredentialValue('deepseek');
-  const deepSeek = createDeepSeekCompatibleProvider(apiKey);
+  const model = resolveChatModel(request.model);
+  const apiKey = await getCredentialValue(getChatModelDefinition(model).provider);
+  const providerOptions = getChatProviderOptions(model);
   const { text } = await generateText({
     maxOutputTokens: 600,
-    model: deepSeek(resolveDeepSeekModel(request.model)),
+    model: createChatLanguageModel(apiKey, model),
     prompt: `表情名称：${request.name.trim()}`,
-    providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
+    ...(providerOptions ? { providerOptions } : {}),
     system: `你负责为角色表情图生图编写中文提示词。根据用户给出的表情名称，输出一段可直接编辑和用于生图的表情描述。
 
 要求：
@@ -312,7 +314,7 @@ export async function generateCharacterExpressionPrompt(
   });
   const prompt = text.trim();
   if (!prompt) {
-    throw new Error('DeepSeek 未返回表情提示词');
+    throw new Error('聊天模型未返回表情提示词');
   }
   return prompt.slice(0, MAX_PROMPT_LENGTH);
 }
@@ -356,7 +358,11 @@ function getUploadedImageExtension(request: UploadCharacterExpressionRequest): s
 }
 
 function getApiErrorMessage(payload: unknown, fallback: string): string {
-  if (isPlainObject(payload) && isPlainObject(payload.error) && typeof payload.error.message === 'string') {
+  if (
+    isPlainObject(payload) &&
+    isPlainObject(payload.error) &&
+    typeof payload.error.message === 'string'
+  ) {
     return payload.error.message;
   }
   return fallback;

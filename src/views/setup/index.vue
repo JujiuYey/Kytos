@@ -5,15 +5,12 @@ import { AlertCircle, FolderOpen, HardDrive, Loader2, ShieldCheck } from '@lucid
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/app';
+import { getErrorMessage } from '@/utils/helpers';
 
 const appStore = useAppStore();
 const router = useRouter();
 const isSaving = ref(false);
 const errorMessage = ref(appStore.initializationError);
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 async function finishSetup(action: () => Promise<void>) {
   if (isSaving.value) {

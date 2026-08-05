@@ -6,9 +6,66 @@ export type DeepSeekModel = (typeof DEEPSEEK_MODELS)[number];
 // 默认 DeepSeek 模型
 export const DEFAULT_DEEPSEEK_MODEL: DeepSeekModel = 'deepseek-v4-pro';
 
+export const MINIMAX_MODELS = ['MiniMax-M3'] as const;
+export type MiniMaxModel = (typeof MINIMAX_MODELS)[number];
+
+export const CHAT_MODELS = [...DEEPSEEK_MODELS, ...MINIMAX_MODELS] as const;
+export type ChatModel = (typeof CHAT_MODELS)[number];
+export type ChatModelProvider = 'deepseek' | 'minimax';
+
+export interface ChatModelDefinition {
+  id: ChatModel;
+  label: string;
+  provider: ChatModelProvider;
+  supportsImageInput: boolean;
+}
+
+export const CHAT_MODEL_DEFINITIONS: Record<ChatModel, ChatModelDefinition> = {
+  'deepseek-v4-flash': {
+    id: 'deepseek-v4-flash',
+    label: 'DeepSeek V4 Flash',
+    provider: 'deepseek',
+    supportsImageInput: false,
+  },
+  'deepseek-v4-pro': {
+    id: 'deepseek-v4-pro',
+    label: 'DeepSeek V4 Pro',
+    provider: 'deepseek',
+    supportsImageInput: false,
+  },
+  'MiniMax-M3': {
+    id: 'MiniMax-M3',
+    label: 'MiniMax M3',
+    provider: 'minimax',
+    supportsImageInput: true,
+  },
+};
+
+export const DEFAULT_CHAT_MODEL: ChatModel = DEFAULT_DEEPSEEK_MODEL;
+
+export const IMAGE_MODELS = ['gpt-image-2'] as const;
+export type ImageModel = (typeof IMAGE_MODELS)[number];
+export const DEFAULT_IMAGE_MODEL: ImageModel = 'gpt-image-2';
+
 // 判断值是否为合法的 DeepSeek 模型
 export function isDeepSeekModel(value: unknown): value is DeepSeekModel {
   return typeof value === 'string' && DEEPSEEK_MODELS.includes(value as DeepSeekModel);
+}
+
+export function isChatModel(value: unknown): value is ChatModel {
+  return typeof value === 'string' && CHAT_MODELS.includes(value as ChatModel);
+}
+
+export function getChatModelDefinition(model: ChatModel): ChatModelDefinition {
+  return CHAT_MODEL_DEFINITIONS[model];
+}
+
+export function chatModelSupportsImageInput(model: ChatModel): boolean {
+  return getChatModelDefinition(model).supportsImageInput;
+}
+
+export function isImageModel(value: unknown): value is ImageModel {
+  return typeof value === 'string' && IMAGE_MODELS.includes(value as ImageModel);
 }
 
 // 角色种子字段（名称、定位）

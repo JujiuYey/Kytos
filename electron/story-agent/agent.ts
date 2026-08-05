@@ -1,5 +1,6 @@
 import { ToolLoopAgent, isStepCount, tool } from 'ai';
 import { z } from 'zod';
+import type { ChatModel } from '../../shared/character';
 import type { StoryDraft, StoryProject, StoryShotContent } from '../../shared/story';
 import { STORY_SHOT_LIMITS } from '../../shared/story';
 import {
@@ -8,10 +9,7 @@ import {
   presentStoryboard,
   updateStoryDraft,
 } from '../services/story';
-import {
-  createDeepSeekCompatibleProvider,
-  DEEPSEEK_PROVIDER_OPTIONS,
-} from '../services/deepseek-provider';
+import { createChatLanguageModel, getChatProviderOptions } from '../services/chat-provider';
 import { buildStoryInstructions, type StoryShotDisplay } from './instructions';
 
 const draftFields = {
@@ -73,10 +71,14 @@ const storyShotPatchSchema = z
   })
   .refine(value => Object.keys(value).some(key => key !== 'shotId'), '至少更新一个分镜字段');
 
-export function createStoryAgent(options: { apiKey: string; model: string; story: StoryProject }) {
-  const deepSeek = createDeepSeekCompatibleProvider(options.apiKey);
+export function createStoryAgent(options: {
+  apiKey: string;
+  model: ChatModel;
+  story: StoryProject;
+}) {
   let currentDraft = options.story.draft;
   let currentShots = options.story.shots;
+  const providerOptions = getChatProviderOptions(options.model);
 
   async function saveDraft(patch: Partial<StoryDraft> & { title?: string }, ready: boolean) {
     const result = await updateStoryDraft(options.story.id, patch, ready);
@@ -85,8 +87,8 @@ export function createStoryAgent(options: { apiKey: string; model: string; story
   }
 
   return new ToolLoopAgent({
-    model: deepSeek(options.model),
-    providerOptions: DEEPSEEK_PROVIDER_OPTIONS,
+    model: createChatLanguageModel(options.apiKey, options.model),
+    ...(providerOptions ? { providerOptions } : {}),
     instructions: buildStoryInstructions({
       draft: currentDraft,
       shots: currentShots.map<StoryShotDisplay>(({ versions, ...shot }) => ({
