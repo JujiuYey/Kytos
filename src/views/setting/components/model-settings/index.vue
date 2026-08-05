@@ -2,13 +2,7 @@
 import { computed } from 'vue';
 import { Cpu, Image as ImageIcon, Zap } from '@lucide/vue';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import { useAppStore } from '@/stores/app';
 import {
@@ -56,6 +50,9 @@ const fastModel = computed({
     }
   },
 });
+
+const generalModelDefinition = computed(() => CHAT_MODEL_DEFINITIONS[generalModel.value]);
+const fastModelDefinition = computed(() => CHAT_MODEL_DEFINITIONS[fastModel.value]);
 </script>
 
 <template>
@@ -79,7 +76,7 @@ const fastModel = computed({
           <Label for="image-model">模型</Label>
           <Select v-model="imageModel">
             <SelectTrigger id="image-model" class="w-full">
-              <SelectValue />
+              <span class="truncate">{{ imageModelLabels[imageModel] }}</span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="model in IMAGE_MODELS" :key="model" :value="model">
@@ -104,7 +101,12 @@ const fastModel = computed({
           <Label for="general-model">模型</Label>
           <Select v-model="generalModel">
             <SelectTrigger id="general-model" class="w-full">
-              <SelectValue />
+              <span class="flex min-w-0 items-center gap-2">
+                <span class="truncate">{{ generalModelDefinition.label }}</span>
+                <SagStatusBadge v-if="generalModelDefinition.supportsImageInput" tone="info">
+                  支持图片
+                </SagStatusBadge>
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="model in CHAT_MODELS" :key="model" :value="model">
@@ -137,7 +139,12 @@ const fastModel = computed({
           <Label for="fast-model">模型</Label>
           <Select v-model="fastModel">
             <SelectTrigger id="fast-model" class="w-full">
-              <SelectValue />
+              <span class="flex min-w-0 items-center gap-2">
+                <span class="truncate">{{ fastModelDefinition.label }}</span>
+                <SagStatusBadge v-if="fastModelDefinition.supportsImageInput" tone="info">
+                  支持图片
+                </SagStatusBadge>
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="model in CHAT_MODELS" :key="model" :value="model">
