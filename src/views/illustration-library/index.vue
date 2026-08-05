@@ -253,20 +253,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <SagPage>
-    <template #header>
-      <div class="flex min-w-0 items-center gap-3">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <h1 class="truncate text-sm font-semibold">插画管理</h1>
-            <Badge variant="secondary" class="shrink-0 tabular-nums">
-              {{ libraryItems.length }}
-            </Badge>
-          </div>
-          <p class="hidden text-xs text-muted-foreground sm:block">统一查看、上传和整理插画资产</p>
-        </div>
-      </div>
+  <SagPage title="插画管理" description="统一查看、上传和整理插画资产" :icon="ImageIcon">
+    <template #header-leading>
+      <Badge variant="secondary" class="shrink-0 tabular-nums">
+        {{ libraryItems.length }}
+      </Badge>
+    </template>
 
+    <template #header-actions>
       <Button class="ml-auto shrink-0" @click="uploadDialogOpen = true">
         <Upload class="size-4" />
         上传插画

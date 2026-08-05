@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { DefaultChatTransport } from 'ai';
 import type { ChatStatus } from 'ai';
 import { useChat } from '@ai-sdk/vue';
+import { BookOpen } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
@@ -691,8 +692,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <SagPage>
-    <template #header>
+  <SagPage title="故事创作" description="聊故事，拆分镜，逐张完成画面" :icon="BookOpen">
+    <template #header-actions>
       <StoryHeader
         v-if="activeStory"
         v-model:mobile-pane="mobilePane"

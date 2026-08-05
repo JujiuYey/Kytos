@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { Laugh } from '@lucide/vue';
 import { toast } from 'vue-sonner';
+import { Badge } from '@/components/ui/badge';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { ImageReferencePickerDialog } from '@/components/sag/image-reference-picker-dialog';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
@@ -548,8 +550,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <SagPage>
-    <template #header>
+  <SagPage title="表情管理" description="基于正式角色资产生成与管理表情" :icon="Laugh">
+    <template #header-leading>
+      <Badge variant="outline" class="hidden shrink-0 sm:inline-flex">GPT-Image-2</Badge>
+    </template>
+
+    <template #header-actions>
       <ExpressionPageHeader
         v-model:mobile-pane="mobilePane"
         :generator-open="generatorOpen"

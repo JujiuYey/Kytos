@@ -498,29 +498,18 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <SagPage>
-    <template #header>
-      <div class="flex min-w-0 flex-1 items-center gap-3">
-        <div
-          class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
-        >
-          <Sparkles class="size-4" />
-        </div>
-        <div class="min-w-0">
-          <h1 class="truncate text-sm font-semibold">
-            {{ needsSummary || !characterName ? '创建角色' : '创建第一个形象' }}
-          </h1>
-          <p class="truncate text-xs text-muted-foreground">
-            {{
-              needsSummary
-                ? '先建立角色概要，再创建第一个正式形象'
-                : characterName
-                  ? `正在为「${characterName}」建立正式视觉`
-                  : '正在读取角色概要'
-            }}
-          </p>
-        </div>
-      </div>
+  <SagPage
+    :title="needsSummary || !characterName ? '创建角色' : '创建第一个形象'"
+    :description="
+      needsSummary
+        ? '先建立角色概要，再创建第一个正式形象'
+        : characterName
+          ? `正在为「${characterName}」建立正式视觉`
+          : '正在读取角色概要'
+    "
+    :icon="Sparkles"
+  >
+    <template #header-actions>
       <span v-if="!isInitializing && !needsSummary" class="text-xs text-muted-foreground">
         {{ currentStep }} / 4
       </span>

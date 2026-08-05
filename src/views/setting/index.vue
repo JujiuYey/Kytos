@@ -1,73 +1,39 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import ProjectDir from './components/project-dir.vue';
+import { Settings } from '@lucide/vue';
+import ProjectDir from './components/project-dir/index.vue';
 import ApimartKey from './components/apimart-key.vue';
 import DeepseekKey from './components/deepseek-key.vue';
 import MinimaxKey from './components/minimax-key.vue';
 import ModelSettings from './components/model-settings.vue';
-import ThemeToggle from '@/components/theme/theme-toggle.vue';
+import ThemeToggle from './components/theme/index.vue';
+import { SagPage } from '@/components/sag/sag-page';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useTheme } from '@/composables/use-theme';
-
-const { theme } = useTheme();
-
-const themeLabel = computed(() => {
-  const labels = {
-    dark: '深色',
-    light: '浅色',
-    system: '跟随系统',
-  };
-
-  return labels[theme.value];
-});
 </script>
 
 <template>
-  <main class="h-full min-h-0 overflow-hidden">
-    <ScrollArea class="h-full">
-      <div class="w-full px-6 py-8 lg:px-10 lg:py-10">
-        <header>
-          <h1 class="text-2xl font-semibold">系统设置</h1>
-          <p class="mt-1.5 text-sm text-muted-foreground">
-            管理界面外观、本地作品目录、默认模型和模型厂商。
-          </p>
-        </header>
+  <Tabs default-value="basic" class="h-full min-h-0 gap-0">
+    <SagPage
+      title="系统设置"
+      description="管理界面外观、本地作品目录、默认模型和模型厂商"
+      :icon="Settings"
+    >
+      <template #header-actions>
+        <TabsList aria-label="设置分类" class="shrink-0">
+          <TabsTrigger value="basic">基本配置</TabsTrigger>
+          <TabsTrigger value="defaults">默认模型</TabsTrigger>
+          <TabsTrigger value="providers">模型厂商</TabsTrigger>
+        </TabsList>
+      </template>
 
-        <Tabs default-value="basic" class="mt-8 w-full">
-          <TabsList aria-label="设置分类">
-            <TabsTrigger value="basic">基本配置</TabsTrigger>
-            <TabsTrigger value="defaults">默认模型</TabsTrigger>
-            <TabsTrigger value="providers">模型厂商</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="basic" class="mt-4 space-y-8">
-            <section aria-labelledby="appearance-heading">
-              <div class="mb-4">
-                <h2 id="appearance-heading" class="text-base font-semibold">外观</h2>
-                <p class="mt-1 text-sm text-muted-foreground">选择应用使用的界面主题。</p>
-              </div>
-              <div class="flex items-center justify-between gap-4 rounded-md border p-5">
-                <div class="min-w-0">
-                  <h3 class="text-sm font-medium">界面主题</h3>
-                  <p class="mt-1 text-sm text-muted-foreground">当前：{{ themeLabel }}</p>
-                </div>
-                <ThemeToggle />
-              </div>
-            </section>
-
-            <section aria-labelledby="workspace-heading">
-              <div class="mb-4">
-                <h2 id="workspace-heading" class="text-base font-semibold">作品工作区</h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  素材和生成结果保存在这里。切换目录不会搬迁已有文件。
-                </p>
-              </div>
-              <ProjectDir />
-            </section>
+      <ScrollArea class="min-h-0 flex-1">
+        <div class="w-full px-6 py-8 lg:px-10 lg:py-10">
+          <TabsContent value="basic" class="space-y-8">
+            <ThemeToggle />
+            <ProjectDir />
           </TabsContent>
 
-          <TabsContent value="defaults" class="mt-4">
+          <TabsContent value="defaults">
             <section aria-labelledby="models-heading">
               <div class="mb-4">
                 <h2 id="models-heading" class="text-base font-semibold">默认模型</h2>
@@ -79,7 +45,7 @@ const themeLabel = computed(() => {
             </section>
           </TabsContent>
 
-          <TabsContent value="providers" class="mt-4">
+          <TabsContent value="providers">
             <section aria-labelledby="providers-heading">
               <div class="mb-6">
                 <h2 id="providers-heading" class="text-base font-semibold">模型厂商</h2>
@@ -140,8 +106,8 @@ const themeLabel = computed(() => {
               </Tabs>
             </section>
           </TabsContent>
-        </Tabs>
-      </div>
-    </ScrollArea>
-  </main>
+        </div>
+      </ScrollArea>
+    </SagPage>
+  </Tabs>
 </template>

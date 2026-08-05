@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ImagePlus, Images, MessageSquare, Plus, Trash2 } from '@lucide/vue';
+import { Images, MessageSquare, Plus, Trash2 } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -34,31 +34,20 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-1 items-center gap-3">
-    <div
-      class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
-    >
-      <ImagePlus class="size-4" />
-    </div>
-    <div class="hidden min-w-0 sm:block">
-      <h1 class="truncate text-sm font-semibold">插画创作</h1>
-      <p class="truncate text-xs text-muted-foreground">对话整理画面，版本持续演化</p>
-    </div>
-    <Select
-      :model-value="activeTopicId"
-      :disabled="busy"
-      @update:model-value="value => emit('select', String(value))"
-    >
-      <SelectTrigger class="min-w-0 flex-1 sm:ml-2 sm:max-w-56">
-        <SelectValue placeholder="选择插画主题" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem v-for="topic in topics" :key="topic.id" :value="topic.id">
-          {{ topic.title }}
-        </SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
+  <Select
+    :model-value="activeTopicId"
+    :disabled="busy"
+    @update:model-value="value => emit('select', String(value))"
+  >
+    <SelectTrigger class="min-w-0 flex-1 sm:max-w-56">
+      <SelectValue placeholder="选择插画主题" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem v-for="topic in topics" :key="topic.id" :value="topic.id">
+        {{ topic.title }}
+      </SelectItem>
+    </SelectContent>
+  </Select>
 
   <Tabs
     :model-value="mobilePane"

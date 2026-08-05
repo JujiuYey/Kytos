@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { UserRoundPlus } from '@lucide/vue';
+import { Plus, UserRoundPlus, UsersRound } from '@lucide/vue';
 import { toast } from 'vue-sonner';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
@@ -11,7 +12,6 @@ import { SagPage } from '@/components/sag/sag-page';
 import type { CharacterLibraryCharacter, CharacterLibraryState, CharacterSummary } from '@/types';
 import CharacterCard from './components/character-card.vue';
 import CharacterCardSkeleton from './components/character-card-skeleton.vue';
-import CharacterPageHeader from './components/character-page-header.vue';
 import CharacterSummaryDialog from './components/character-summary-dialog.vue';
 
 const router = useRouter();
@@ -127,9 +127,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <SagPage>
-    <template #header>
-      <CharacterPageHeader :count="characters.length" :busy="busy" @create="createCharacter" />
+  <SagPage title="角色管理" description="管理多个角色及其完整形象资料" :icon="UsersRound">
+    <template #header-leading>
+      <Badge variant="secondary" class="shrink-0 tabular-nums">
+        {{ characters.length }}
+      </Badge>
+    </template>
+
+    <template #header-actions>
+      <Button :disabled="busy" @click="createCharacter">
+        <Plus class="size-4" />
+        新建角色
+      </Button>
     </template>
 
     <SagErrorRetryAlert

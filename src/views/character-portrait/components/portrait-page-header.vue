@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { Camera, Images, PersonStanding, SlidersHorizontal, Upload } from '@lucide/vue';
-import { Badge } from '@/components/ui/badge';
+import { Images, PersonStanding, SlidersHorizontal, Upload } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -12,7 +11,6 @@ import {
 import type { CharacterLibraryCharacter } from '@/types';
 
 defineProps<{
-  assetCount: number;
   generatorOpen: boolean;
   characters: CharacterLibraryCharacter[];
   characterSelectionDisabled: boolean;
@@ -30,21 +28,6 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-1 items-center gap-3">
-    <div
-      class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
-    >
-      <Camera class="size-4" />
-    </div>
-    <div class="min-w-0">
-      <div class="flex items-center gap-2">
-        <h1 class="truncate text-sm font-semibold">角色视觉资产</h1>
-        <Badge variant="secondary" class="shrink-0 tabular-nums">{{ assetCount }}</Badge>
-      </div>
-      <p class="truncate text-xs text-muted-foreground">基于正式视觉生成和管理角色动作</p>
-    </div>
-  </div>
-
   <Select
     :model-value="selectedCharacterId"
     :disabled="characterSelectionDisabled"

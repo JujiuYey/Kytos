@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { AlertCircle } from '@lucide/vue';
+import { AlertCircle, Camera } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upload-dialog';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
@@ -594,13 +595,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <SagPage>
-    <template #header>
+  <SagPage title="角色视觉资产" description="基于正式视觉生成和管理角色动作" :icon="Camera">
+    <template #header-leading>
+      <Badge variant="secondary" class="shrink-0 tabular-nums">{{ assetCount }}</Badge>
+    </template>
+
+    <template #header-actions>
       <PortraitPageHeader
         v-model:mobile-pane="mobilePane"
         :characters="characters"
         :character-selection-disabled="characterSelectionDisabled"
-        :asset-count="assetCount"
         :generator-open="generatorOpen"
         :operation-disabled="operationDisabled"
         :selected-character-id="selectedCharacterId"

@@ -171,25 +171,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <SagPage>
-    <template #header>
-      <div class="flex min-w-0 items-center gap-3">
-        <div
-          class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
-        >
-          <BookMarked class="size-4" />
-        </div>
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <h1 class="truncate text-sm font-semibold">故事管理</h1>
-            <Badge variant="secondary" class="shrink-0 tabular-nums">{{ stories.length }}</Badge>
-          </div>
-          <p class="hidden truncate text-xs text-muted-foreground sm:block">
-            集中查看故事进度，继续进入任意故事创作
-          </p>
-        </div>
-      </div>
+  <SagPage title="故事管理" description="集中查看故事进度，继续进入任意故事创作" :icon="BookMarked">
+    <template #header-leading>
+      <Badge variant="secondary" class="shrink-0 tabular-nums">{{ stories.length }}</Badge>
+    </template>
 
+    <template #header-actions>
       <Button class="ml-auto shrink-0" :disabled="creating" @click="createStory">
         <Plus class="size-4" />
         {{ creating ? '创建中' : '新建故事' }}

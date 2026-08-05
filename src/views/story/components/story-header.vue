@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BookMarked, BookOpen, Images, MessageSquare, Plus, Trash2 } from '@lucide/vue';
+import { BookMarked, Images, MessageSquare, Plus, Trash2 } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -30,31 +30,20 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-1 items-center gap-3">
-    <div
-      class="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
-    >
-      <BookOpen class="size-4" />
-    </div>
-    <div class="hidden min-w-0 sm:block">
-      <h1 class="truncate text-sm font-semibold">故事创作</h1>
-      <p class="truncate text-xs text-muted-foreground">聊故事，拆分镜，逐张完成画面</p>
-    </div>
-    <Select
-      :model-value="activeStoryId"
-      :disabled="busy"
-      @update:model-value="value => emit('select', String(value))"
-    >
-      <SelectTrigger class="min-w-0 flex-1 sm:ml-2 sm:max-w-56">
-        <SelectValue placeholder="选择故事" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem v-for="story in stories" :key="story.id" :value="story.id">
-          {{ story.title }}
-        </SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
+  <Select
+    :model-value="activeStoryId"
+    :disabled="busy"
+    @update:model-value="value => emit('select', String(value))"
+  >
+    <SelectTrigger class="min-w-0 flex-1 sm:max-w-56">
+      <SelectValue placeholder="选择故事" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem v-for="story in stories" :key="story.id" :value="story.id">
+        {{ story.title }}
+      </SelectItem>
+    </SelectContent>
+  </Select>
 
   <Tabs
     :model-value="mobilePane"

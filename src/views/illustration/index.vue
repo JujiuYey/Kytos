@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { DefaultChatTransport } from 'ai';
 import type { ChatStatus, FileUIPart } from 'ai';
 import { useChat } from '@ai-sdk/vue';
+import { ImagePlus } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import {
   ImageReferencePickerDialog,
@@ -592,8 +593,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <SagPage>
-    <template #header>
+  <SagPage title="插画创作" description="对话整理画面，版本持续演化" :icon="ImagePlus">
+    <template #header-actions>
       <IllustrationHeader
         v-if="activeTopic"
         v-model:mobile-pane="mobilePane"
