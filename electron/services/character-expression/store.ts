@@ -8,10 +8,12 @@ import { EXPRESSION_STORE_FILE_NAME, EXPRESSION_STORE_VERSION } from './constant
 import { parseExpressionRecord } from './parsers';
 import type { StoredExpressionWorkspace } from './types';
 
+// 定位指定角色表情库的 JSON 文件路径
 async function resolveStorePath(characterId: string): Promise<string> {
   return path.join(await getCharacterDirectory(characterId), EXPRESSION_STORE_FILE_NAME);
 }
 
+// 读取表情库：文件缺失或非对象视为空 store；版本不一致抛错避免污染新数据
 export async function loadExpressionStore(characterId: string): Promise<StoredExpressionWorkspace> {
   const storePath = await resolveStorePath(characterId);
   const value = await readJsonFile(storePath);
@@ -32,6 +34,7 @@ export async function loadExpressionStore(characterId: string): Promise<StoredEx
   };
 }
 
+// 把表情库整体写回 JSON，覆盖式持久化
 export async function saveExpressionStore(
   characterId: string,
   store: StoredExpressionWorkspace,
@@ -39,6 +42,7 @@ export async function saveExpressionStore(
   await writeJsonFile(await resolveStorePath(characterId), store);
 }
 
+// 替换或前置插入一条表情记录，并按 updatedAt 倒序重排，保证最新记录在最前
 export function replaceRecord(
   store: StoredExpressionWorkspace,
   record: CharacterExpressionRecord,
@@ -66,6 +70,7 @@ export function patchRecordName(
   };
 }
 
+// 移除记录中指定图片；若该记录图片被全部清空则一并删除整条记录，保持“记录必有图”约束
 export function removeImageFromRecord(
   store: StoredExpressionWorkspace,
   recordId: string,

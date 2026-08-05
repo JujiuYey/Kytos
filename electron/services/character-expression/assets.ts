@@ -20,6 +20,7 @@ import type { ApiTaskData } from '../../utils';
 import { EXPRESSION_ASSET_DIRECTORY } from './constants';
 import { getExpressionAssetUrl } from './parsers';
 
+// 校验上传请求
 function validateUploadRequest(request: UploadCharacterExpressionRequest): void {
   if (
     !request ||
@@ -40,6 +41,7 @@ function validateUploadRequest(request: UploadCharacterExpressionRequest): void 
   }
 }
 
+// 推断上传图片扩展名
 function getUploadedImageExtension(request: UploadCharacterExpressionRequest): string {
   const mimeType = request.mimeType.split(';', 1)[0]?.trim().toLowerCase();
   if (mimeType) {
@@ -55,6 +57,7 @@ function getUploadedImageExtension(request: UploadCharacterExpressionRequest): s
   throw new Error('仅支持 PNG、JPEG、WebP 或 AVIF 图片');
 }
 
+// 表情资产目录解析
 async function getAssetDirectory(): Promise<string> {
   return path.join(
     await getWorkspaceDirectory(),
@@ -63,6 +66,7 @@ async function getAssetDirectory(): Promise<string> {
   );
 }
 
+// 下载 apimart 生成图片到工作区
 export async function downloadTaskImages(
   taskId: string,
   taskData: ApiTaskData,
@@ -105,6 +109,7 @@ export async function downloadTaskImages(
   );
 }
 
+// 把参考图编码成 base64 data URI
 export async function getReferenceData(
   selection: CharacterExpressionReferenceSelection,
   directoryName: string,
@@ -123,6 +128,7 @@ export async function getReferenceData(
   return `data:${image.mimeType};base64,${imageData.toString('base64')}`;
 }
 
+// 原子写入上传的表情图片
 export async function saveUploadedExpressionFile(
   request: UploadCharacterExpressionRequest,
 ): Promise<{ fileName: string; result: SavedFileResult }> {
@@ -143,6 +149,7 @@ export async function saveUploadedExpressionFile(
   };
 }
 
+// 删除表情图片
 export async function deleteExpressionAssetFile(fileName: string): Promise<void> {
   const assetDirectory = await getAssetDirectory();
   await unlink(path.join(assetDirectory, fileName));

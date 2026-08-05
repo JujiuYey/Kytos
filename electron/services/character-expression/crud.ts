@@ -1,6 +1,5 @@
 // 角色表情公共 CRUD：workspace 查询 / 上传 / 重命名 / 删除
-import path from 'node:path';
-import { isPlainObject } from 'es-toolkit';
+import { z } from 'zod';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionWorkspaceState,
@@ -9,8 +8,9 @@ import type {
   RenameCharacterExpressionRequest,
   UploadCharacterExpressionRequest,
 } from '../../../shared/character-expression';
-import { ID_PATTERN, MAX_NAME_LENGTH } from '../../constants';
+import { MAX_NAME_LENGTH } from '../../constants';
 import { isNodeError } from '../../storage/json-store';
+import { idSchema, nameSchema, parseRequest, safeFileNameSchema } from '../../utils';
 import { deleteExpressionAssetFile, saveUploadedExpressionFile } from './assets';
 import {
   loadExpressionStore,
@@ -21,13 +21,23 @@ import {
 } from './store';
 import type { StoredExpressionWorkspace } from './types';
 
+const getWorkspaceRequestSchema = z.object({ characterId: z.string() });
+const renameRequestSchema = z.object({
+  characterId: z.string(),
+  name: nameSchema(MAX_NAME_LENGTH),
+  taskId: idSchema,
+});
+const deleteRequestSchema = z.object({
+  characterId: z.string(),
+  fileName: safeFileNameSchema,
+  taskId: idSchema,
+});
+
 export async function getCharacterExpressionWorkspace(
   request: GetCharacterExpressionWorkspaceRequest,
 ): Promise<CharacterExpressionWorkspaceState> {
-  if (!request || typeof request.characterId !== 'string') {
-    throw new Error('角色编号无效');
-  }
-  const store = await loadExpressionStore(request.characterId);
+  const { characterId } = parseRequest(request, getWorkspaceRequestSchema);
+  const store = await loadExpressionStore(characterId);
   return { records: store.records };
 }
 
@@ -67,20 +77,10 @@ export async function uploadCharacterExpression(
 export async function renameCharacterExpression(
   request: RenameCharacterExpressionRequest,
 ): Promise<CharacterExpressionWorkspaceState> {
-  if (
-    !isPlainObject(request) ||
-    typeof request.characterId !== 'string' ||
-    typeof request.taskId !== 'string' ||
-    !ID_PATTERN.test(request.taskId) ||
-    typeof request.name !== 'string' ||
-    !request.name.trim() ||
-    request.name.length > MAX_NAME_LENGTH
-  ) {
-    throw new Error('表情名称无效');
-  }
+  const { characterId, name, taskId } = parseRequest(request, renameRequestSchema);
 
-  const store = await loadExpressionStore(request.characterId);
-  const record = store.records.find(item => item.id === request.taskId);
+  const store = await loadExpressionStore(characterId);
+  const record = store.records.find(item => item.id === taskId);
   if (!record) {
     throw new Error('未找到要重命名的表情');
   }
@@ -88,28 +88,18 @@ export async function renameCharacterExpression(
     throw new Error('表情完成后才能重命名');
   }
 
-  const normalizedName = request.name.trim();
-  const nextStore = patchRecordName(store, record.id, normalizedName, new Date().toISOString());
-  await saveExpressionStore(request.characterId, nextStore);
+  const nextStore = patchRecordName(store, record.id, name, new Date().toISOString());
+  await saveExpressionStore(characterId, nextStore);
   return { records: nextStore.records };
 }
 
 export async function deleteCharacterExpression(
   request: DeleteCharacterExpressionRequest,
 ): Promise<CharacterExpressionWorkspaceState> {
-  if (
-    !isPlainObject(request) ||
-    typeof request.characterId !== 'string' ||
-    typeof request.taskId !== 'string' ||
-    !ID_PATTERN.test(request.taskId) ||
-    typeof request.fileName !== 'string' ||
-    path.basename(request.fileName) !== request.fileName
-  ) {
-    throw new Error('表情删除请求无效');
-  }
-  const store = await loadExpressionStore(request.characterId);
-  const record = store.records.find(item => item.id === request.taskId);
-  const image = record?.images.find(item => item.fileName === request.fileName);
+  const { characterId, fileName, taskId } = parseRequest(request, deleteRequestSchema);
+  const store = await loadExpressionStore(characterId);
+  const record = store.records.find(item => item.id === taskId);
+  const image = record?.images.find(item => item.fileName === fileName);
   if (!record || !image) {
     throw new Error('未找到这张表情图片');
   }
@@ -117,15 +107,15 @@ export async function deleteCharacterExpression(
   const nextStore: StoredExpressionWorkspace = removeImageFromRecord(
     store,
     record.id,
-    request.fileName,
+    fileName,
     new Date().toISOString(),
   );
-  await saveExpressionStore(request.characterId, nextStore);
+  await saveExpressionStore(characterId, nextStore);
   try {
-    await deleteExpressionAssetFile(request.fileName);
+    await deleteExpressionAssetFile(fileName);
   } catch (error: unknown) {
     if (!isNodeError(error) || error.code !== 'ENOENT') {
-      await saveExpressionStore(request.characterId, store);
+      await saveExpressionStore(characterId, store);
       throw new Error(
         error instanceof Error ? `表情图片删除失败：${error.message}` : '表情图片删除失败',
       );
