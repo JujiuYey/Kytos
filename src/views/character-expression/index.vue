@@ -76,7 +76,7 @@ const { deleteDialogOpen, deleteExpression, deletingFileName, requestDelete } = 
     },
   },
 );
-const { searchQuery, filteredRecords, clearSearch } = useExpressionSearch({ records });
+const { searchQuery, filteredRecords, cleanQuery } = useExpressionSearch({ records });
 const { renameDialogOpen, renameExpression, renameTarget, renamingTaskId, requestRename } =
   useExpressionRename({
     characterId: selectedCharacterId,
@@ -460,7 +460,7 @@ onBeforeUnmount(() => {
           <ExpressionEmptyState
             v-else
             :search-query="searchQuery"
-            @update:search-query="clearSearch"
+            @update:search-query="cleanQuery"
           />
         </ScrollArea>
       </section>

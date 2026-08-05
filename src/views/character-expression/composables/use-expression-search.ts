@@ -20,9 +20,9 @@ export function useExpressionSearch(options: UseExpressionSearchOptions) {
     );
   });
 
-  function clearSearch(): void {
+  function cleanQuery() {
     searchQuery.value = '';
   }
 
-  return { clearSearch, filteredRecords, searchQuery };
+  return { searchQuery, filteredRecords, cleanQuery };
 }

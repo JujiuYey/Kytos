@@ -80,30 +80,30 @@ export {
   CHARACTER_SEED_FIELDS,
   CHARACTER_VISUAL_ANCHOR_FIELDS,
   CHARACTER_VISUAL_PRESENTATION_FIELDS,
+  createEmptyCharacterDraft,
+  normalizeCharacterDraft,
+} from '../../shared/character';
+export {
   CHAT_MODELS,
   CHAT_MODEL_DEFINITIONS,
   DEFAULT_CHAT_MODEL,
   DEEPSEEK_MODELS,
   DEFAULT_DEEPSEEK_MODEL,
-  DEFAULT_IMAGE_MODEL,
-  IMAGE_MODELS,
   MINIMAX_MODELS,
   chatModelSupportsImageInput,
-  createEmptyCharacterDraft,
   getChatModelDefinition,
   isChatModel,
   isDeepSeekModel,
-  isImageModel,
-  normalizeCharacterDraft,
-} from '../../shared/character';
+} from '../../shared/chat-model';
 export type {
   ChatModel,
   ChatModelDefinition,
   ChatModelProvider,
   DeepSeekModel,
-  ImageModel,
   MiniMaxModel,
-} from '../../shared/character';
+} from '../../shared/chat-model';
+export { DEFAULT_IMAGE_MODEL, IMAGE_MODELS, isImageModel } from '../../shared/image-model';
+export type { ImageModel } from '../../shared/image-model';
 export {
   CHARACTER_VISUAL_RESOLUTIONS,
   CHARACTER_VISUAL_SIZES,

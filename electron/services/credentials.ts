@@ -5,7 +5,7 @@ import type {
   CredentialStatus,
   SetCredentialRequest,
 } from '../../shared/desktop';
-import { readJsonFile, writeJsonFile } from './json-store';
+import { readJsonFile, writeJsonFile } from '../storage/json-store';
 import { isPlainObject } from 'es-toolkit';
 
 interface StoredSecrets {

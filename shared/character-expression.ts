@@ -5,7 +5,7 @@ import type {
   CharacterVisualAssetSelection,
 } from './character-visual';
 import type { CharacterScopeRequest } from './character-library';
-import type { ChatModel } from './character';
+import type { ChatModel } from './chat-model';
 import type { SavedFileResult } from './desktop';
 
 // 角色表情支持的尺寸

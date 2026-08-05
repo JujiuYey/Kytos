@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { CharacterDraft, CharacterWorkspaceState } from '../../shared/character';
 import { normalizeCharacterDraft } from '../../shared/character';
 import { getActiveCharacterDirectory } from './character-library';
-import { readJsonFile } from './json-store';
+import { readJsonFile } from '../storage/json-store';
 
 const DRAFT_FILE_NAME = 'character-draft.json';
 

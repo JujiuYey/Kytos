@@ -1,8 +1,8 @@
 import { ToolLoopAgent, isStepCount, tool } from 'ai';
 import { z } from 'zod';
-import type { ChatModel } from '../../shared/character';
+import type { ChatModel } from '../../shared/chat-model';
 import type { IllustrationBrief, IllustrationTopic } from '../../shared/illustration';
-import { createChatLanguageModel, getChatProviderOptions } from '../services/chat-provider';
+import { createChatLanguageModel, getChatProviderOptions } from '../providers/chat-provider';
 import { updateIllustrationBrief } from '../services/illustration';
 import { buildIllustrationInstructions } from './instructions';
 

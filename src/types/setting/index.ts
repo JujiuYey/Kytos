@@ -1,4 +1,5 @@
-import type { ChatModel, DeepSeekModel, ImageModel } from '../../../shared/character';
+import type { ChatModel, DeepSeekModel } from '../../../shared/chat-model';
+import type { ImageModel } from '../../../shared/image-model';
 
 // 应用设置接口
 export interface AppSettings {

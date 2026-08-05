@@ -1,5 +1,5 @@
 // 角色视觉资产的公共类型与请求/响应模型
-import type { ChatModel } from './character';
+import type { ChatModel } from './chat-model';
 import type { CharacterScopeRequest } from './character-library';
 import type { SavedFileResult } from './desktop';
 

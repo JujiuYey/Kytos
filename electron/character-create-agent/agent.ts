@@ -4,8 +4,8 @@ import type {
   CharacterCreateDraft,
   CharacterCreatePromptResult,
 } from '../../shared/character-create';
-import type { ChatModel } from '../../shared/character';
-import { createChatLanguageModel, getChatProviderOptions } from '../services/chat-provider';
+import type { ChatModel } from '../../shared/chat-model';
+import { createChatLanguageModel, getChatProviderOptions } from '../providers/chat-provider';
 import { buildCharacterCreateInstructions } from './instructions';
 
 const draftFields = {

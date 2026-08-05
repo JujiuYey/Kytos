@@ -1,6 +1,6 @@
 import { createAgentUIStreamResponse } from 'ai';
-import { DEFAULT_CHAT_MODEL, getChatModelDefinition, isChatModel } from '../../shared/character';
-import type { ChatModel } from '../../shared/character';
+import { DEFAULT_CHAT_MODEL, getChatModelDefinition, isChatModel } from '../../shared/chat-model';
+import type { ChatModel } from '../../shared/chat-model';
 import { getCredentialValue } from '../services/credentials';
 import { getStory } from '../services/story';
 import { createStoryAgent } from './agent';
