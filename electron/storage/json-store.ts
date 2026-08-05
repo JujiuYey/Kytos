@@ -6,8 +6,15 @@ export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
 }
 
-export function readJsonFile<T = unknown>(filePath: string): Promise<T | null> {
-  return readJson(filePath, { throws: false }) as Promise<T | null>;
+export async function readJsonFile<T = unknown>(filePath: string): Promise<T | null> {
+  try {
+    return (await readJson(filePath, { throws: false })) as T | null;
+  } catch (error: unknown) {
+    if (isNodeError(error) && error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
