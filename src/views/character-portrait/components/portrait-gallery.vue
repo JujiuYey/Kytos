@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Check, Clock3, Image as ImageIcon, Pencil, Trash2 } from '@lucide/vue';
+import { Check, Clock3, Crop, Image as ImageIcon, Pencil, Trash2 } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
 import { Badge } from '@/components/ui/badge';
@@ -60,6 +60,7 @@ const emit = defineEmits<{
     record: CharacterImageRecord,
     image: CharacterPortraitImage,
   ): void;
+  (event: 'edit', record: CharacterImageRecord, image: CharacterPortraitImage): void;
   (
     event: 'official',
     kind: AssetKind,
@@ -296,6 +297,22 @@ function formatDate(value: string): string {
                   }}
                 </Button>
                 <div class="flex shrink-0 items-center gap-1.5">
+                  <TooltipProvider :delay-duration="300">
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          class="size-8 text-muted-foreground"
+                          :aria-label="`编辑${getImageName(entry)}`"
+                          @click="emit('edit', entry.record, entry.image)"
+                        >
+                          <Crop class="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>编辑图片</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <TooltipProvider :delay-duration="300">
                     <Tooltip>
                       <TooltipTrigger as-child>

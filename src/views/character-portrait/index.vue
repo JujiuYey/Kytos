@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { AlertCircle, Camera } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -42,6 +43,7 @@ interface ActionReferenceOption extends ImageReferencePickerOption {
 }
 
 const appStore = useAppStore();
+const router = useRouter();
 const library = ref<CharacterLibraryState | null>(null);
 const selectedCharacterId = ref('');
 const credentialStatus = ref<CredentialStatus | null>(null);
@@ -494,6 +496,18 @@ function requestDelete(
   deleteDialogOpen.value = true;
 }
 
+function editImage(record: CharacterImageRecord, image: CharacterPortraitImage): void {
+  void router.push({
+    name: 'image-editor',
+    query: {
+      fileName: image.name || record.name || image.fileName,
+      mimeType: image.mimeType,
+      returnTo: 'character-portrait',
+      sourceUrl: image.url,
+    },
+  });
+}
+
 async function deleteAsset() {
   if (!deleteTarget.value || deletingFileName.value) {
     return;
@@ -668,6 +682,7 @@ onBeforeUnmount(() => {
           :sheet-records="sheetRecords"
           class="min-h-0 min-w-0 flex-1"
           @delete="requestDelete"
+          @edit="editImage"
           @official="selectAsset"
           @rename="requestRename"
         />

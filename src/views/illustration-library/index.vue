@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   Clock3,
+  Crop,
   Image as ImageIcon,
   ImagePlus,
   PencilLine,
@@ -215,6 +216,18 @@ function reviseIllustration(item: IllustrationLibraryItem): void {
   });
 }
 
+function editImage(item: IllustrationLibraryItem): void {
+  void router.push({
+    name: 'image-editor',
+    query: {
+      fileName: item.title || item.image.fileName,
+      mimeType: item.image.mimeType,
+      returnTo: 'illustration-library',
+      sourceUrl: item.image.url,
+    },
+  });
+}
+
 async function confirmDelete(): Promise<void> {
   const target = deleteTarget.value;
   if (!target || deletingItemId.value) {
@@ -366,6 +379,22 @@ onMounted(() => {
                 <span class="truncate">{{ formatDate(item.createdAt) }}</span>
               </span>
               <div class="flex shrink-0 items-center gap-1">
+                <TooltipProvider :delay-duration="300">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        class="size-8 text-muted-foreground"
+                        :aria-label="`编辑${item.title}`"
+                        @click="editImage(item)"
+                      >
+                        <Crop class="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>编辑图片</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Button
                   v-if="item.source === 'generated'"
                   size="sm"

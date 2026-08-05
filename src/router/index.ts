@@ -44,10 +44,10 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '表情管理' },
       },
       {
-        path: '/character-expression/editor',
-        name: 'character-expression-editor',
-        component: () => import('@/views/character-expression-editor/index.vue'),
-        meta: { title: '编辑表情' },
+        path: '/image-editor',
+        name: 'image-editor',
+        component: () => import('@/views/image-editor/index.vue'),
+        meta: { title: '图片编辑' },
       },
       {
         path: '/illustration',

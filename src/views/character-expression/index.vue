@@ -191,11 +191,12 @@ function referenceAssetKey(selection: CharacterExpressionReferenceSelection): st
 
 function editExpression(record: CharacterExpressionRecord, image: CharacterPortraitImage): void {
   void router.push({
-    name: 'character-expression-editor',
+    name: 'image-editor',
     query: {
-      characterId: selectedCharacterId.value,
-      fileName: image.fileName,
-      taskId: record.id,
+      fileName: record.name || image.fileName,
+      mimeType: image.mimeType,
+      returnTo: 'character-expression',
+      sourceUrl: image.url,
     },
   });
 }

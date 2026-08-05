@@ -325,7 +325,7 @@ async function exportImage(): Promise<void> {
 }
 
 function stripExtension(fileName: string): string {
-  return fileName.replace(/\.[^./\\]+$/, '') || '未命名表情';
+  return fileName.replace(/\.[^./\\]+$/, '') || '未命名图片';
 }
 
 async function loadImage(): Promise<void> {
@@ -379,11 +379,11 @@ onBeforeUnmount(() => {
 <template>
   <main class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
     <header class="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-5">
-      <Button size="icon" variant="ghost" aria-label="返回表情管理" @click="emit('back')">
+      <Button size="icon" variant="ghost" aria-label="返回" @click="emit('back')">
         <ArrowLeft class="size-4" />
       </Button>
       <div class="min-w-0 flex-1">
-        <h1 class="truncate text-sm font-semibold">编辑表情</h1>
+        <h1 class="truncate text-sm font-semibold">编辑图片</h1>
         <p class="truncate text-xs text-muted-foreground">{{ props.fileName }}</p>
       </div>
       <Tabs v-model="mobilePane" class="lg:hidden" aria-label="编辑器视图">
@@ -418,7 +418,7 @@ onBeforeUnmount(() => {
         <div v-else-if="errorMessage" class="max-w-sm text-center">
           <p class="text-sm font-medium">无法读取这张图片</p>
           <p class="mt-2 text-sm text-muted-foreground">{{ errorMessage }}</p>
-          <Button class="mt-4" variant="outline" @click="emit('back')">返回表情管理</Button>
+          <Button class="mt-4" variant="outline" @click="emit('back')">返回</Button>
         </div>
         <div v-else class="relative shrink-0 shadow-sm" :style="stageStyle">
           <canvas
