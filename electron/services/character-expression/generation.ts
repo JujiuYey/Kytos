@@ -10,7 +10,7 @@ import type {
   GetCharacterExpressionTaskRequest,
 } from '../../../shared/character-expression';
 import { MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '../../../shared/character-expression';
-import { API_BASE_URL, ID_PATTERN, MAX_NAME_LENGTH, MAX_PROMPT_LENGTH } from '../../constants';
+import { ID_PATTERN, MAX_NAME_LENGTH, MAX_PROMPT_LENGTH } from '../../constants';
 import { createChatLanguageModel, getChatProviderOptions } from '../../providers/chat-provider';
 import { getCredentialValue } from '../credentials';
 import { getCharacterVisualReferences, getCharacterVisualWorkspace } from '../character-visual';
@@ -19,7 +19,13 @@ import { EXPRESSION_ASSET_DIRECTORY } from './constants';
 import { isExpressionSize, isResolution, parseReferenceSelection, selectionKey } from './parsers';
 import { buildExpressionPrompt, resolveChatModel } from './prompts';
 import { loadExpressionStore, replaceRecord, saveExpressionStore } from './store';
-import { getSubmittedTaskId, isTaskStatus, parseTaskData, requestApi } from '../../utils';
+import {
+  buildGptImage2RequestBody,
+  isTaskStatus,
+  pollImageTask,
+  submitImageTask,
+} from '../../utils';
+import type { GptImage2Resolution } from '../../utils';
 import type { ExpressionReferenceData } from './types';
 import type { StoredExpressionWorkspace } from './types';
 
@@ -112,21 +118,14 @@ export async function generateCharacterExpression(
     ),
   );
   const apiKey = await getCredentialValue('apimart');
-  const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
-    body: JSON.stringify({
-      image_urls: imageUrls,
-      model: 'gpt-image-2',
-      n: request.count,
-      prompt: buildExpressionPrompt(request),
-      resolution: request.resolution,
-      size: request.size,
-    }),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
+  const body = buildGptImage2RequestBody({
+    imageUrls,
+    n: request.count,
+    prompt: buildExpressionPrompt(request),
+    resolution: request.resolution as GptImage2Resolution,
+    size: request.size,
   });
+  const taskId = await submitImageTask(body, apiKey);
 
   const now = new Date().toISOString();
   const prompt = buildExpressionPrompt(request);
@@ -135,7 +134,7 @@ export async function generateCharacterExpression(
     createdAt: now,
     description: request.description.trim(),
     errorMessage: null,
-    id: getSubmittedTaskId(payload),
+    id: taskId,
     images: [],
     name: request.name.trim(),
     originalName: null,
@@ -176,14 +175,7 @@ export async function getCharacterExpressionTask(
   }
 
   const apiKey = await getCredentialValue('apimart');
-  const payload = await requestApi(
-    `${API_BASE_URL}/v1/tasks/${encodeURIComponent(taskId)}?language=zh`,
-    {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      method: 'GET',
-    },
-  );
-  const taskData = parseTaskData(payload);
+  const taskData = await pollImageTask(taskId, apiKey);
   if (!isTaskStatus(taskData.status)) {
     throw new Error('图片生成服务返回了未知任务状态');
   }

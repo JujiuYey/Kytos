@@ -12,11 +12,17 @@ import type {
   StoryShotVersion,
   StoryVersionReference,
 } from '../../../shared/story';
-import { API_BASE_URL, ID_PATTERN, MAX_TEXT_LENGTH } from '../../constants';
-import { getSubmittedTaskId, parseTaskData, requestApi } from '../../utils';
+import { ID_PATTERN, MAX_TEXT_LENGTH } from '../../constants';
+import {
+  buildGptImage2RequestBody,
+  isTaskStatus,
+  pollImageTask,
+  submitImageTask,
+} from '../../utils';
+import type { GptImage2Resolution } from '../../utils';
 import { ASSET_DIRECTORY, isActiveGenerationStatus } from './constants';
 import { downloadTaskImages, readReferenceImage } from './assets';
-import { isTaskStatus, parseVersionReference, requireShot, requireStory } from './parsers';
+import { parseVersionReference, requireShot, requireStory } from './parsers';
 import { loadStore, replaceStory, saveStore } from './store';
 
 let taskCommitQueue: Promise<void> = Promise.resolve();
@@ -129,21 +135,14 @@ export async function generateStoryShot(
 
   const prompt = buildPrompt(story, shot, request.prompt);
   const apiKey = await getCredentialValue('apimart');
-  const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
-    body: JSON.stringify({
-      image_urls: referenceImages,
-      model: 'gpt-image-2',
-      n: 1,
-      prompt,
-      resolution: story.resolution,
-      size: story.size,
-    }),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
+  const body = buildGptImage2RequestBody({
+    imageUrls: referenceImages,
+    n: 1,
+    prompt,
+    resolution: story.resolution as GptImage2Resolution,
+    size: story.size,
   });
+  const taskId = await submitImageTask(body, apiKey);
 
   const now = new Date().toISOString();
   const version: StoryShotVersion = {
@@ -152,7 +151,7 @@ export async function generateStoryShot(
     continuityVersion,
     createdAt: now,
     errorMessage: null,
-    id: getSubmittedTaskId(payload),
+    id: taskId,
     images: [],
     progress: 0,
     prompt,
@@ -195,11 +194,7 @@ export async function getStoryShotTask(taskId: string): Promise<StoryShotVersion
   }
 
   const apiKey = await getCredentialValue('apimart');
-  const payload = await requestApi(
-    `${API_BASE_URL}/v1/tasks/${encodeURIComponent(taskId)}?language=zh`,
-    { headers: { Authorization: `Bearer ${apiKey}` }, method: 'GET' },
-  );
-  const taskData = parseTaskData(payload);
+  const taskData = await pollImageTask(taskId, apiKey);
   const taskStatusRaw = taskData.status;
   if (!isTaskStatus(taskStatusRaw)) {
     throw new Error('图片生成服务返回了未知任务状态');

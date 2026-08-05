@@ -9,8 +9,14 @@ import type {
   IllustrationVersion,
   IllustrationVersionReference,
 } from '../../../shared/illustration';
-import { API_BASE_URL, ID_PATTERN } from '../../constants';
-import { getSubmittedTaskId, isTaskStatus, parseTaskData, requestApi } from '../../utils';
+import { ID_PATTERN } from '../../constants';
+import {
+  buildGptImage2RequestBody,
+  isTaskStatus,
+  pollImageTask,
+  submitImageTask,
+} from '../../utils';
+import type { GptImage2Resolution } from '../../utils';
 import { getCharacterExpressionWorkspace } from '../character-expression';
 import { getCharacterLibrary } from '../character-library';
 import { getCredentialValue } from '../credentials';
@@ -121,24 +127,14 @@ export async function generateIllustration(
     request.revisionPrompt?.trim() ?? '',
   );
   const apiKey = await getCredentialValue('apimart');
-  const body: Record<string, unknown> = {
-    model: 'gpt-image-2',
+  const body = buildGptImage2RequestBody({
+    imageUrls: referenceImages.length > 0 ? referenceImages : undefined,
     n: 1,
     prompt,
-    resolution: request.resolution,
+    resolution: request.resolution as GptImage2Resolution,
     size: request.size,
-  };
-  if (referenceImages.length) {
-    body.image_urls = referenceImages;
-  }
-  const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
-    body: JSON.stringify(body),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
   });
+  const taskId = await submitImageTask(body, apiKey);
 
   // 5. 写回任务记录
   const now = new Date().toISOString();
@@ -147,7 +143,7 @@ export async function generateIllustration(
     characterReferences: requestedCharacterReferences.map(selection => ({ ...selection })),
     createdAt: now,
     errorMessage: null,
-    id: getSubmittedTaskId(payload),
+    id: taskId,
     images: [],
     progress: 0,
     prompt,
@@ -184,11 +180,7 @@ export async function getIllustrationTask(taskId: string): Promise<IllustrationV
     return version;
   }
   const apiKey = await getCredentialValue('apimart');
-  const payload = await requestApi(
-    `${API_BASE_URL}/v1/tasks/${encodeURIComponent(taskId)}?language=zh`,
-    { headers: { Authorization: `Bearer ${apiKey}` }, method: 'GET' },
-  );
-  const taskData = parseTaskData(payload);
+  const taskData = await pollImageTask(taskId, apiKey);
   if (!isTaskStatus(taskData.status)) {
     throw new Error('图片生成服务返回了未知任务状态');
   }

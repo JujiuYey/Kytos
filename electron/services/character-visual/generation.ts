@@ -20,15 +20,15 @@ import {
   LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY,
   MAX_NAME_LENGTH,
 } from './constants';
-import { API_BASE_URL, ID_PATTERN, MAX_PROMPT_LENGTH } from '../../constants';
-import { getSubmittedTaskId, parseTaskData, requestApi } from './api';
+import { ID_PATTERN, MAX_PROMPT_LENGTH } from '../../constants';
 import {
+  buildGptImage2RequestBody,
   isTaskStatus,
-  isVisualResolution,
-  isVisualSize,
-  legacySelectionKey,
-  selectionKey,
-} from './parsers';
+  pollImageTask,
+  submitImageTask,
+} from '../../utils';
+import type { GptImage2Resolution } from '../../utils';
+import { isVisualResolution, isVisualSize, legacySelectionKey, selectionKey } from './parsers';
 import {
   findVisualAsset,
   loadVisualStore,
@@ -83,22 +83,14 @@ export async function generateCharacterAction(
   const { directoryName, image } = reference;
   const referenceDataUrl = await readOfficialReferenceImage(directoryName, image);
   const apiKey = await getCredentialValue('apimart');
-  const body: Record<string, unknown> = {
-    image_urls: [referenceDataUrl],
-    model: 'gpt-image-2',
+  const body = buildGptImage2RequestBody({
+    imageUrls: [referenceDataUrl],
     n: request.count,
     prompt: buildCharacterActionPrompt(request.action),
-    resolution: request.resolution,
+    resolution: request.resolution as GptImage2Resolution,
     size: request.size,
-  };
-  const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
-    body: JSON.stringify(body),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
   });
+  const taskId = await submitImageTask(body, apiKey);
 
   const now = new Date().toISOString();
   const record: LegacyActionRecord = {
@@ -108,7 +100,7 @@ export async function generateCharacterAction(
     referenceAsset: reference.selection,
     createdAt: now,
     errorMessage: null,
-    id: getSubmittedTaskId(payload),
+    id: taskId,
     images: [],
     originalName: null,
     progress: 0,
@@ -140,14 +132,7 @@ export async function getCharacterVisualAssetTask(
   }
 
   const apiKey = await getCredentialValue('apimart');
-  const payload = await requestApi(
-    `${API_BASE_URL}/v1/tasks/${encodeURIComponent(taskId)}?language=zh`,
-    {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      method: 'GET',
-    },
-  );
-  const taskData = parseTaskData(payload);
+  const taskData = await pollImageTask(taskId, apiKey);
   if (!isTaskStatus(taskData.status)) {
     throw new Error('图片生成服务返回了未知任务状态');
   }
@@ -224,28 +209,21 @@ export async function generateCharacterReferenceBoard(
     references.map(({ directoryName, image }) => readOfficialReferenceImage(directoryName, image)),
   );
   const apiKey = await getCredentialValue('apimart');
-  const payload = await requestApi(`${API_BASE_URL}/v1/images/generations`, {
-    body: JSON.stringify({
-      image_urls: referenceImageUrls,
-      model: 'gpt-image-2',
-      n: 1,
-      prompt: request.prompt.trim(),
-      resolution: request.resolution,
-      size: CHARACTER_REFERENCE_BOARD_SIZE,
-    }),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
+  const body = buildGptImage2RequestBody({
+    imageUrls: referenceImageUrls,
+    n: 1,
+    prompt: request.prompt.trim(),
+    resolution: request.resolution as GptImage2Resolution,
+    size: CHARACTER_REFERENCE_BOARD_SIZE,
   });
+  const taskId = await submitImageTask(body, apiKey);
 
   const now = new Date().toISOString();
   const record: LegacyReferenceBoardRecord = {
     count: 1,
     createdAt: now,
     errorMessage: null,
-    id: getSubmittedTaskId(payload),
+    id: taskId,
     images: [],
     name: request.name.trim(),
     originalName: null,

@@ -3,13 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { isPlainObject } from 'es-toolkit';
+import { ID_PATTERN, MAX_PROMPT_LENGTH, WORKSPACE_ASSETS_SUBDIRECTORY } from '../../constants';
 import {
-  API_BASE_URL,
-  ID_PATTERN,
-  MAX_PROMPT_LENGTH,
-  WORKSPACE_ASSETS_SUBDIRECTORY,
-} from '../../constants';
-import { getSubmittedTaskId, isTaskStatus, parseTaskData, requestApi } from '../../utils';
+  buildGptImage2RequestBody,
+  isTaskStatus,
+  pollImageTask,
+  submitImageTask,
+} from '../../utils';
+import type { GptImage2Resolution } from '../../utils';
 import type {
   CharacterVisualGeneration,
   GenerateCharacterVisualRequest,
@@ -44,24 +45,14 @@ export async function generateCharacterVisual(
   validateImageUrls(request.imageUrls);
   const imageUrls = getImageUrls(request);
   const { n, size, resolution } = validateGenerationOptions(request);
-  const body: Record<string, unknown> = {
-    model: 'gpt-image-2',
+  const body = buildGptImage2RequestBody({
+    imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
     n,
     prompt: request.prompt.trim(),
-    resolution,
+    resolution: resolution as GptImage2Resolution,
     size,
-  };
-  if (imageUrls.length) body.image_urls = imageUrls;
-  const taskId = getSubmittedTaskId(
-    await requestApi(`${API_BASE_URL}/v1/images/generations`, {
-      body: JSON.stringify(body),
-      headers: {
-        Authorization: `Bearer ${await getCredentialValue('apimart')}`,
-        'Content-Type': 'application/json',
-      },
-      method: 'POST',
-    }),
-  );
+  });
+  const taskId = await submitImageTask(body, await getCredentialValue('apimart'));
   const now = new Date().toISOString();
   const generation: StoredGeneration = {
     createdAt: now,
@@ -87,15 +78,7 @@ export async function getCharacterVisualGeneration(
   const existing = store.generations.find(generation => generation.id === request.generationId);
   if (!existing) throw new Error('未找到角色视觉任务');
   if (existing.status === 'completed' && existing.images.length > 0) return existing;
-  const taskData = parseTaskData(
-    await requestApi(
-      `${API_BASE_URL}/v1/tasks/${encodeURIComponent(existing.taskId)}?language=zh`,
-      {
-        headers: { Authorization: `Bearer ${await getCredentialValue('apimart')}` },
-        method: 'GET',
-      },
-    ),
-  );
+  const taskData = await pollImageTask(existing.taskId, await getCredentialValue('apimart'));
   if (!isTaskStatus(taskData.status)) throw new Error('图片生成服务返回了未知任务状态');
   const imageUrls = taskData.result?.images?.flatMap(image => image.url) ?? [];
   if (taskData.status === 'completed' && imageUrls.length === 0) {
