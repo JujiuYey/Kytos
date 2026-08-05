@@ -7,8 +7,8 @@ import {
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import type {
   CharacterExpressionRecord,
-  CharacterPortraitImage,
-  CharacterPortraitTaskStatus,
+  CharacterVisualImage,
+  CharacterVisualTaskStatus,
 } from '@/types';
 import ExpressionImageCard from './expression-image-card.vue';
 
@@ -18,10 +18,10 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: 'edit', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
+  (event: 'edit', record: CharacterExpressionRecord, image: CharacterVisualImage): void;
 }>();
 
-const activeStatuses: CharacterPortraitTaskStatus[] = ['submitted', 'pending', 'processing'];
+const activeStatuses: CharacterVisualTaskStatus[] = ['submitted', 'pending', 'processing'];
 
 function isActive(record: CharacterExpressionRecord): boolean {
   return activeStatuses.includes(record.status);
@@ -31,7 +31,7 @@ function getStatusLabel(record: CharacterExpressionRecord): string {
   if (record.source === 'uploaded') {
     return '已上传';
   }
-  const labels: Record<CharacterPortraitTaskStatus, string> = {
+  const labels: Record<CharacterVisualTaskStatus, string> = {
     cancelled: '已取消',
     completed: '已完成',
     failed: '失败',

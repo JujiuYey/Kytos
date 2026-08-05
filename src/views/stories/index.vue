@@ -23,7 +23,7 @@ import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import { SagStatusBadge } from '@/components/sag/status-badge';
-import type { CharacterPortraitImage, StoryProject } from '@/types';
+import type { CharacterVisualImage, StoryProject } from '@/types';
 
 type StoryStatusTone = 'error' | 'info' | 'neutral' | 'success' | 'warning';
 
@@ -54,7 +54,7 @@ const filteredStories = computed(() => {
   });
 });
 
-function getCover(story: StoryProject): CharacterPortraitImage | null {
+function getCover(story: StoryProject): CharacterVisualImage | null {
   const keyShot = story.shots.find(shot => shot.id === story.keyShotId);
   const candidateShots = keyShot
     ? [keyShot, ...story.shots.filter(shot => shot !== keyShot)]

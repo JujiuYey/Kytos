@@ -5,18 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagStatusBadge } from '@/components/sag/status-badge';
-import type { CharacterExpressionRecord, CharacterPortraitImage } from '@/types';
+import type { CharacterExpressionRecord, CharacterVisualImage } from '@/types';
 import { useExpressionActions } from '../contexts/expression-actions-context';
 
 const props = defineProps<{
   record: CharacterExpressionRecord;
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   imageIndex: number;
   statusLabel: string;
 }>();
 
 const emit = defineEmits<{
-  (event: 'edit', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
+  (event: 'edit', record: CharacterExpressionRecord, image: CharacterVisualImage): void;
 }>();
 
 const { deletingFileName, renamingTaskId, requestDelete, requestRename } = useExpressionActions();

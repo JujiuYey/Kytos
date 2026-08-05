@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   CharacterExpressionApi,
   CharacterLibraryApi,
-  CharacterPortraitApi,
+  CharacterVisualAssetApi,
   CharacterVisualApi,
   DesktopApi,
   FileApi,
@@ -81,41 +81,29 @@ const libraryApi: CharacterLibraryApi = {
   updateCharacter: request => ipcRenderer.invoke('character-library:update-character', request),
 };
 
-// 角色头像/设定图/视觉素材管理 IPC 桥接
-const portraitApi: CharacterPortraitApi = {
-  // 删除角色头像
-  deleteCharacterPortrait: request => ipcRenderer.invoke('character-portrait:delete', request),
-  // 删除角色设定图
-  deleteCharacterSheet: request => ipcRenderer.invoke('character-sheet:delete', request),
-  // 生成角色头像
-  generateCharacterPortrait: request => ipcRenderer.invoke('character-portrait:generate', request),
+// 角色视觉资产 IPC 桥接
+const assetsApi: CharacterVisualAssetApi = {
+  // 删除角色视觉资产
+  deleteCharacterVisualAsset: request => ipcRenderer.invoke('character-visual:delete', request),
+  // 生成角色动作
+  generateCharacterAction: request =>
+    ipcRenderer.invoke('character-visual:generate-action', request),
   // 生成角色动作提示词
   generateCharacterActionPrompt: request =>
-    ipcRenderer.invoke('character-portrait:generate-action-prompt', request),
-  // 生成角色设定图
-  generateCharacterSheet: request => ipcRenderer.invoke('character-sheet:generate', request),
-  // 查询角色头像任务
-  getCharacterPortraitTask: taskId => ipcRenderer.invoke('character-portrait:get-task', taskId),
-  // 查询角色头像工作区
-  getCharacterPortraitWorkspace: request =>
-    ipcRenderer.invoke('character-portrait:get-workspace', request),
-  // 查询角色设定图任务
-  getCharacterSheetTask: taskId => ipcRenderer.invoke('character-sheet:get-task', taskId),
-  // 查询角色工作区
-  getCharacterWorkspace: () => ipcRenderer.invoke('character:get-workspace'),
+    ipcRenderer.invoke('character-visual:generate-action-prompt', request),
+  // 生成角色参考板
+  generateCharacterReferenceBoard: request =>
+    ipcRenderer.invoke('character-visual:generate-reference-board', request),
+  // 查询角色视觉任务
+  getCharacterVisualAssetTask: taskId => ipcRenderer.invoke('character-visual:get-task', taskId),
+  // 查询角色视觉工作区
+  getCharacterVisualWorkspace: request =>
+    ipcRenderer.invoke('character-visual:get-workspace', request),
   // 重命名角色视觉素材
   renameCharacterVisualAsset: request => ipcRenderer.invoke('character-visual:rename', request),
-  // 选中角色头像
-  selectCharacterPortrait: request => ipcRenderer.invoke('character-portrait:select', request),
-  // 选中角色设定图
-  selectCharacterSheet: request => ipcRenderer.invoke('character-sheet:select', request),
   // 设为官方角色视觉素材
   setCharacterVisualAssetOfficial: request =>
     ipcRenderer.invoke('character-visual:set-official', request),
-  // 上传角色头像
-  uploadCharacterPortrait: request => ipcRenderer.invoke('character-portrait:upload', request),
-  // 上传角色设定图
-  uploadCharacterSheet: request => ipcRenderer.invoke('character-sheet:upload', request),
   // 上传角色视觉素材
   uploadCharacterVisualAsset: request => ipcRenderer.invoke('character-visual:upload', request),
 };
@@ -194,7 +182,7 @@ const desktop: DesktopApi = {
   illustration: illustrationApi,
   character: {
     library: libraryApi,
-    portrait: portraitApi,
+    assets: assetsApi,
     expression: expressionApi,
     visual: visualApi,
   },

@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { CharacterPortraitResolution } from '@/types';
+import type { CharacterVisualResolution } from '@/types';
 import type { ImageOutputSize } from './types';
 
 const props = withDefaults(
@@ -18,7 +18,7 @@ const props = withDefaults(
     disabled?: boolean;
     fixedSize?: ImageOutputSize;
     idPrefix: string;
-    resolution: CharacterPortraitResolution;
+    resolution: CharacterVisualResolution;
     size?: ImageOutputSize;
     sizeOptions?: readonly ImageOutputSize[];
     title?: string | null;
@@ -36,7 +36,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (event: 'update:count', value: number): void;
-  (event: 'update:resolution', value: CharacterPortraitResolution): void;
+  (event: 'update:resolution', value: CharacterVisualResolution): void;
   (event: 'update:size', value: ImageOutputSize): void;
 }>();
 
@@ -80,7 +80,7 @@ const columnsClass = computed(() => (props.count === undefined ? 'grid-cols-2' :
         <Select
           :model-value="resolution"
           :disabled="disabled"
-          @update:model-value="emit('update:resolution', $event as CharacterPortraitResolution)"
+          @update:model-value="emit('update:resolution', $event as CharacterVisualResolution)"
         >
           <SelectTrigger :id="`${idPrefix}-resolution`" class="w-full">
             <SelectValue />

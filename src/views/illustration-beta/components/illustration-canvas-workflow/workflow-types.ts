@@ -1,7 +1,7 @@
 import type { Node as FlowNode } from '@vue-flow/core';
 import type {
-  CharacterPortraitImage,
-  CharacterPortraitResolution,
+  CharacterVisualImage,
+  CharacterVisualResolution,
   CharacterVisualAssetSelection,
 } from '@/types';
 
@@ -16,7 +16,7 @@ export type WorkflowRunStatus =
   | 'cancelled';
 
 export interface WorkflowAssetOption {
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   key: string;
   label: string;
   selection: CharacterVisualAssetSelection;
@@ -24,7 +24,7 @@ export interface WorkflowAssetOption {
 
 export interface WorkflowAssetNodeData {
   assetKey: string;
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   kind: 'asset';
   label: string;
   selection: CharacterVisualAssetSelection;
@@ -37,14 +37,14 @@ export interface WorkflowGeneratorNodeData {
   name: string;
   prompt: string;
   progress: number;
-  resolution: CharacterPortraitResolution;
+  resolution: CharacterVisualResolution;
   status: WorkflowRunStatus;
   taskId: string;
 }
 
 export interface WorkflowResultNodeData {
   errorMessage: string;
-  image: CharacterPortraitImage | null;
+  image: CharacterVisualImage | null;
   kind: 'result';
   label: string;
   progress: number;

@@ -14,25 +14,20 @@ import {
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import type {
-  CharacterImageRecord,
-  CharacterPortraitImage,
-  CharacterPortraitRecord,
-  CharacterPortraitTaskStatus,
-  CharacterSheetRecord,
+  CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
+  CharacterVisualImage,
+  CharacterVisualTaskStatus,
 } from '@/types';
-
-type AssetKind = 'portrait' | 'sheet';
 
 interface GalleryEntryBase {
   imageIndex: number;
   key: string;
-  kind: AssetKind;
-  record: CharacterImageRecord;
+  record: CharacterVisualAssetRecord;
 }
 
 interface GalleryImageEntry extends GalleryEntryBase {
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   type: 'image';
 }
 
@@ -47,53 +42,35 @@ const props = defineProps<{
   deletingFileName: string;
   officialAssets: CharacterVisualAssetSelection[];
   pollingState: GenerationTaskPollingState;
-  portraitRecords: CharacterPortraitRecord[];
-  selectingFileName: string;
+  records: CharacterVisualAssetRecord[];
   renamingFileName: string;
-  sheetRecords: CharacterSheetRecord[];
+  selectingFileName: string;
 }>();
 
 const emit = defineEmits<{
-  (
-    event: 'delete',
-    kind: AssetKind,
-    record: CharacterImageRecord,
-    image: CharacterPortraitImage,
-  ): void;
-  (event: 'edit', record: CharacterImageRecord, image: CharacterPortraitImage): void;
+  (event: 'delete', record: CharacterVisualAssetRecord, image: CharacterVisualImage): void;
+  (event: 'edit', record: CharacterVisualAssetRecord, image: CharacterVisualImage): void;
   (
     event: 'official',
-    kind: AssetKind,
-    record: CharacterImageRecord,
-    image: CharacterPortraitImage,
+    record: CharacterVisualAssetRecord,
+    image: CharacterVisualImage,
     official: boolean,
   ): void;
-  (
-    event: 'rename',
-    kind: AssetKind,
-    record: CharacterImageRecord,
-    image: CharacterPortraitImage,
-  ): void;
+  (event: 'rename', record: CharacterVisualAssetRecord, image: CharacterVisualImage): void;
 }>();
 
-const activeStatuses: CharacterPortraitTaskStatus[] = ['submitted', 'pending', 'processing'];
+const activeStatuses: CharacterVisualTaskStatus[] = ['submitted', 'pending', 'processing'];
 
-const galleryEntries = computed<GalleryEntry[]>(() =>
-  [
-    ...createEntries('portrait', props.portraitRecords),
-    ...createEntries('sheet', props.sheetRecords),
-  ].sort((left, right) => right.record.createdAt.localeCompare(left.record.createdAt)),
-);
+const galleryEntries = computed<GalleryEntry[]>(() => createEntries(props.records));
 
-function createEntries(kind: AssetKind, records: CharacterImageRecord[]): GalleryEntry[] {
+function createEntries(records: CharacterVisualAssetRecord[]): GalleryEntry[] {
   return records.flatMap((record): GalleryEntry[] => {
     if (isActive(record) || record.status === 'failed' || record.status === 'cancelled') {
       return [
         {
           image: null,
           imageIndex: -1,
-          key: `${kind}:${record.id}:task`,
-          kind,
+          key: `${record.id}:task`,
           record,
           type: 'task' as const,
         },
@@ -104,8 +81,7 @@ function createEntries(kind: AssetKind, records: CharacterImageRecord[]): Galler
       (image, imageIndex): GalleryImageEntry => ({
         image,
         imageIndex,
-        key: `${kind}:${record.id}:${image.fileName}`,
-        kind,
+        key: `${record.id}:${image.fileName}`,
         record,
         type: 'image',
       }),
@@ -113,7 +89,7 @@ function createEntries(kind: AssetKind, records: CharacterImageRecord[]): Galler
   });
 }
 
-function isActive(record: CharacterImageRecord): boolean {
+function isActive(record: CharacterVisualAssetRecord): boolean {
   return activeStatuses.includes(record.status);
 }
 
@@ -122,10 +98,7 @@ function isSelected(entry: GalleryEntry): boolean {
     return false;
   }
   return props.officialAssets.some(
-    asset =>
-      asset.kind === entry.kind &&
-      asset.taskId === entry.record.id &&
-      asset.fileName === entry.image?.fileName,
+    asset => asset.taskId === entry.record.id && asset.fileName === entry.image?.fileName,
   );
 }
 
@@ -133,14 +106,14 @@ function toggleOfficialStatus(entry: GalleryEntry): void {
   if (entry.type !== 'image') {
     return;
   }
-  emit('official', entry.kind, entry.record, entry.image, !isSelected(entry));
+  emit('official', entry.record, entry.image, !isSelected(entry));
 }
 
-function getStatusLabel(record: CharacterImageRecord): string {
+function getStatusLabel(record: CharacterVisualAssetRecord): string {
   if (record.source === 'uploaded') {
     return '已上传';
   }
-  const labels: Record<CharacterPortraitTaskStatus, string> = {
+  const labels: Record<CharacterVisualTaskStatus, string> = {
     cancelled: '已取消',
     completed: '已完成',
     failed: '失败',
@@ -155,8 +128,8 @@ function getImageName(entry: GalleryEntry): string {
   return entry.image?.name || entry.record.name;
 }
 
-function getAspectClass(size: CharacterImageRecord['size']): string {
-  const aspectClasses: Record<CharacterImageRecord['size'], string> = {
+function getAspectClass(size: CharacterVisualAssetRecord['size']): string {
+  const aspectClasses: Record<CharacterVisualAssetRecord['size'], string> = {
     '1:1': 'aspect-square',
     '16:9': 'aspect-video',
     '2:3': 'aspect-[2/3]',
@@ -322,7 +295,7 @@ function formatDate(value: string): string {
                           class="size-8 text-muted-foreground"
                           :disabled="Boolean(renamingFileName) || Boolean(selectingFileName)"
                           :aria-label="`重命名${getImageName(entry)}`"
-                          @click="emit('rename', entry.kind, entry.record, entry.image)"
+                          @click="emit('rename', entry.record, entry.image)"
                         >
                           <Pencil class="size-4" />
                         </Button>
@@ -343,7 +316,7 @@ function formatDate(value: string): string {
                             Boolean(selectingFileName)
                           "
                           :aria-label="`删除${getImageName(entry)}`"
-                          @click="emit('delete', entry.kind, entry.record, entry.image)"
+                          @click="emit('delete', entry.record, entry.image)"
                         >
                           <Trash2 class="size-4" />
                         </Button>

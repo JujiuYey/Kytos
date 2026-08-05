@@ -15,8 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { CharacterPortraitResolution } from '@/types';
-import { MAX_CHARACTER_SHEET_REFERENCE_IMAGES } from '@/types';
+import type { CharacterVisualResolution } from '@/types';
+import { MAX_CHARACTER_REFERENCE_IMAGES } from '@/types';
 import type { WorkflowAssetOption, WorkflowNode } from '../workflow-types';
 
 defineProps<{
@@ -31,7 +31,7 @@ const emit = defineEmits<{
   (event: 'update-asset', value: string): void;
   (event: 'update-name', value: string): void;
   (event: 'update-prompt', value: string): void;
-  (event: 'update-resolution', value: CharacterPortraitResolution): void;
+  (event: 'update-resolution', value: CharacterVisualResolution): void;
 }>();
 </script>
 
@@ -74,7 +74,7 @@ const emit = defineEmits<{
         <dl class="space-y-2 text-xs">
           <div class="flex items-center justify-between gap-3">
             <dt class="text-muted-foreground">类型</dt>
-            <dd>{{ node.data.selection.kind === 'portrait' ? '角色图片' : '角色表' }}</dd>
+            <dd>角色视觉</dd>
           </div>
           <div class="flex items-center justify-between gap-3">
             <dt class="text-muted-foreground">状态</dt>
@@ -87,7 +87,7 @@ const emit = defineEmits<{
         <div class="flex items-center justify-between gap-3 text-sm">
           <span class="text-muted-foreground">已连接参考图</span>
           <Badge variant="secondary">
-            {{ referenceCount }} / {{ MAX_CHARACTER_SHEET_REFERENCE_IMAGES }}
+            {{ referenceCount }} / {{ MAX_CHARACTER_REFERENCE_IMAGES }}
           </Badge>
         </div>
         <div class="space-y-2">

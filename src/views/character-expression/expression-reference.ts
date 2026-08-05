@@ -1,4 +1,4 @@
-import type { CharacterExpressionReferenceSelection, CharacterPortraitImage } from '@/types';
+import type { CharacterExpressionReferenceSelection, CharacterVisualImage } from '@/types';
 
 // 参考图在选择器中的展示分类。
 export type ExpressionReferenceSource = 'expression' | 'visual';
@@ -8,7 +8,7 @@ export interface ExpressionReferenceOption {
   // 补充说明图片的资产类型、尺寸或来源。
   detail: string;
   // 用于预览参考图的图片信息。
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   // 供列表渲染和选中状态匹配使用的稳定唯一键。
   key: string;
   // 展示给用户的参考图名称。

@@ -1,10 +1,9 @@
 // 角色表情模块的类型定义与请求/响应模型
 import type {
-  CharacterImageRecord,
-  CharacterPortraitResolution,
-  CharacterPortraitSelection,
-  CharacterVisualAssetKind,
-} from './character-portrait';
+  CharacterVisualAssetRecord,
+  CharacterVisualResolution,
+  CharacterVisualAssetSelection,
+} from './character-visual';
 import type { CharacterScopeRequest } from './character-library';
 import type { ChatModel } from './character';
 import type { SavedFileResult } from './desktop';
@@ -17,10 +16,10 @@ export const MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES = 16;
 // 角色表情尺寸
 export type CharacterExpressionSize = (typeof CHARACTER_EXPRESSION_SIZES)[number];
 // 角色表情引用类型
-export type CharacterExpressionReferenceKind = CharacterVisualAssetKind | 'expression';
+export type CharacterExpressionReferenceKind = 'visual' | 'expression';
 
 // 角色表情引用选择
-export interface CharacterExpressionReferenceSelection extends CharacterPortraitSelection {
+export interface CharacterExpressionReferenceSelection extends CharacterVisualAssetSelection {
   // 引用类型
   kind: CharacterExpressionReferenceKind;
 }
@@ -36,7 +35,7 @@ export interface GenerateCharacterExpressionRequest extends CharacterScopeReques
   // 参考素材列表
   referenceAssets: CharacterExpressionReferenceSelection[];
   // 分辨率
-  resolution: CharacterPortraitResolution;
+  resolution: CharacterVisualResolution;
   // 尺寸
   size: CharacterExpressionSize;
 }
@@ -44,7 +43,7 @@ export interface GenerateCharacterExpressionRequest extends CharacterScopeReques
 // 角色表情记录
 export interface CharacterExpressionRecord
   extends
-    CharacterImageRecord<CharacterExpressionSize>,
+    Omit<CharacterVisualAssetRecord<CharacterExpressionSize>, 'referenceAssets'>,
     Omit<GenerateCharacterExpressionRequest, 'characterId'> {}
 
 // 角色表情工作区状态

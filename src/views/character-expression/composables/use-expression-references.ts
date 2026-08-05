@@ -2,12 +2,12 @@ import { computed, ref, type Ref } from 'vue';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceSelection,
-  CharacterPortraitWorkspaceState,
+  CharacterVisualWorkspaceState,
 } from '@/types';
 import type { ExpressionReferenceOption } from '../expression-reference';
 
 interface UseExpressionReferencesOptions {
-  portraitWorkspace: Readonly<Ref<CharacterPortraitWorkspaceState | null>>;
+  visualWorkspace: Readonly<Ref<CharacterVisualWorkspaceState | null>>;
   records: Readonly<Ref<CharacterExpressionRecord[]>>;
 }
 
@@ -19,43 +19,24 @@ export function useExpressionReferences(options: UseExpressionReferencesOptions)
   const selectedReferenceAssets = ref<CharacterExpressionReferenceSelection[]>([]);
 
   const referenceOptions = computed<ExpressionReferenceOption[]>(() => {
-    const workspace = options.portraitWorkspace.value;
+    const workspace = options.visualWorkspace.value;
     if (!workspace) {
       return [];
     }
 
-    const portraitOptions = workspace.records.flatMap(record =>
+    const visualOptions = workspace.records.flatMap(record =>
       record.status === 'completed'
         ? record.images.map(image => {
             const selection = {
               fileName: image.fileName,
-              kind: 'portrait' as const,
+              kind: 'visual' as const,
               taskId: record.id,
             };
             return {
-              detail: `角色图片 · ${record.size}`,
+              detail: `角色视觉 · ${record.size}`,
               image,
               key: referenceAssetKey(selection),
-              label: image.name || record.name || '角色图片',
-              selection,
-              source: 'visual' as const,
-            };
-          })
-        : [],
-    );
-    const sheetOptions = workspace.sheetRecords.flatMap(record =>
-      record.status === 'completed'
-        ? record.images.map(image => {
-            const selection = {
-              fileName: image.fileName,
-              kind: 'sheet' as const,
-              taskId: record.id,
-            };
-            return {
-              detail: '角色表 · 16:9',
-              image,
-              key: referenceAssetKey(selection),
-              label: image.name || record.name || '角色表',
+              label: image.name || record.name || '角色视觉',
               selection,
               source: 'visual' as const,
             };
@@ -82,7 +63,7 @@ export function useExpressionReferences(options: UseExpressionReferencesOptions)
         : [],
     );
 
-    return [...portraitOptions, ...sheetOptions, ...expressionOptions];
+    return [...visualOptions, ...expressionOptions];
   });
   const selectedReferenceKeys = computed(() =>
     selectedReferenceAssets.value.map(referenceAssetKey),

@@ -4,9 +4,9 @@ import { Image as AiImage } from '@/components/ai-elements/image';
 import { Button } from '@/components/ui/button';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { CharacterImageSize, CharacterLibraryCharacter } from '@/types';
+import type { CharacterVisualSize, CharacterLibraryCharacter } from '@/types';
 
-const visualAssetAspectClasses: Record<CharacterImageSize, string> = {
+const visualAssetAspectClasses: Record<CharacterVisualSize, string> = {
   '1:1': 'aspect-square',
   '16:9': 'aspect-video',
   '2:3': 'aspect-[2/3]',
@@ -14,7 +14,7 @@ const visualAssetAspectClasses: Record<CharacterImageSize, string> = {
   '4:5': 'aspect-[4/5]',
 };
 
-function getVisualAssetAspectClass(size: CharacterImageSize): string {
+function getVisualAssetAspectClass(size: CharacterVisualSize): string {
   return visualAssetAspectClasses[size];
 }
 

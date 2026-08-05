@@ -67,7 +67,7 @@ function submit(): void {
             id="rename-character-visual"
             v-model="name"
             maxlength="80"
-            placeholder="例如：角色表、定妆照、冬季造型"
+            placeholder="例如：基础形象、冬季造型、挥手动作"
           />
         </div>
         <DialogFooter>

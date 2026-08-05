@@ -3,11 +3,11 @@ import { Check, History, ImageUpscale, LoaderCircle } from '@lucide/vue';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import type { CharacterPortraitImage, CharacterVisualGeneration } from '@/types';
+import type { CharacterVisualImage, CharacterVisualGeneration } from '@/types';
 
 defineProps<{
-  baseImage: CharacterPortraitImage;
-  finalImage: CharacterPortraitImage | null;
+  baseImage: CharacterVisualImage;
+  finalImage: CharacterVisualImage | null;
   finalVersions: CharacterVisualGeneration[];
   isGenerating: boolean;
   isSaved: boolean;

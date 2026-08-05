@@ -1,10 +1,10 @@
 import { ref, type Ref } from 'vue';
 import { toast } from 'vue-sonner';
-import type { CharacterExpressionRecord, CharacterPortraitImage } from '@/types';
+import type { CharacterExpressionRecord, CharacterVisualImage } from '@/types';
 import { toErrorMessage } from '@/utils/helpers';
 
 interface DeleteTarget {
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   record: CharacterExpressionRecord;
 }
 
@@ -18,7 +18,7 @@ export function useExpressionDelete(options: UseExpressionDeleteOptions) {
   const deleteTarget = ref<DeleteTarget | null>(null);
   const deletingFileName = ref('');
 
-  function requestDelete(record: CharacterExpressionRecord, image: CharacterPortraitImage): void {
+  function requestDelete(record: CharacterExpressionRecord, image: CharacterVisualImage): void {
     deleteTarget.value = { image, record };
     deleteDialogOpen.value = true;
   }

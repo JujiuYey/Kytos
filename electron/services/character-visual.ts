@@ -5,34 +5,28 @@ import { generateText } from 'ai';
 import { getChatModelDefinition, isChatModel } from '../../shared/character';
 import type { ChatModel } from '../../shared/character';
 import type {
-  CharacterImageSource,
-  CharacterPortraitImage,
-  CharacterPortraitRecord,
-  CharacterPortraitResolution,
-  CharacterPortraitSelection,
-  CharacterPortraitSize,
-  CharacterPortraitTaskStatus,
-  CharacterPortraitWorkspaceState,
-  CharacterSheetRecord,
+  CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
-  DeleteCharacterPortraitRequest,
-  DeleteCharacterSheetRequest,
+  CharacterVisualImage,
+  CharacterVisualResolution,
+  CharacterVisualSize,
+  CharacterVisualSource,
+  CharacterVisualTaskStatus,
+  CharacterVisualWorkspaceState,
   GenerateCharacterActionPromptRequest,
-  GenerateCharacterPortraitRequest,
-  GenerateCharacterSheetRequest,
+  GenerateCharacterActionRequest,
+  GenerateCharacterReferenceBoardRequest,
   RenameCharacterVisualAssetRequest,
-  SelectCharacterPortraitRequest,
-  SelectCharacterSheetRequest,
   SetCharacterVisualAssetOfficialRequest,
   UploadCharacterVisualAssetRequest,
-} from '../../shared/character-portrait';
+} from '../../shared/character-visual';
 import {
-  CHARACTER_PORTRAIT_RESOLUTIONS,
-  CHARACTER_PORTRAIT_SIZES,
-  CHARACTER_SHEET_SIZE,
+  CHARACTER_REFERENCE_BOARD_SIZE,
+  CHARACTER_VISUAL_RESOLUTIONS,
+  CHARACTER_VISUAL_SIZES,
   MAX_CHARACTER_ACTION_LENGTH,
-  MAX_CHARACTER_SHEET_REFERENCE_IMAGES,
-} from '../../shared/character-portrait';
+  MAX_CHARACTER_REFERENCE_IMAGES,
+} from '../../shared/character-visual';
 import type { SaveFileRequest, SavedFileResult } from '../../shared/desktop';
 import { createChatLanguageModel, getChatProviderOptions } from './chat-provider';
 import { getActiveCharacterDirectory, getCharacterDirectory } from './character-library';
@@ -42,21 +36,38 @@ import { getWorkspaceDirectory } from './workspace';
 import { isPlainObject } from 'es-toolkit';
 
 const API_BASE_URL = 'https://api.apimart.ai';
-const PORTRAIT_STORE_FILE_NAME = 'character-portraits.json';
-const PORTRAIT_ASSET_DIRECTORY = 'character-portraits';
-const SHEET_ASSET_DIRECTORY = 'character-sheets';
+const LEGACY_VISUAL_STORE_FILE_NAME = 'character-portraits.json';
+const LEGACY_ACTION_ASSET_DIRECTORY = 'character-portraits';
+const LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY = 'character-sheets';
 const MAX_PROMPT_LENGTH = 20_000;
 const MAX_STORED_PROMPT_LENGTH = 50_000;
 const MAX_NAME_LENGTH = 80;
 const MAX_REFERENCE_IMAGE_SIZE = 20 * 1024 * 1024;
 const TASK_ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/;
 
-interface StoredPortraitWorkspace {
-  officialAssets: CharacterVisualAssetSelection[];
-  records: CharacterPortraitRecord[];
-  selectedImage: CharacterPortraitSelection | null;
-  selectedSheet: CharacterPortraitSelection | null;
-  sheetRecords: CharacterSheetRecord[];
+type LegacyVisualAssetKind = 'portrait' | 'sheet';
+
+interface LegacyVisualAssetSelection extends CharacterVisualAssetSelection {
+  kind: LegacyVisualAssetKind;
+}
+
+interface LegacyActionRecord extends Omit<CharacterVisualAssetRecord, 'referenceAssets'> {
+  referenceAsset?: LegacyVisualAssetSelection | null;
+}
+
+interface LegacyReferenceBoardRecord extends Omit<CharacterVisualAssetRecord, 'referenceAssets'> {
+  count: 1;
+  referenceAssets: LegacyVisualAssetSelection[];
+  referenceImage: CharacterVisualAssetSelection | null;
+  size: typeof CHARACTER_REFERENCE_BOARD_SIZE;
+}
+
+interface StoredVisualWorkspace {
+  officialAssets: LegacyVisualAssetSelection[];
+  records: LegacyActionRecord[];
+  selectedImage: CharacterVisualAssetSelection | null;
+  selectedSheet: CharacterVisualAssetSelection | null;
+  sheetRecords: LegacyReferenceBoardRecord[];
   version: 3;
 }
 
@@ -73,19 +84,21 @@ interface ApiTaskData {
 
 export interface OfficialCharacterVisualReference {
   directoryName: string;
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   selection: CharacterVisualAssetSelection;
 }
 
-function isPortraitSize(value: unknown): value is CharacterPortraitSize {
-  return CHARACTER_PORTRAIT_SIZES.includes(value as CharacterPortraitSize);
+export type CharacterVisualReference = OfficialCharacterVisualReference;
+
+function isVisualSize(value: unknown): value is CharacterVisualSize {
+  return CHARACTER_VISUAL_SIZES.includes(value as CharacterVisualSize);
 }
 
-function isPortraitResolution(value: unknown): value is CharacterPortraitResolution {
-  return CHARACTER_PORTRAIT_RESOLUTIONS.includes(value as CharacterPortraitResolution);
+function isVisualResolution(value: unknown): value is CharacterVisualResolution {
+  return CHARACTER_VISUAL_RESOLUTIONS.includes(value as CharacterVisualResolution);
 }
 
-function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
+function isTaskStatus(value: unknown): value is CharacterVisualTaskStatus {
   return ['submitted', 'pending', 'processing', 'completed', 'failed', 'cancelled'].includes(
     String(value),
   );
@@ -99,7 +112,7 @@ function parseImage(
   value: unknown,
   directoryName: string,
   fallbackName?: string,
-): CharacterPortraitImage | null {
+): CharacterVisualImage | null {
   if (
     !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
@@ -118,15 +131,15 @@ function parseImage(
   };
 }
 
-function parsePortraitRecord(value: unknown): CharacterPortraitRecord | null {
+function parseLegacyActionRecord(value: unknown): LegacyActionRecord | null {
   if (
     !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !TASK_ID_PATTERN.test(value.id) ||
     typeof value.prompt !== 'string' ||
     value.prompt.length > MAX_STORED_PROMPT_LENGTH ||
-    !isPortraitSize(value.size) ||
-    !isPortraitResolution(value.resolution) ||
+    !isVisualSize(value.size) ||
+    !isVisualResolution(value.resolution) ||
     typeof value.count !== 'number' ||
     !Number.isInteger(value.count) ||
     value.count < 1 ||
@@ -138,8 +151,8 @@ function parsePortraitRecord(value: unknown): CharacterPortraitRecord | null {
 
   const images = Array.isArray(value.images)
     ? value.images
-        .map(image => parseImage(image, PORTRAIT_ASSET_DIRECTORY, '定妆照'))
-        .filter((image): image is CharacterPortraitImage => Boolean(image))
+        .map(image => parseImage(image, LEGACY_ACTION_ASSET_DIRECTORY, '角色视觉'))
+        .filter((image): image is CharacterVisualImage => Boolean(image))
     : [];
 
   return {
@@ -151,11 +164,11 @@ function parsePortraitRecord(value: unknown): CharacterPortraitRecord | null {
     name:
       typeof value.name === 'string' && value.name.trim()
         ? value.name.trim().slice(0, MAX_NAME_LENGTH)
-        : '定妆照',
+        : '角色视觉',
     originalName: typeof value.originalName === 'string' ? value.originalName : null,
     progress: typeof value.progress === 'number' ? Math.min(100, Math.max(0, value.progress)) : 0,
     prompt: value.prompt,
-    referenceAsset: parseVisualAssetSelection(value.referenceAsset),
+    referenceAsset: parseLegacyVisualAssetSelection(value.referenceAsset),
     resolution: value.resolution,
     size: value.size,
     source: value.source === 'uploaded' ? 'uploaded' : 'generated',
@@ -164,15 +177,15 @@ function parsePortraitRecord(value: unknown): CharacterPortraitRecord | null {
   };
 }
 
-function parseSheetRecord(value: unknown): CharacterSheetRecord | null {
+function parseLegacyReferenceBoardRecord(value: unknown): LegacyReferenceBoardRecord | null {
   if (
     !isPlainObject(value) ||
     typeof value.id !== 'string' ||
     !TASK_ID_PATTERN.test(value.id) ||
     typeof value.prompt !== 'string' ||
     value.prompt.length > MAX_STORED_PROMPT_LENGTH ||
-    value.size !== CHARACTER_SHEET_SIZE ||
-    !isPortraitResolution(value.resolution) ||
+    value.size !== CHARACTER_REFERENCE_BOARD_SIZE ||
+    !isVisualResolution(value.resolution) ||
     !isTaskStatus(value.status)
   ) {
     return null;
@@ -180,17 +193,17 @@ function parseSheetRecord(value: unknown): CharacterSheetRecord | null {
 
   const images = Array.isArray(value.images)
     ? value.images
-        .map(image => parseImage(image, SHEET_ASSET_DIRECTORY, '角色表'))
-        .filter((image): image is CharacterPortraitImage => Boolean(image))
+        .map(image => parseImage(image, LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY, '角色参考板'))
+        .filter((image): image is CharacterVisualImage => Boolean(image))
     : [];
   const parsedReferenceAssets = Array.isArray(value.referenceAssets)
     ? value.referenceAssets
-        .map(parseVisualAssetSelection)
-        .filter((asset): asset is CharacterVisualAssetSelection => Boolean(asset))
+        .map(parseLegacyVisualAssetSelection)
+        .filter((asset): asset is LegacyVisualAssetSelection => Boolean(asset))
     : [];
   const referenceAssets = [
-    ...new Map(parsedReferenceAssets.map(asset => [selectionKey(asset), asset])).values(),
-  ].slice(0, MAX_CHARACTER_SHEET_REFERENCE_IMAGES);
+    ...new Map(parsedReferenceAssets.map(asset => [legacySelectionKey(asset), asset])).values(),
+  ].slice(0, MAX_CHARACTER_REFERENCE_IMAGES);
   const legacyReferenceImage = parseSelection(value.referenceImage);
 
   return {
@@ -202,7 +215,7 @@ function parseSheetRecord(value: unknown): CharacterSheetRecord | null {
     name:
       typeof value.name === 'string' && value.name.trim()
         ? value.name.trim().slice(0, MAX_NAME_LENGTH)
-        : '角色表',
+        : '角色参考板',
     originalName: typeof value.originalName === 'string' ? value.originalName : null,
     progress: typeof value.progress === 'number' ? Math.min(100, Math.max(0, value.progress)) : 0,
     prompt: value.prompt,
@@ -213,14 +226,14 @@ function parseSheetRecord(value: unknown): CharacterSheetRecord | null {
         ? { fileName: referenceAssets[0].fileName, taskId: referenceAssets[0].taskId }
         : null),
     resolution: value.resolution,
-    size: CHARACTER_SHEET_SIZE,
+    size: CHARACTER_REFERENCE_BOARD_SIZE,
     source: value.source === 'uploaded' ? 'uploaded' : 'generated',
     status: value.status,
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
   };
 }
 
-function parseSelection(value: unknown): CharacterPortraitSelection | null {
+function parseSelection(value: unknown): CharacterVisualAssetSelection | null {
   if (
     !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
@@ -233,7 +246,7 @@ function parseSelection(value: unknown): CharacterPortraitSelection | null {
   return { fileName: value.fileName, taskId: value.taskId };
 }
 
-function parseVisualAssetSelection(value: unknown): CharacterVisualAssetSelection | null {
+function parseLegacyVisualAssetSelection(value: unknown): LegacyVisualAssetSelection | null {
   const selection = parseSelection(value);
   if (
     !selection ||
@@ -245,16 +258,20 @@ function parseVisualAssetSelection(value: unknown): CharacterVisualAssetSelectio
   return { ...selection, kind: value.kind };
 }
 
-function selectionKey(selection: CharacterVisualAssetSelection): string {
+function legacySelectionKey(selection: LegacyVisualAssetSelection): string {
   return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
 }
 
-function getOfficialAssets(value: Record<string, unknown>): CharacterVisualAssetSelection[] {
+function selectionKey(selection: CharacterVisualAssetSelection): string {
+  return `${selection.taskId}:${selection.fileName}`;
+}
+
+function getOfficialAssets(value: Record<string, unknown>): LegacyVisualAssetSelection[] {
   if (Array.isArray(value.officialAssets)) {
     const assets = value.officialAssets
-      .map(parseVisualAssetSelection)
-      .filter((asset): asset is CharacterVisualAssetSelection => Boolean(asset));
-    return [...new Map(assets.map(asset => [selectionKey(asset), asset])).values()];
+      .map(parseLegacyVisualAssetSelection)
+      .filter((asset): asset is LegacyVisualAssetSelection => Boolean(asset));
+    return [...new Map(assets.map(asset => [legacySelectionKey(asset), asset])).values()];
   }
 
   const selectedImage = parseSelection(value.selectedImage);
@@ -262,10 +279,10 @@ function getOfficialAssets(value: Record<string, unknown>): CharacterVisualAsset
   return [
     selectedImage ? { ...selectedImage, kind: 'portrait' as const } : null,
     selectedSheet ? { ...selectedSheet, kind: 'sheet' as const } : null,
-  ].filter((asset): asset is CharacterVisualAssetSelection => Boolean(asset));
+  ].filter((asset): asset is LegacyVisualAssetSelection => Boolean(asset));
 }
 
-function syncLegacySelections(store: StoredPortraitWorkspace): void {
+function syncLegacySelections(store: StoredVisualWorkspace): void {
   const primary =
     store.officialAssets.find(asset => asset.kind === 'portrait') ?? store.officialAssets[0];
   const secondary =
@@ -277,46 +294,91 @@ function syncLegacySelections(store: StoredPortraitWorkspace): void {
     : null;
 }
 
-function toWorkspaceState(store: StoredPortraitWorkspace): CharacterPortraitWorkspaceState {
+function toWorkspaceState(store: StoredVisualWorkspace): CharacterVisualWorkspaceState {
+  const records = [
+    ...store.records.map(record => toVisualAssetRecord(record, 'action')),
+    ...store.sheetRecords.map(record => toVisualAssetRecord(record, 'reference-board')),
+  ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   return {
-    officialAssets: store.officialAssets,
-    records: store.records,
-    selectedImage: store.selectedImage,
-    selectedSheet: store.selectedSheet,
-    sheetRecords: store.sheetRecords,
+    officialAssets: [
+      ...new Map(
+        store.officialAssets.map(asset => {
+          const selection = toVisualAssetSelection(asset);
+          return [selectionKey(selection), selection];
+        }),
+      ).values(),
+    ],
+    records,
   };
 }
 
-export function getOfficialCharacterVisualReferences(
-  workspace: CharacterPortraitWorkspaceState,
-): OfficialCharacterVisualReference[] {
-  return workspace.officialAssets.flatMap(selection => {
-    const records = selection.kind === 'portrait' ? workspace.records : workspace.sheetRecords;
-    const image = records
-      .find(record => record.id === selection.taskId)
-      ?.images.find(item => item.fileName === selection.fileName);
-    return image
-      ? [
-          {
-            directoryName:
-              selection.kind === 'portrait' ? PORTRAIT_ASSET_DIRECTORY : SHEET_ASSET_DIRECTORY,
-            image,
-            selection,
-          },
-        ]
-      : [];
-  });
+function toVisualAssetSelection(
+  selection: LegacyVisualAssetSelection,
+): CharacterVisualAssetSelection {
+  return { fileName: selection.fileName, taskId: selection.taskId };
 }
 
-async function getPortraitStorePath(characterId?: string): Promise<string> {
+function toVisualAssetRecord(
+  record: LegacyActionRecord | LegacyReferenceBoardRecord,
+  generationMode: CharacterVisualAssetRecord['generationMode'] = null,
+): CharacterVisualAssetRecord {
+  const referenceAssets =
+    'referenceAssets' in record
+      ? record.referenceAssets.map(toVisualAssetSelection)
+      : record.referenceAsset
+        ? [toVisualAssetSelection(record.referenceAsset)]
+        : [];
+  const {
+    referenceAsset: _referenceAsset,
+    referenceImage: _referenceImage,
+    ...baseRecord
+  } = record as LegacyActionRecord & LegacyReferenceBoardRecord;
+  return {
+    ...baseRecord,
+    generationMode: record.source === 'generated' ? generationMode : null,
+    referenceAssets,
+  };
+}
+
+function getAssetDirectory(image: CharacterVisualImage): string {
+  return image.url.includes(`/${LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY}/`)
+    ? LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY
+    : LEGACY_ACTION_ASSET_DIRECTORY;
+}
+
+export function getOfficialCharacterVisualReferences(
+  workspace: CharacterVisualWorkspaceState,
+): OfficialCharacterVisualReference[] {
+  const officialKeys = new Set(workspace.officialAssets.map(selectionKey));
+  return getCharacterVisualReferences(workspace).filter(reference =>
+    officialKeys.has(selectionKey(reference.selection)),
+  );
+}
+
+export function getCharacterVisualReferences(
+  workspace: CharacterVisualWorkspaceState,
+): CharacterVisualReference[] {
+  return workspace.records.flatMap(record =>
+    record.status === 'completed'
+      ? record.images.map(image => ({
+          directoryName: getAssetDirectory(image),
+          image,
+          selection: { fileName: image.fileName, taskId: record.id },
+        }))
+      : [],
+  );
+}
+
+// Historical names are isolated here so existing workspaces remain readable.
+async function getLegacyVisualStorePath(characterId?: string): Promise<string> {
   const characterDirectory = characterId
     ? await getCharacterDirectory(characterId)
     : await getActiveCharacterDirectory();
-  return path.join(characterDirectory, PORTRAIT_STORE_FILE_NAME);
+  return path.join(characterDirectory, LEGACY_VISUAL_STORE_FILE_NAME);
 }
 
-async function loadPortraitStore(characterId?: string): Promise<StoredPortraitWorkspace> {
-  const storePath = await getPortraitStorePath(characterId);
+async function loadVisualStore(characterId?: string): Promise<StoredVisualWorkspace> {
+  const storePath = await getLegacyVisualStorePath(characterId);
   const value = await readJsonFile(storePath);
   if (!isPlainObject(value)) {
     return {
@@ -331,16 +393,16 @@ async function loadPortraitStore(characterId?: string): Promise<StoredPortraitWo
 
   const records = Array.isArray(value.records)
     ? value.records
-        .map(parsePortraitRecord)
-        .filter((record): record is CharacterPortraitRecord => Boolean(record))
+        .map(parseLegacyActionRecord)
+        .filter((record): record is LegacyActionRecord => Boolean(record))
     : [];
   const sheetRecords = Array.isArray(value.sheetRecords)
     ? value.sheetRecords
-        .map(parseSheetRecord)
-        .filter((record): record is CharacterSheetRecord => Boolean(record))
+        .map(parseLegacyReferenceBoardRecord)
+        .filter((record): record is LegacyReferenceBoardRecord => Boolean(record))
     : [];
 
-  const store: StoredPortraitWorkspace = {
+  const store: StoredVisualWorkspace = {
     officialAssets: getOfficialAssets(value),
     records: records.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
     selectedImage: parseSelection(value.selectedImage),
@@ -361,15 +423,12 @@ async function loadPortraitStore(characterId?: string): Promise<StoredPortraitWo
   return store;
 }
 
-async function savePortraitStore(
-  store: StoredPortraitWorkspace,
-  characterId?: string,
-): Promise<void> {
-  await writeJsonFile(await getPortraitStorePath(characterId), store);
+async function saveVisualStore(store: StoredVisualWorkspace, characterId?: string): Promise<void> {
+  await writeJsonFile(await getLegacyVisualStorePath(characterId), store);
 }
 
 function validateGenerateRequest(
-  request: GenerateCharacterPortraitRequest,
+  request: GenerateCharacterActionRequest,
 ): CharacterVisualAssetSelection {
   if (!isPlainObject(request)) {
     throw new Error('生成参数无效');
@@ -387,7 +446,7 @@ function validateGenerateRequest(
   if (!Number.isInteger(request.count) || request.count < 1 || request.count > 4) {
     throw new Error('候选张数必须在 1 到 4 之间');
   }
-  if (!isPortraitSize(request.size) || !isPortraitResolution(request.resolution)) {
+  if (!isVisualSize(request.size) || !isVisualResolution(request.resolution)) {
     throw new Error('图片规格无效');
   }
   return validateVisualAssetSelection(request.referenceAsset);
@@ -580,7 +639,7 @@ function getUploadedImageExtension(request: SaveFileRequest): string {
 async function saveUploadedImage(
   request: SaveFileRequest & { name?: string },
   assetDirectoryName: string,
-): Promise<{ image: CharacterPortraitImage; result: SavedFileResult; uploadId: string }> {
+): Promise<{ image: CharacterVisualImage; result: SavedFileResult; uploadId: string }> {
   validateImageUploadRequest(request);
   const workspacePath = await getWorkspaceDirectory();
   const assetDirectory = path.join(workspacePath, 'assets', assetDirectoryName);
@@ -614,7 +673,7 @@ async function downloadTaskImages(
   taskData: ApiTaskData,
   assetDirectoryName: string,
   name: string,
-): Promise<CharacterPortraitImage[]> {
+): Promise<CharacterVisualImage[]> {
   const imageUrls = taskData.result?.images?.flatMap(image => image.url) ?? [];
   if (imageUrls.length === 0) {
     throw new Error('图片生成任务已完成，但没有返回图片');
@@ -660,9 +719,9 @@ async function downloadTaskImages(
 }
 
 function replaceRecord(
-  store: StoredPortraitWorkspace,
-  record: CharacterPortraitRecord,
-): StoredPortraitWorkspace {
+  store: StoredVisualWorkspace,
+  record: LegacyActionRecord,
+): StoredVisualWorkspace {
   return {
     ...store,
     records: [record, ...store.records.filter(item => item.id !== record.id)].sort((left, right) =>
@@ -672,9 +731,9 @@ function replaceRecord(
 }
 
 function replaceSheetRecord(
-  store: StoredPortraitWorkspace,
-  record: CharacterSheetRecord,
-): StoredPortraitWorkspace {
+  store: StoredVisualWorkspace,
+  record: LegacyReferenceBoardRecord,
+): StoredVisualWorkspace {
   return {
     ...store,
     sheetRecords: [record, ...store.sheetRecords.filter(item => item.id !== record.id)].sort(
@@ -683,10 +742,10 @@ function replaceSheetRecord(
   };
 }
 
-export async function getCharacterPortraitWorkspace(
+export async function getCharacterVisualWorkspace(
   characterId?: string,
-): Promise<CharacterPortraitWorkspaceState> {
-  return toWorkspaceState(await loadPortraitStore(characterId));
+): Promise<CharacterVisualWorkspaceState> {
+  return toWorkspaceState(await loadVisualStore(characterId));
 }
 
 function validateVisualAssetSelection(
@@ -694,7 +753,6 @@ function validateVisualAssetSelection(
 ): CharacterVisualAssetSelection {
   if (
     !isPlainObject(request) ||
-    (request.kind !== 'portrait' && request.kind !== 'sheet') ||
     typeof request.taskId !== 'string' ||
     !TASK_ID_PATTERN.test(request.taskId) ||
     typeof request.fileName !== 'string' ||
@@ -704,105 +762,54 @@ function validateVisualAssetSelection(
   }
   return {
     fileName: request.fileName,
-    kind: request.kind,
     taskId: request.taskId,
   };
 }
 
 function findVisualAsset(
-  store: StoredPortraitWorkspace,
+  store: StoredVisualWorkspace,
   selection: CharacterVisualAssetSelection,
-): { image: CharacterPortraitImage; record: CharacterPortraitRecord | CharacterSheetRecord } {
-  const record =
-    selection.kind === 'portrait'
-      ? store.records.find(item => item.id === selection.taskId)
-      : store.sheetRecords.find(item => item.id === selection.taskId);
-  const image = record?.images.find(item => item.fileName === selection.fileName);
-  if (!record || !image) {
-    throw new Error('未找到这张角色视觉图片');
+): {
+  directoryName: string;
+  image: CharacterVisualImage;
+  record: LegacyActionRecord | LegacyReferenceBoardRecord;
+  selection: LegacyVisualAssetSelection;
+} {
+  for (const candidate of [
+    {
+      directoryName: LEGACY_ACTION_ASSET_DIRECTORY,
+      kind: 'portrait' as const,
+      records: store.records,
+    },
+    {
+      directoryName: LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY,
+      kind: 'sheet' as const,
+      records: store.sheetRecords,
+    },
+  ]) {
+    const record = candidate.records.find(item => item.id === selection.taskId);
+    const image = record?.images.find(item => item.fileName === selection.fileName);
+    if (record && image) {
+      return {
+        directoryName: candidate.directoryName,
+        image,
+        record,
+        selection: { ...selection, kind: candidate.kind },
+      };
+    }
   }
-  return { image, record };
-}
-
-export async function uploadCharacterPortrait(request: SaveFileRequest): Promise<SavedFileResult> {
-  const { image, result, uploadId } = await saveUploadedImage(request, PORTRAIT_ASSET_DIRECTORY);
-  const now = new Date().toISOString();
-  const record: CharacterPortraitRecord = {
-    count: 1,
-    createdAt: now,
-    errorMessage: null,
-    id: uploadId,
-    images: [image],
-    name: '定妆照',
-    originalName: request.fileName,
-    progress: 100,
-    prompt: '',
-    resolution: '1k',
-    size: '2:3',
-    source: 'uploaded',
-    status: 'completed',
-    updatedAt: now,
-  };
-  const store = replaceRecord(await loadPortraitStore(), record);
-  store.officialAssets = [{ fileName: image.fileName, kind: 'portrait', taskId: uploadId }];
-  syncLegacySelections(store);
-  try {
-    await savePortraitStore(store);
-  } catch (error: unknown) {
-    const workspacePath = await getWorkspaceDirectory();
-    await unlink(
-      path.join(workspacePath, 'assets', PORTRAIT_ASSET_DIRECTORY, image.fileName),
-    ).catch(() => undefined);
-    throw error;
-  }
-  return result;
-}
-
-export async function uploadCharacterSheet(request: SaveFileRequest): Promise<SavedFileResult> {
-  const { image, result, uploadId } = await saveUploadedImage(request, SHEET_ASSET_DIRECTORY);
-  const now = new Date().toISOString();
-  const record: CharacterSheetRecord = {
-    count: 1,
-    createdAt: now,
-    errorMessage: null,
-    id: uploadId,
-    images: [image],
-    name: '角色表',
-    originalName: request.fileName,
-    progress: 100,
-    prompt: '',
-    referenceAssets: [],
-    referenceImage: null,
-    resolution: '1k',
-    size: CHARACTER_SHEET_SIZE,
-    source: 'uploaded',
-    status: 'completed',
-    updatedAt: now,
-  };
-  const store = replaceSheetRecord(await loadPortraitStore(), record);
-  store.officialAssets = [
-    ...store.officialAssets.filter(asset => asset.kind !== 'sheet'),
-    { fileName: image.fileName, kind: 'sheet', taskId: uploadId },
-  ];
-  syncLegacySelections(store);
-  try {
-    await savePortraitStore(store);
-  } catch (error: unknown) {
-    const workspacePath = await getWorkspaceDirectory();
-    await unlink(path.join(workspacePath, 'assets', SHEET_ASSET_DIRECTORY, image.fileName)).catch(
-      () => undefined,
-    );
-    throw error;
-  }
-  return result;
+  throw new Error('未找到这张角色视觉图片');
 }
 
 export async function uploadCharacterVisualAsset(
   request: UploadCharacterVisualAssetRequest,
 ): Promise<SavedFileResult> {
-  const { image, result, uploadId } = await saveUploadedImage(request, PORTRAIT_ASSET_DIRECTORY);
+  const { image, result, uploadId } = await saveUploadedImage(
+    request,
+    LEGACY_ACTION_ASSET_DIRECTORY,
+  );
   const now = new Date().toISOString();
-  const record: CharacterPortraitRecord = {
+  const record: LegacyActionRecord = {
     count: 1,
     createdAt: now,
     errorMessage: null,
@@ -818,13 +825,13 @@ export async function uploadCharacterVisualAsset(
     status: 'completed',
     updatedAt: now,
   };
-  const store = replaceRecord(await loadPortraitStore(), record);
+  const store = replaceRecord(await loadVisualStore(request.characterId), record);
   try {
-    await savePortraitStore(store);
+    await saveVisualStore(store, request.characterId);
   } catch (error: unknown) {
     const workspacePath = await getWorkspaceDirectory();
     await unlink(
-      path.join(workspacePath, 'assets', PORTRAIT_ASSET_DIRECTORY, image.fileName),
+      path.join(workspacePath, 'assets', LEGACY_ACTION_ASSET_DIRECTORY, image.fileName),
     ).catch(() => undefined);
     throw error;
   }
@@ -834,14 +841,14 @@ export async function uploadCharacterVisualAsset(
 export async function saveOfficialCharacterVisual(
   characterId: string,
   request: SaveFileRequest,
-  source: CharacterImageSource = 'generated',
+  source: CharacterVisualSource = 'generated',
 ): Promise<void> {
   const { image, uploadId } = await saveUploadedImage(
     { ...request, name: '正式角色视觉' },
-    PORTRAIT_ASSET_DIRECTORY,
+    LEGACY_ACTION_ASSET_DIRECTORY,
   );
   const now = new Date().toISOString();
-  const record: CharacterPortraitRecord = {
+  const record: LegacyActionRecord = {
     count: 1,
     createdAt: now,
     errorMessage: null,
@@ -857,20 +864,20 @@ export async function saveOfficialCharacterVisual(
     status: 'completed',
     updatedAt: now,
   };
-  const selection: CharacterVisualAssetSelection = {
+  const selection: LegacyVisualAssetSelection = {
     fileName: image.fileName,
     kind: 'portrait',
     taskId: uploadId,
   };
-  const store = replaceRecord(await loadPortraitStore(characterId), record);
+  const store = replaceRecord(await loadVisualStore(characterId), record);
   store.officialAssets = [selection];
   syncLegacySelections(store);
   try {
-    await savePortraitStore(store, characterId);
+    await saveVisualStore(store, characterId);
   } catch (error: unknown) {
     const workspacePath = await getWorkspaceDirectory();
     await unlink(
-      path.join(workspacePath, 'assets', PORTRAIT_ASSET_DIRECTORY, image.fileName),
+      path.join(workspacePath, 'assets', LEGACY_ACTION_ASSET_DIRECTORY, image.fileName),
     ).catch(() => undefined);
     throw error;
   }
@@ -878,7 +885,7 @@ export async function saveOfficialCharacterVisual(
 
 export async function renameCharacterVisualAsset(
   request: RenameCharacterVisualAssetRequest,
-): Promise<CharacterPortraitWorkspaceState> {
+): Promise<CharacterVisualWorkspaceState> {
   const selection = validateVisualAssetSelection(request);
   if (
     typeof request.name !== 'string' ||
@@ -887,10 +894,10 @@ export async function renameCharacterVisualAsset(
   ) {
     throw new Error('角色视觉名称无效');
   }
-  const store = await loadPortraitStore();
-  findVisualAsset(store, selection);
+  const store = await loadVisualStore();
+  const match = findVisualAsset(store, selection);
   const normalizedName = request.name.trim();
-  const updateRecord = <T extends CharacterPortraitRecord | CharacterSheetRecord>(
+  const updateRecord = <T extends LegacyActionRecord | LegacyReferenceBoardRecord>(
     record: T,
   ): T => ({
     ...record,
@@ -900,7 +907,7 @@ export async function renameCharacterVisualAsset(
     name: record.images.length === 1 ? normalizedName : record.name,
     updatedAt: new Date().toISOString(),
   });
-  if (selection.kind === 'portrait') {
+  if (match.selection.kind === 'portrait') {
     store.records = store.records.map(record =>
       record.id === selection.taskId ? updateRecord(record) : record,
     );
@@ -909,79 +916,80 @@ export async function renameCharacterVisualAsset(
       record.id === selection.taskId ? updateRecord(record) : record,
     );
   }
-  await savePortraitStore(store);
+  await saveVisualStore(store);
   return toWorkspaceState(store);
 }
 
 export async function setCharacterVisualAssetOfficial(
   request: SetCharacterVisualAssetOfficialRequest,
-): Promise<CharacterPortraitWorkspaceState> {
+): Promise<CharacterVisualWorkspaceState> {
   const selection = validateVisualAssetSelection(request);
   if (typeof request.official !== 'boolean') {
     throw new Error('正式资产状态无效');
   }
-  const store = await loadPortraitStore();
-  findVisualAsset(store, selection);
-  const key = selectionKey(selection);
+  const store = await loadVisualStore();
+  const match = findVisualAsset(store, selection);
+  const key = legacySelectionKey(match.selection);
   store.officialAssets = request.official
     ? [
         ...store.officialAssets,
-        ...(!store.officialAssets.some(asset => selectionKey(asset) === key) ? [selection] : []),
+        ...(!store.officialAssets.some(asset => legacySelectionKey(asset) === key)
+          ? [match.selection]
+          : []),
       ]
-    : store.officialAssets.filter(asset => selectionKey(asset) !== key);
+    : store.officialAssets.filter(asset => legacySelectionKey(asset) !== key);
   syncLegacySelections(store);
-  await savePortraitStore(store);
+  await saveVisualStore(store);
   return toWorkspaceState(store);
 }
 
-export async function deleteCharacterPortrait(
-  request: DeleteCharacterPortraitRequest,
-): Promise<CharacterPortraitWorkspaceState> {
-  if (
-    !isPlainObject(request) ||
-    typeof request.taskId !== 'string' ||
-    !TASK_ID_PATTERN.test(request.taskId) ||
-    typeof request.fileName !== 'string' ||
-    path.basename(request.fileName) !== request.fileName
-  ) {
-    throw new Error('定妆照删除请求无效');
-  }
-
-  const store = await loadPortraitStore();
-  const record = store.records.find(item => item.id === request.taskId);
-  const image = record?.images.find(item => item.fileName === request.fileName);
-  if (!record || !image) {
-    throw new Error('未找到这张定妆照');
-  }
+export async function deleteCharacterVisualAsset(
+  request: CharacterVisualAssetSelection,
+): Promise<CharacterVisualWorkspaceState> {
+  const selection = validateVisualAssetSelection(request);
+  const store = await loadVisualStore();
+  const { directoryName, record, selection: legacySelection } = findVisualAsset(store, selection);
   if (
     store.officialAssets.some(
-      asset => asset.taskId === request.taskId && asset.fileName === request.fileName,
+      asset => legacySelectionKey(asset) === legacySelectionKey(legacySelection),
     )
   ) {
     throw new Error('正式资产不能删除，请先移出正式资产');
   }
 
-  const remainingImages = record.images.filter(item => item.fileName !== request.fileName);
-  const nextStore: StoredPortraitWorkspace = {
+  const remainingImages = record.images.filter(item => item.fileName !== selection.fileName);
+  const nextStore: StoredVisualWorkspace = {
     ...store,
-    records: remainingImages.length
-      ? store.records.map(item =>
-          item.id === record.id
-            ? { ...item, images: remainingImages, updatedAt: new Date().toISOString() }
-            : item,
-        )
-      : store.records.filter(item => item.id !== record.id),
+    ...(legacySelection.kind === 'portrait'
+      ? {
+          records: remainingImages.length
+            ? store.records.map(item =>
+                item.id === record.id
+                  ? { ...item, images: remainingImages, updatedAt: new Date().toISOString() }
+                  : item,
+              )
+            : store.records.filter(item => item.id !== record.id),
+        }
+      : {
+          sheetRecords: remainingImages.length
+            ? store.sheetRecords.map(item =>
+                item.id === record.id
+                  ? { ...item, images: remainingImages, updatedAt: new Date().toISOString() }
+                  : item,
+              )
+            : store.sheetRecords.filter(item => item.id !== record.id),
+        }),
   };
 
-  await savePortraitStore(nextStore);
+  await saveVisualStore(nextStore);
   try {
     const workspacePath = await getWorkspaceDirectory();
-    await unlink(path.join(workspacePath, 'assets', PORTRAIT_ASSET_DIRECTORY, request.fileName));
+    await unlink(path.join(workspacePath, 'assets', directoryName, selection.fileName));
   } catch (error: unknown) {
     if (!isNodeError(error) || error.code !== 'ENOENT') {
-      await savePortraitStore(store);
+      await saveVisualStore(store);
       throw new Error(
-        error instanceof Error ? `定妆照文件删除失败：${error.message}` : '定妆照文件删除失败',
+        error instanceof Error ? `角色视觉文件删除失败：${error.message}` : '角色视觉文件删除失败',
       );
     }
   }
@@ -989,20 +997,23 @@ export async function deleteCharacterPortrait(
   return toWorkspaceState(nextStore);
 }
 
-export async function generateCharacterPortrait(
-  request: GenerateCharacterPortraitRequest,
-): Promise<CharacterPortraitRecord> {
+export async function generateCharacterAction(
+  request: GenerateCharacterActionRequest,
+): Promise<CharacterVisualAssetRecord> {
   const referenceAsset = validateGenerateRequest(request);
-  const store = await loadPortraitStore();
-  if (!store.officialAssets.some(asset => selectionKey(asset) === selectionKey(referenceAsset))) {
+  const store = await loadVisualStore();
+  const reference = findVisualAsset(store, referenceAsset);
+  if (
+    !store.officialAssets.some(
+      asset => legacySelectionKey(asset) === legacySelectionKey(reference.selection),
+    )
+  ) {
     throw new Error('动作参考图必须是当前角色的正式视觉');
   }
-  const { image } = findVisualAsset(store, referenceAsset);
+  const { directoryName, image } = reference;
   const workspacePath = await getWorkspaceDirectory();
-  const referenceDirectory =
-    referenceAsset.kind === 'portrait' ? PORTRAIT_ASSET_DIRECTORY : SHEET_ASSET_DIRECTORY;
   const referenceData = await readFile(
-    path.join(workspacePath, 'assets', referenceDirectory, image.fileName),
+    path.join(workspacePath, 'assets', directoryName, image.fileName),
   );
   if (referenceData.byteLength > MAX_REFERENCE_IMAGE_SIZE) {
     throw new Error(`正式角色视觉图片“${image.name || image.fileName}”超过 20 MB`);
@@ -1026,11 +1037,11 @@ export async function generateCharacterPortrait(
   });
 
   const now = new Date().toISOString();
-  const record: CharacterPortraitRecord = {
+  const record: LegacyActionRecord = {
     count: request.count,
     name: request.name.trim(),
     prompt: request.action.trim(),
-    referenceAsset,
+    referenceAsset: reference.selection,
     createdAt: now,
     errorMessage: null,
     id: getSubmittedTaskId(payload),
@@ -1043,21 +1054,25 @@ export async function generateCharacterPortrait(
     size: request.size,
     updatedAt: now,
   };
-  await savePortraitStore(replaceRecord(store, record));
-  return record;
+  await saveVisualStore(replaceRecord(store, record));
+  return toVisualAssetRecord(record, 'action');
 }
 
-export async function getCharacterPortraitTask(taskId: string): Promise<CharacterPortraitRecord> {
+export async function getCharacterVisualAssetTask(
+  taskId: string,
+): Promise<CharacterVisualAssetRecord> {
   if (!TASK_ID_PATTERN.test(taskId)) {
     throw new Error('图片生成任务编号无效');
   }
-  const store = await loadPortraitStore();
-  const existingRecord = store.records.find(record => record.id === taskId);
+  const store = await loadVisualStore();
+  const actionRecord = store.records.find(record => record.id === taskId);
+  const referenceBoardRecord = store.sheetRecords.find(record => record.id === taskId);
+  const existingRecord = actionRecord ?? referenceBoardRecord;
   if (!existingRecord) {
     throw new Error('未找到图片生成任务');
   }
   if (existingRecord.status === 'completed' && existingRecord.images.length > 0) {
-    return existingRecord;
+    return toVisualAssetRecord(existingRecord, actionRecord ? 'action' : 'reference-board');
   }
 
   const apiKey = await getCredentialValue('apimart');
@@ -1075,9 +1090,14 @@ export async function getCharacterPortraitTask(taskId: string): Promise<Characte
 
   const images =
     taskData.status === 'completed'
-      ? await downloadTaskImages(taskId, taskData, PORTRAIT_ASSET_DIRECTORY, existingRecord.name)
+      ? await downloadTaskImages(
+          taskId,
+          taskData,
+          actionRecord ? LEGACY_ACTION_ASSET_DIRECTORY : LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY,
+          existingRecord.name,
+        )
       : existingRecord.images;
-  const updatedRecord: CharacterPortraitRecord = {
+  const updatedRecord = {
     ...existingRecord,
     errorMessage:
       taskData.status === 'failed' || taskData.status === 'cancelled'
@@ -1091,13 +1111,17 @@ export async function getCharacterPortraitTask(taskId: string): Promise<Characte
     status: taskData.status,
     updatedAt: new Date().toISOString(),
   };
-  await savePortraitStore(replaceRecord(store, updatedRecord));
-  return updatedRecord;
+  await saveVisualStore(
+    actionRecord
+      ? replaceRecord(store, updatedRecord as LegacyActionRecord)
+      : replaceSheetRecord(store, updatedRecord as LegacyReferenceBoardRecord),
+  );
+  return toVisualAssetRecord(updatedRecord, actionRecord ? 'action' : 'reference-board');
 }
 
-export async function generateCharacterSheet(
-  request: GenerateCharacterSheetRequest,
-): Promise<CharacterSheetRecord> {
+export async function generateCharacterReferenceBoard(
+  request: GenerateCharacterReferenceBoardRequest,
+): Promise<CharacterVisualAssetRecord> {
   if (
     !isPlainObject(request) ||
     typeof request.name !== 'string' ||
@@ -1108,21 +1132,26 @@ export async function generateCharacterSheet(
     request.prompt.length > MAX_PROMPT_LENGTH ||
     !Array.isArray(request.referenceAssets) ||
     request.referenceAssets.length < 1 ||
-    request.referenceAssets.length > MAX_CHARACTER_SHEET_REFERENCE_IMAGES ||
-    !isPortraitResolution(request.resolution)
+    request.referenceAssets.length > MAX_CHARACTER_REFERENCE_IMAGES ||
+    !isVisualResolution(request.resolution)
   ) {
     throw new Error('参考图生成参数无效');
   }
 
-  const store = await loadPortraitStore();
+  const store = await loadVisualStore();
   const parsedReferenceAssets = request.referenceAssets.map(validateVisualAssetSelection);
-  const referenceAssets = [
+  const publicReferenceAssets = [
     ...new Map(parsedReferenceAssets.map(asset => [selectionKey(asset), asset])).values(),
   ];
+  const references = publicReferenceAssets.map(referenceAsset =>
+    findVisualAsset(store, referenceAsset),
+  );
   if (
-    referenceAssets.some(
-      referenceAsset =>
-        !store.officialAssets.some(asset => selectionKey(asset) === selectionKey(referenceAsset)),
+    references.some(
+      reference =>
+        !store.officialAssets.some(
+          asset => legacySelectionKey(asset) === legacySelectionKey(reference.selection),
+        ),
     )
   ) {
     throw new Error('画布连接的参考图包含非正式资产');
@@ -1130,12 +1159,9 @@ export async function generateCharacterSheet(
 
   const workspacePath = await getWorkspaceDirectory();
   const referenceImageUrls = await Promise.all(
-    referenceAssets.map(async referenceAsset => {
-      const { image } = findVisualAsset(store, referenceAsset);
-      const referenceDirectory =
-        referenceAsset.kind === 'portrait' ? PORTRAIT_ASSET_DIRECTORY : SHEET_ASSET_DIRECTORY;
+    references.map(async ({ directoryName, image }) => {
       const referenceData = await readFile(
-        path.join(workspacePath, 'assets', referenceDirectory, image.fileName),
+        path.join(workspacePath, 'assets', directoryName, image.fileName),
       );
       if (referenceData.byteLength > MAX_REFERENCE_IMAGE_SIZE) {
         throw new Error(`正式角色视觉图片“${image.name || image.fileName}”超过 20 MB`);
@@ -1151,7 +1177,7 @@ export async function generateCharacterSheet(
       n: 1,
       prompt: request.prompt.trim(),
       resolution: request.resolution,
-      size: CHARACTER_SHEET_SIZE,
+      size: CHARACTER_REFERENCE_BOARD_SIZE,
     }),
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -1161,7 +1187,7 @@ export async function generateCharacterSheet(
   });
 
   const now = new Date().toISOString();
-  const record: CharacterSheetRecord = {
+  const record: LegacyReferenceBoardRecord = {
     count: 1,
     createdAt: now,
     errorMessage: null,
@@ -1171,162 +1197,19 @@ export async function generateCharacterSheet(
     originalName: null,
     progress: 0,
     prompt: request.prompt.trim(),
-    referenceAssets,
-    referenceImage: referenceAssets[0]
-      ? { fileName: referenceAssets[0].fileName, taskId: referenceAssets[0].taskId }
+    referenceAssets: references.map(reference => reference.selection),
+    referenceImage: publicReferenceAssets[0]
+      ? {
+          fileName: publicReferenceAssets[0].fileName,
+          taskId: publicReferenceAssets[0].taskId,
+        }
       : null,
     resolution: request.resolution,
-    size: CHARACTER_SHEET_SIZE,
+    size: CHARACTER_REFERENCE_BOARD_SIZE,
     source: 'generated',
     status: 'submitted',
     updatedAt: now,
   };
-  await savePortraitStore(replaceSheetRecord(store, record));
-  return record;
-}
-
-export async function getCharacterSheetTask(taskId: string): Promise<CharacterSheetRecord> {
-  if (!TASK_ID_PATTERN.test(taskId)) {
-    throw new Error('角色表生成任务编号无效');
-  }
-  const store = await loadPortraitStore();
-  const existingRecord = store.sheetRecords.find(record => record.id === taskId);
-  if (!existingRecord) {
-    throw new Error('未找到角色表生成任务');
-  }
-  if (existingRecord.status === 'completed' && existingRecord.images.length > 0) {
-    return existingRecord;
-  }
-
-  const apiKey = await getCredentialValue('apimart');
-  const payload = await requestApi(
-    `${API_BASE_URL}/v1/tasks/${encodeURIComponent(taskId)}?language=zh`,
-    {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      method: 'GET',
-    },
-  );
-  const taskData = parseTaskData(payload);
-  if (!isTaskStatus(taskData.status)) {
-    throw new Error('图片生成服务返回了未知任务状态');
-  }
-
-  const images =
-    taskData.status === 'completed'
-      ? await downloadTaskImages(taskId, taskData, SHEET_ASSET_DIRECTORY, existingRecord.name)
-      : existingRecord.images;
-  const updatedRecord: CharacterSheetRecord = {
-    ...existingRecord,
-    errorMessage:
-      taskData.status === 'failed' || taskData.status === 'cancelled'
-        ? taskData.error?.message || '角色表生成任务未完成'
-        : null,
-    images,
-    progress:
-      taskData.status === 'completed'
-        ? 100
-        : Math.min(100, Math.max(0, taskData.progress ?? existingRecord.progress)),
-    status: taskData.status,
-    updatedAt: new Date().toISOString(),
-  };
-  await savePortraitStore(replaceSheetRecord(store, updatedRecord));
-  return updatedRecord;
-}
-
-export async function selectCharacterSheet(
-  request: SelectCharacterSheetRequest,
-): Promise<CharacterPortraitWorkspaceState> {
-  if (
-    !isPlainObject(request) ||
-    typeof request.taskId !== 'string' ||
-    !TASK_ID_PATTERN.test(request.taskId) ||
-    typeof request.fileName !== 'string' ||
-    path.basename(request.fileName) !== request.fileName
-  ) {
-    throw new Error('角色表选择无效');
-  }
-
-  const store = await loadPortraitStore();
-  const record = store.sheetRecords.find(item => item.id === request.taskId);
-  if (!record?.images.some(image => image.fileName === request.fileName)) {
-    throw new Error('未找到这张角色表');
-  }
-  return setCharacterVisualAssetOfficial({ ...request, kind: 'sheet', official: true });
-}
-
-export async function deleteCharacterSheet(
-  request: DeleteCharacterSheetRequest,
-): Promise<CharacterPortraitWorkspaceState> {
-  if (
-    !isPlainObject(request) ||
-    typeof request.taskId !== 'string' ||
-    !TASK_ID_PATTERN.test(request.taskId) ||
-    typeof request.fileName !== 'string' ||
-    path.basename(request.fileName) !== request.fileName
-  ) {
-    throw new Error('角色表删除请求无效');
-  }
-
-  const store = await loadPortraitStore();
-  const record = store.sheetRecords.find(item => item.id === request.taskId);
-  const image = record?.images.find(item => item.fileName === request.fileName);
-  if (!record || !image) {
-    throw new Error('未找到这张角色表');
-  }
-  if (
-    store.officialAssets.some(
-      asset => asset.taskId === request.taskId && asset.fileName === request.fileName,
-    )
-  ) {
-    throw new Error('正式资产不能删除，请先移出正式资产');
-  }
-
-  const remainingImages = record.images.filter(item => item.fileName !== request.fileName);
-  const nextStore: StoredPortraitWorkspace = {
-    ...store,
-    sheetRecords: remainingImages.length
-      ? store.sheetRecords.map(item =>
-          item.id === record.id
-            ? { ...item, images: remainingImages, updatedAt: new Date().toISOString() }
-            : item,
-        )
-      : store.sheetRecords.filter(item => item.id !== record.id),
-  };
-
-  await savePortraitStore(nextStore);
-  try {
-    const workspacePath = await getWorkspaceDirectory();
-    await unlink(path.join(workspacePath, 'assets', SHEET_ASSET_DIRECTORY, request.fileName));
-  } catch (error: unknown) {
-    if (!isNodeError(error) || error.code !== 'ENOENT') {
-      await savePortraitStore(store);
-      throw new Error(
-        error instanceof Error ? `角色表文件删除失败：${error.message}` : '角色表文件删除失败',
-      );
-    }
-  }
-
-  return toWorkspaceState(nextStore);
-}
-
-export async function selectCharacterPortrait(
-  request: SelectCharacterPortraitRequest,
-): Promise<CharacterPortraitWorkspaceState> {
-  if (
-    !isPlainObject(request) ||
-    typeof request.taskId !== 'string' ||
-    !TASK_ID_PATTERN.test(request.taskId) ||
-    typeof request.fileName !== 'string' ||
-    path.basename(request.fileName) !== request.fileName
-  ) {
-    throw new Error('定妆照选择无效');
-  }
-
-  const store = await loadPortraitStore();
-  const record = store.records.find(item => item.id === request.taskId);
-  if (!record?.images.some(image => image.fileName === request.fileName)) {
-    throw new Error('未找到这张定妆照');
-  }
-
-  return setCharacterVisualAssetOfficial({ ...request, kind: 'portrait', official: true });
+  await saveVisualStore(replaceSheetRecord(store, record));
+  return toVisualAssetRecord(record, 'reference-board');
 }

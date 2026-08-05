@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
-import { MAX_CHARACTER_SHEET_REFERENCE_IMAGES } from '@/types';
+import { MAX_CHARACTER_REFERENCE_IMAGES } from '@/types';
 import type { WorkflowNodeData, WorkflowRunStatus } from '../workflow-types';
 
 const props = defineProps<{
@@ -121,7 +121,7 @@ function statusLabel(status: WorkflowRunStatus): string {
         <span class="truncate font-medium">{{ data.name }}</span>
         <div class="flex items-center gap-1.5">
           <Badge variant="secondary">
-            参考图 {{ referenceCount || 0 }} / {{ MAX_CHARACTER_SHEET_REFERENCE_IMAGES }}
+            参考图 {{ referenceCount || 0 }} / {{ MAX_CHARACTER_REFERENCE_IMAGES }}
           </Badge>
           <Badge variant="outline">{{ data.resolution.toUpperCase() }} · 16:9</Badge>
         </div>

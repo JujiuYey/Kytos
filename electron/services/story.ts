@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
-  CharacterPortraitImage,
-  CharacterPortraitResolution,
-  CharacterPortraitSelection,
-  CharacterPortraitTaskStatus,
-} from '../../shared/character-portrait';
-import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
+  CharacterVisualImage,
+  CharacterVisualResolution,
+  CharacterVisualAssetSelection,
+  CharacterVisualTaskStatus,
+} from '../../shared/character-visual';
+import { CHARACTER_VISUAL_RESOLUTIONS } from '../../shared/character-visual';
 import type { IllustrationSize } from '../../shared/illustration';
 import { ILLUSTRATION_SIZES } from '../../shared/illustration';
 import type {
@@ -40,9 +40,9 @@ import {
   createEmptyStoryShotContent,
 } from '../../shared/story';
 import {
-  getCharacterPortraitWorkspace,
+  getCharacterVisualWorkspace,
   getOfficialCharacterVisualReferences,
-} from './character-portrait';
+} from './character-visual';
 import { getCredentialValue } from './credentials';
 import { readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
@@ -109,11 +109,11 @@ function isSize(value: unknown): value is IllustrationSize {
   return ILLUSTRATION_SIZES.includes(value as IllustrationSize);
 }
 
-function isResolution(value: unknown): value is CharacterPortraitResolution {
-  return CHARACTER_PORTRAIT_RESOLUTIONS.includes(value as CharacterPortraitResolution);
+function isResolution(value: unknown): value is CharacterVisualResolution {
+  return CHARACTER_VISUAL_RESOLUTIONS.includes(value as CharacterVisualResolution);
 }
 
-function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
+function isTaskStatus(value: unknown): value is CharacterVisualTaskStatus {
   return ['submitted', 'pending', 'processing', 'completed', 'failed', 'cancelled'].includes(
     String(value),
   );
@@ -160,7 +160,7 @@ function parseShotContent(value: unknown): StoryShotContent {
   return content;
 }
 
-function parseSelection(value: unknown): CharacterPortraitSelection | null {
+function parseSelection(value: unknown): CharacterVisualAssetSelection | null {
   if (
     !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
@@ -192,7 +192,7 @@ function getAssetUrl(fileName: string): string {
   return `app://bundle/workspace-assets/${ASSET_DIRECTORY}/${encodeURIComponent(fileName)}`;
 }
 
-function parseImage(value: unknown): CharacterPortraitImage | null {
+function parseImage(value: unknown): CharacterVisualImage | null {
   if (
     !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
@@ -223,8 +223,23 @@ function parseVersion(value: unknown): StoryShotVersion | null {
   ) {
     return null;
   }
+  const characterReferences = Array.isArray(value.characterReferences)
+    ? value.characterReferences
+        .map(parseSelection)
+        .filter((selection): selection is CharacterVisualAssetSelection => Boolean(selection))
+    : [parseSelection(value.referencePortrait), parseSelection(value.referenceSheet)].filter(
+        (selection): selection is CharacterVisualAssetSelection => Boolean(selection),
+      );
   return {
     baseVersion: parseVersionReference(value.baseVersion),
+    characterReferences: [
+      ...new Map(
+        characterReferences.map(selection => [
+          `${selection.taskId}:${selection.fileName}`,
+          selection,
+        ]),
+      ).values(),
+    ],
     continuityVersion: parseVersionReference(value.continuityVersion),
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     errorMessage: typeof value.errorMessage === 'string' ? value.errorMessage : null,
@@ -232,12 +247,10 @@ function parseVersion(value: unknown): StoryShotVersion | null {
     images: Array.isArray(value.images)
       ? value.images
           .map(parseImage)
-          .filter((image): image is CharacterPortraitImage => Boolean(image))
+          .filter((image): image is CharacterVisualImage => Boolean(image))
       : [],
     progress: typeof value.progress === 'number' ? Math.min(100, Math.max(0, value.progress)) : 0,
     prompt: value.prompt,
-    referencePortrait: parseSelection(value.referencePortrait),
-    referenceSheet: parseSelection(value.referenceSheet),
     resolution: value.resolution,
     size: value.size,
     status: value.status,
@@ -772,7 +785,11 @@ export async function saveStoryConversation(
 }
 
 function getApiErrorMessage(payload: unknown, fallback: string): string {
-  if (isPlainObject(payload) && isPlainObject(payload.error) && typeof payload.error.message === 'string') {
+  if (
+    isPlainObject(payload) &&
+    isPlainObject(payload.error) &&
+    typeof payload.error.message === 'string'
+  ) {
     return payload.error.message;
   }
   return fallback;
@@ -855,7 +872,7 @@ function getImageExtension(mimeType: string, imageUrl: string): string {
 async function downloadTaskImages(
   taskId: string,
   taskData: ApiTaskData,
-): Promise<CharacterPortraitImage[]> {
+): Promise<CharacterVisualImage[]> {
   const imageUrls = taskData.result?.images?.flatMap(image => image.url) ?? [];
   if (imageUrls.length === 0) {
     throw new Error('分镜图片生成任务已完成，但没有返回图片');
@@ -891,10 +908,7 @@ async function downloadTaskImages(
   );
 }
 
-async function readReferenceImage(
-  directory: string,
-  image: CharacterPortraitImage,
-): Promise<string> {
+async function readReferenceImage(directory: string, image: CharacterVisualImage): Promise<string> {
   const imageData = await readFile(
     path.join(await getWorkspaceDirectory(), 'assets', directory, image.fileName),
   );
@@ -916,7 +930,7 @@ function getSelectedVersionReference(shot: StoryShot): StoryVersionReference | n
 function resolveVersionImage(
   story: StoryProject,
   reference: StoryVersionReference,
-): CharacterPortraitImage | null {
+): CharacterVisualImage | null {
   const version = story.shots
     .find(shot => shot.id === reference.shotId)
     ?.versions.find(item => item.id === reference.versionId && item.status === 'completed');
@@ -982,18 +996,13 @@ export async function generateStoryShot(
     throw new Error('这个分镜已有图片正在生成');
   }
 
-  const portraitWorkspace = await getCharacterPortraitWorkspace();
-  const characterReferences = getOfficialCharacterVisualReferences(portraitWorkspace);
-  if (!characterReferences.length) {
+  const visualWorkspace = await getCharacterVisualWorkspace();
+  const visualReferences = getOfficialCharacterVisualReferences(visualWorkspace);
+  if (!visualReferences.length) {
     throw new Error('请先将至少一张角色视觉图片设为正式资产');
   }
-  const referencePortrait = characterReferences[0]!.selection;
-  const referenceSheet = characterReferences[1]?.selection ?? null;
-
   const referenceImages = await Promise.all(
-    characterReferences.map(reference =>
-      readReferenceImage(reference.directoryName, reference.image),
-    ),
+    visualReferences.map(reference => readReferenceImage(reference.directoryName, reference.image)),
   );
   let continuityVersion = resolveContinuityReference(story, shot);
   if (continuityVersion) {
@@ -1038,6 +1047,7 @@ export async function generateStoryShot(
   const now = new Date().toISOString();
   const version: StoryShotVersion = {
     baseVersion,
+    characterReferences: visualReferences.map(reference => ({ ...reference.selection })),
     continuityVersion,
     createdAt: now,
     errorMessage: null,
@@ -1045,8 +1055,6 @@ export async function generateStoryShot(
     images: [],
     progress: 0,
     prompt,
-    referencePortrait: { ...referencePortrait },
-    referenceSheet: referenceSheet ? { ...referenceSheet } : null,
     resolution: story.resolution,
     size: story.size,
     status: 'submitted',

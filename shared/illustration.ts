@@ -1,11 +1,10 @@
 // 插画模块的类型定义与请求/响应模型
 import type { UIMessage } from 'ai';
 import type {
-  CharacterPortraitImage,
-  CharacterPortraitResolution,
-  CharacterPortraitSelection,
-  CharacterPortraitTaskStatus,
-} from './character-portrait';
+  CharacterVisualImage,
+  CharacterVisualResolution,
+  CharacterVisualTaskStatus,
+} from './character-visual';
 import type { CharacterExpressionReferenceSelection } from './character-expression';
 
 // 插画 Agent 端点
@@ -85,21 +84,17 @@ export interface IllustrationVersion {
   // 版本ID
   id: string;
   // 图片列表
-  images: CharacterPortraitImage[];
+  images: CharacterVisualImage[];
   // 生成进度
   progress: number;
   // 提示词
   prompt: string;
-  // 引用头像
-  referencePortrait: CharacterPortraitSelection | null;
-  // 引用设定图
-  referenceSheet: CharacterPortraitSelection | null;
   // 分辨率
-  resolution: CharacterPortraitResolution;
+  resolution: CharacterVisualResolution;
   // 尺寸
   size: IllustrationSize;
   // 任务状态
-  status: CharacterPortraitTaskStatus;
+  status: CharacterVisualTaskStatus;
   // 更新时间
   updatedAt: string;
   // 是否使用角色
@@ -191,7 +186,7 @@ export interface GenerateIllustrationRequest {
   // 修订提示词
   revisionPrompt: string | null;
   // 分辨率
-  resolution: CharacterPortraitResolution;
+  resolution: CharacterVisualResolution;
   // 尺寸
   size: IllustrationSize;
   // 主题ID
@@ -245,9 +240,7 @@ export function createEmptyIllustrationBrief(): IllustrationBrief {
 // 插画 API
 export interface IllustrationApi {
   // 创建插画主题
-  createIllustrationTopic: (
-    request: CreateIllustrationTopicRequest,
-  ) => Promise<IllustrationTopic>;
+  createIllustrationTopic: (request: CreateIllustrationTopicRequest) => Promise<IllustrationTopic>;
   // 删除插画主题
   deleteIllustrationTopic: (
     request: DeleteIllustrationTopicRequest,

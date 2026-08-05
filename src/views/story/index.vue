@@ -12,8 +12,8 @@ import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {
-  CharacterPortraitResolution,
-  CharacterPortraitWorkspaceState,
+  CharacterVisualResolution,
+  CharacterVisualWorkspaceState,
   CredentialStatus,
   IllustrationSize,
   StoryAgentMessage,
@@ -44,7 +44,7 @@ const activeStoryId = ref('');
 const deepseekStatus = ref<CredentialStatus | null>(null);
 const minimaxStatus = ref<CredentialStatus | null>(null);
 const apimartStatus = ref<CredentialStatus | null>(null);
-const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
+const visualWorkspace = ref<CharacterVisualWorkspaceState | null>(null);
 const initializationError = ref('');
 const operationError = ref('');
 const isInitializing = ref(true);
@@ -76,9 +76,7 @@ const activeStory = computed(
   () => stories.value.find(story => story.id === activeStoryId.value) ?? null,
 );
 const apimartConfigured = computed(() => Boolean(apimartStatus.value?.configured));
-const characterAssetsReady = computed(() =>
-  Boolean(portraitWorkspace.value?.officialAssets.length),
-);
+const characterAssetsReady = computed(() => Boolean(visualWorkspace.value?.officialAssets.length));
 const assetsReady = computed(() => characterAssetsReady.value);
 
 const transport = new DefaultChatTransport<StoryAgentMessage>({
@@ -275,18 +273,18 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   initializationError.value = '';
   try {
-    const [workspace, deepseek, minimax, apimart, portraits] = await Promise.all([
+    const [workspace, deepseek, minimax, apimart, visuals] = await Promise.all([
       window.desktop.story.getStoryWorkspace(),
       window.desktop.settings.getCredentialStatus('deepseek'),
       window.desktop.settings.getCredentialStatus('minimax'),
       window.desktop.settings.getCredentialStatus('apimart'),
-      window.desktop.character.portrait.getCharacterPortraitWorkspace(),
+      window.desktop.character.assets.getCharacterVisualWorkspace(),
     ]);
     stories.value = workspace.stories;
     deepseekStatus.value = deepseek;
     minimaxStatus.value = minimax;
     apimartStatus.value = apimart;
-    portraitWorkspace.value = portraits;
+    visualWorkspace.value = visuals;
 
     const requestedStoryId =
       typeof route.query.storyId === 'string' ? route.query.storyId : undefined;
@@ -385,7 +383,7 @@ async function updateProject(
   patch: Partial<{
     confirmStoryboard: boolean;
     keyShotId: string;
-    resolution: CharacterPortraitResolution;
+    resolution: CharacterVisualResolution;
     size: IllustrationSize;
     title: string;
   }>,
@@ -606,7 +604,7 @@ function setBase(payload: { reference: StoryVersionReference; shot: StoryShot })
 }
 
 function manageAssets(): void {
-  void router.push(characterAssetsReady.value ? '/illustration-library' : '/character-portrait');
+  void router.push(characterAssetsReady.value ? '/illustration-library' : '/character-visual');
 }
 
 async function confirmDeleteStory(): Promise<void> {

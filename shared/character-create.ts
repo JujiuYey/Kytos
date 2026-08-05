@@ -1,6 +1,6 @@
 // 角色创建 Agent 与视觉素材生成的类型定义
 import type { UIMessage } from 'ai';
-import type { CharacterPortraitImage, CharacterPortraitTaskStatus } from './character-portrait';
+import type { CharacterVisualImage, CharacterVisualTaskStatus } from './character-visual';
 
 // 角色创建 Agent 端点
 export const CHARACTER_CREATE_AGENT_ENDPOINT = 'app://bundle/api/character-create-agent';
@@ -153,13 +153,13 @@ export interface CharacterVisualGeneration {
   // 任务ID
   id: string;
   // 生成的图片
-  image: CharacterPortraitImage | null;
+  image: CharacterVisualImage | null;
   // 生成的所有图片
-  images: CharacterPortraitImage[];
+  images: CharacterVisualImage[];
   // 生成进度
   progress: number;
   // 任务状态
-  status: CharacterPortraitTaskStatus;
+  status: CharacterVisualTaskStatus;
   // 更新时间
   updatedAt: string;
 }

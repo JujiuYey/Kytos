@@ -2,7 +2,7 @@
 import type { StoryApi } from './story';
 import type { IllustrationApi } from './illustration';
 import type { CharacterLibraryApi } from './character-library';
-import type { CharacterPortraitApi } from './character-portrait';
+import type { CharacterVisualAssetApi } from './character-visual';
 import type { CharacterExpressionApi } from './character-expression';
 import type { CharacterVisualApi } from './character-create';
 
@@ -10,7 +10,7 @@ export type {
   StoryApi,
   IllustrationApi,
   CharacterLibraryApi,
-  CharacterPortraitApi,
+  CharacterVisualAssetApi,
   CharacterExpressionApi,
   CharacterVisualApi,
 };
@@ -123,8 +123,8 @@ export interface DesktopApi {
   character: {
     // 角色库
     library: CharacterLibraryApi;
-    // 角色头像与设定图
-    portrait: CharacterPortraitApi;
+    // 角色视觉资产
+    assets: CharacterVisualAssetApi;
     // 角色表情
     expression: CharacterExpressionApi;
     // 角色视觉素材生成

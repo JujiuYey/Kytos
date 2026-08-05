@@ -1,3 +1,3 @@
-import type { CharacterImageSize, IllustrationSize } from '@/types';
+import type { CharacterVisualSize, IllustrationSize } from '@/types';
 
-export type ImageOutputSize = CharacterImageSize | IllustrationSize;
+export type ImageOutputSize = CharacterVisualSize | IllustrationSize;

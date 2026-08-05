@@ -1,4 +1,4 @@
-import type { CharacterPortraitImage } from '@/types';
+import type { CharacterVisualImage } from '@/types';
 
 export interface ImageReferencePickerFilter {
   label: string;
@@ -7,7 +7,7 @@ export interface ImageReferencePickerFilter {
 
 export interface ImageReferencePickerOption {
   detail: string;
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   key: string;
   label: string;
   source: string;

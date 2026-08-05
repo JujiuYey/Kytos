@@ -10,12 +10,12 @@ import type {
   SaveCharacterVisualResult,
 } from '../../shared/character-create';
 import type {
-  CharacterPortraitImage,
-  CharacterPortraitTaskStatus,
-} from '../../shared/character-portrait';
+  CharacterVisualImage,
+  CharacterVisualTaskStatus,
+} from '../../shared/character-visual';
 import type { SaveFileRequest } from '../../shared/desktop';
 import { getCharacterLibrary, prepareCharacterVisualSave } from './character-library';
-import { saveOfficialCharacterVisual } from './character-portrait';
+import { saveOfficialCharacterVisual } from './character-visual';
 import { getCredentialValue } from './credentials';
 import { readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
@@ -47,7 +47,7 @@ interface ApiTaskData {
   status?: string;
 }
 
-function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
+function isTaskStatus(value: unknown): value is CharacterVisualTaskStatus {
   return ['submitted', 'pending', 'processing', 'completed', 'failed', 'cancelled'].includes(
     String(value),
   );
@@ -61,7 +61,7 @@ function getAssetUrl(fileName: string): string {
   return `app://bundle/workspace-assets/${ASSET_DIRECTORY}/${encodeURIComponent(fileName)}`;
 }
 
-function parseImage(value: unknown): CharacterPortraitImage | null {
+function parseImage(value: unknown): CharacterVisualImage | null {
   if (
     !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
@@ -89,9 +89,7 @@ function parseGeneration(value: unknown): StoredGeneration | null {
     return null;
   }
   const images = Array.isArray(value.images)
-    ? value.images
-        .map(parseImage)
-        .filter((image): image is CharacterPortraitImage => Boolean(image))
+    ? value.images.map(parseImage).filter((image): image is CharacterVisualImage => Boolean(image))
     : [];
   const image = parseImage(value.image) ?? images[0] ?? null;
   if (images.length === 0 && image) images.push(image);
@@ -220,7 +218,7 @@ async function downloadImage(
   taskId: string,
   imageUrl: string,
   index: number,
-): Promise<CharacterPortraitImage> {
+): Promise<CharacterVisualImage> {
   const parsedUrl = new URL(imageUrl);
   if (parsedUrl.protocol !== 'https:') throw new Error('图片生成服务返回了不安全的图片地址');
   const response = await fetch(parsedUrl, { signal: AbortSignal.timeout(60_000) });

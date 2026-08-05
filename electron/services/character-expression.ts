@@ -22,15 +22,14 @@ import {
   MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES,
 } from '../../shared/character-expression';
 import type {
-  CharacterPortraitImage,
-  CharacterPortraitResolution,
-  CharacterPortraitTaskStatus,
-  CharacterPortraitWorkspaceState,
-} from '../../shared/character-portrait';
-import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
+  CharacterVisualImage,
+  CharacterVisualResolution,
+  CharacterVisualTaskStatus,
+} from '../../shared/character-visual';
+import { CHARACTER_VISUAL_RESOLUTIONS } from '../../shared/character-visual';
 import type { SavedFileResult } from '../../shared/desktop';
 import { getCharacterDirectory } from './character-library';
-import { getCharacterPortraitWorkspace } from './character-portrait';
+import { getCharacterVisualReferences, getCharacterVisualWorkspace } from './character-visual';
 import { createChatLanguageModel, getChatProviderOptions } from './chat-provider';
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
@@ -40,8 +39,6 @@ import { isPlainObject } from 'es-toolkit';
 const API_BASE_URL = 'https://api.apimart.ai';
 const EXPRESSION_STORE_FILE_NAME = 'character-expressions.json';
 const EXPRESSION_ASSET_DIRECTORY = 'character-expressions';
-const PORTRAIT_ASSET_DIRECTORY = 'character-portraits';
-const SHEET_ASSET_DIRECTORY = 'character-sheets';
 const MAX_NAME_LENGTH = 80;
 const MAX_PROMPT_LENGTH = 20_000;
 const MAX_REFERENCE_IMAGE_SIZE = 20 * 1024 * 1024;
@@ -66,7 +63,7 @@ interface ApiTaskData {
 
 interface ExpressionReferenceData {
   directoryName: string;
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   selection: CharacterExpressionReferenceSelection;
 }
 
@@ -74,11 +71,11 @@ function isExpressionSize(value: unknown): value is CharacterExpressionSize {
   return CHARACTER_EXPRESSION_SIZES.includes(value as CharacterExpressionSize);
 }
 
-function isResolution(value: unknown): value is CharacterPortraitResolution {
-  return CHARACTER_PORTRAIT_RESOLUTIONS.includes(value as CharacterPortraitResolution);
+function isResolution(value: unknown): value is CharacterVisualResolution {
+  return CHARACTER_VISUAL_RESOLUTIONS.includes(value as CharacterVisualResolution);
 }
 
-function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
+function isTaskStatus(value: unknown): value is CharacterVisualTaskStatus {
   return ['submitted', 'pending', 'processing', 'completed', 'failed', 'cancelled'].includes(
     String(value),
   );
@@ -87,7 +84,7 @@ function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
 function parseReferenceSelection(value: unknown): CharacterExpressionReferenceSelection | null {
   if (
     !isPlainObject(value) ||
-    !['expression', 'portrait', 'sheet'].includes(String(value.kind)) ||
+    !['expression', 'visual', 'portrait', 'sheet'].includes(String(value.kind)) ||
     typeof value.fileName !== 'string' ||
     path.basename(value.fileName) !== value.fileName ||
     typeof value.taskId !== 'string' ||
@@ -97,7 +94,7 @@ function parseReferenceSelection(value: unknown): CharacterExpressionReferenceSe
   }
   return {
     fileName: value.fileName,
-    kind: value.kind as CharacterExpressionReferenceSelection['kind'],
+    kind: value.kind === 'expression' ? 'expression' : 'visual',
     taskId: value.taskId,
   };
 }
@@ -110,7 +107,7 @@ function getExpressionAssetUrl(fileName: string): string {
   return `app://bundle/workspace-assets/${EXPRESSION_ASSET_DIRECTORY}/${encodeURIComponent(fileName)}`;
 }
 
-function parseImage(value: unknown): CharacterPortraitImage | null {
+function parseImage(value: unknown): CharacterVisualImage | null {
   if (
     !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
@@ -150,9 +147,7 @@ function parseExpressionRecord(value: unknown): CharacterExpressionRecord | null
   }
 
   const images = Array.isArray(value.images)
-    ? value.images
-        .map(parseImage)
-        .filter((image): image is CharacterPortraitImage => Boolean(image))
+    ? value.images.map(parseImage).filter((image): image is CharacterVisualImage => Boolean(image))
     : [];
   const parsedReferenceAssets = value.referenceAssets.map(parseReferenceSelection);
   if (parsedReferenceAssets.some(asset => !asset)) {
@@ -446,7 +441,7 @@ function getImageExtension(mimeType: string, imageUrl: string): string {
 async function downloadTaskImages(
   taskId: string,
   taskData: ApiTaskData,
-): Promise<CharacterPortraitImage[]> {
+): Promise<CharacterVisualImage[]> {
   const imageUrls = taskData.result?.images?.flatMap(image => image.url) ?? [];
   if (imageUrls.length === 0) {
     throw new Error('表情生成任务已完成，但没有返回图片');
@@ -487,7 +482,7 @@ async function downloadTaskImages(
 async function getReferenceData(
   selection: CharacterExpressionReferenceSelection,
   directoryName: string,
-  image: CharacterPortraitImage,
+  image: CharacterVisualImage,
 ): Promise<string> {
   if (selection.fileName !== image.fileName) {
     throw new Error('选择的角色参考已失效，请重新选择');
@@ -503,35 +498,13 @@ async function getReferenceData(
 }
 
 function getAvailableReferences(
-  portraitWorkspace: CharacterPortraitWorkspaceState,
+  visualReferences: ReturnType<typeof getCharacterVisualReferences>,
   expressionStore: StoredExpressionWorkspace,
 ): ExpressionReferenceData[] {
-  const portraitReferences = portraitWorkspace.records.flatMap(record =>
-    record.status === 'completed'
-      ? record.images.map(image => ({
-          directoryName: PORTRAIT_ASSET_DIRECTORY,
-          image,
-          selection: {
-            fileName: image.fileName,
-            kind: 'portrait' as const,
-            taskId: record.id,
-          },
-        }))
-      : [],
-  );
-  const sheetReferences = portraitWorkspace.sheetRecords.flatMap(record =>
-    record.status === 'completed'
-      ? record.images.map(image => ({
-          directoryName: SHEET_ASSET_DIRECTORY,
-          image,
-          selection: {
-            fileName: image.fileName,
-            kind: 'sheet' as const,
-            taskId: record.id,
-          },
-        }))
-      : [],
-  );
+  const characterVisualReferences = visualReferences.map(reference => ({
+    ...reference,
+    selection: { ...reference.selection, kind: 'visual' as const },
+  }));
   const expressionReferences = expressionStore.records.flatMap(record =>
     record.status === 'completed'
       ? record.images.map(image => ({
@@ -545,7 +518,7 @@ function getAvailableReferences(
         }))
       : [],
   );
-  return [...portraitReferences, ...sheetReferences, ...expressionReferences];
+  return [...characterVisualReferences, ...expressionReferences];
 }
 
 export async function getCharacterExpressionWorkspace(
@@ -562,11 +535,14 @@ export async function generateCharacterExpression(
   request: GenerateCharacterExpressionRequest,
 ): Promise<CharacterExpressionRecord> {
   const requestedAssets = validateGenerateRequest(request);
-  const [portraitWorkspace, expressionStore] = await Promise.all([
-    getCharacterPortraitWorkspace(request.characterId),
+  const [visualWorkspace, expressionStore] = await Promise.all([
+    getCharacterVisualWorkspace(request.characterId),
     loadExpressionStore(request.characterId),
   ]);
-  const availableReferences = getAvailableReferences(portraitWorkspace, expressionStore);
+  const availableReferences = getAvailableReferences(
+    getCharacterVisualReferences(visualWorkspace),
+    expressionStore,
+  );
   const referencesByKey = new Map(
     availableReferences.map(reference => [selectionKey(reference.selection), reference]),
   );

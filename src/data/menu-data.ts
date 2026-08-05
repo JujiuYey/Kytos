@@ -40,9 +40,9 @@ export const menuGroups: MenuGroup[] = [
       },
       {
         title: '角色视觉',
-        key: 'character-portrait',
+        key: 'character-visual',
         icon: Camera,
-        path: '/character-portrait',
+        path: '/character-visual',
       },
       {
         title: '表情管理',

@@ -81,7 +81,7 @@ async function openCharacterVisual(character: CharacterLibraryCharacter): Promis
     });
     await router.push(
       character.visualAsset
-        ? { name: 'character-portrait' }
+        ? { name: 'character-visual' }
         : { name: 'character-create', query: { characterId: character.id } },
     );
   } catch (error: unknown) {

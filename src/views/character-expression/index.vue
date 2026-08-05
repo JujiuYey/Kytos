@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { Laugh } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { useCredentialStatus } from '@/composables/use-credential-status';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { ImageReferencePickerDialog } from '@/components/sag/image-reference-picker-dialog';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
@@ -16,19 +17,21 @@ import type {
   CharacterExpressionSize,
   CharacterExpressionWorkspaceState,
   CharacterLibraryState,
-  CharacterPortraitImage,
-  CharacterPortraitResolution,
-  CharacterPortraitWorkspaceState,
+  CharacterVisualImage,
+  CharacterVisualResolution,
+  CharacterVisualWorkspaceState,
 } from '@/types';
 import { getChatModelDefinition, MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
-import ExpressionGallery from './components/expression-gallery.vue';
+import ExpressionEmptyState from './components/expression-empty-state.vue';
 import ExpressionGeneratorPanel from './components/expression-generator-panel.vue';
 import ExpressionPageHeader from './components/expression-page-header.vue';
 import ExpressionRenameDialog from './components/expression-rename-dialog.vue';
 import ExpressionUploadDialog from './components/expression-upload-dialog.vue';
+import ExpressionRecords from './components/expression-records.vue';
 import { useExpressionDelete } from './composables/use-expression-delete';
 import { useExpressionReferences } from './composables/use-expression-references';
 import { useExpressionRename } from './composables/use-expression-rename';
+import { useExpressionSearch } from './composables/use-expression-search';
 import { useGeneratorOpen } from './composables/use-generator-open';
 import { useReferenceDialog } from './composables/use-reference-dialog';
 import { useUpload } from './composables/use-upload';
@@ -52,8 +55,8 @@ const {
 const library = ref<CharacterLibraryState | null>(null);
 const selectedCharacterId = ref('');
 const records = ref<CharacterExpressionRecord[]>([]);
-const searchQuery = ref('');
-const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
+
+const visualWorkspace = ref<CharacterVisualWorkspaceState | null>(null);
 
 const {
   hasReferences,
@@ -63,7 +66,7 @@ const {
   selectedReferenceKeys,
   selectedReferenceOptions,
   selectReferenceAssets,
-} = useExpressionReferences({ portraitWorkspace, records });
+} = useExpressionReferences({ records, visualWorkspace });
 
 const { deleteDialogOpen, deleteExpression, deletingFileName, requestDelete } = useExpressionDelete(
   {
@@ -73,6 +76,7 @@ const { deleteDialogOpen, deleteExpression, deletingFileName, requestDelete } = 
     },
   },
 );
+const { searchQuery, filteredRecords, clearSearch } = useExpressionSearch({ records });
 const { renameDialogOpen, renameExpression, renameTarget, renamingTaskId, requestRename } =
   useExpressionRename({
     characterId: selectedCharacterId,
@@ -91,7 +95,7 @@ provideExpressionActions({
 const name = ref('');
 const description = ref('');
 const size = ref<CharacterExpressionSize>('1:1');
-const resolution = ref<CharacterPortraitResolution>('1k');
+const resolution = ref<CharacterVisualResolution>('1k');
 const count = ref(2);
 const errorMessage = ref('');
 const isInitializing = ref(true);
@@ -214,10 +218,10 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
 
 function applyExpressionPageData(
   expressionWorkspace: CharacterExpressionWorkspaceState,
-  currentPortraitWorkspace: CharacterPortraitWorkspaceState,
+  currentVisualWorkspace: CharacterVisualWorkspaceState,
 ): void {
   records.value = expressionWorkspace.records;
-  portraitWorkspace.value = currentPortraitWorkspace;
+  visualWorkspace.value = currentVisualWorkspace;
   resetReferences();
 
   const latestGeneratedRecord = expressionWorkspace.records.find(
@@ -242,18 +246,18 @@ async function loadExpressionPageData(characterId: string): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   records.value = [];
-  portraitWorkspace.value = null;
+  visualWorkspace.value = null;
   resetReferences();
 
   try {
-    const [expressionWorkspace, currentPortraitWorkspace] = await Promise.all([
+    const [expressionWorkspace, currentVisualWorkspace] = await Promise.all([
       window.desktop.character.expression.getCharacterExpressionWorkspace({ characterId }),
-      window.desktop.character.portrait.getCharacterPortraitWorkspace({ characterId }),
+      window.desktop.character.assets.getCharacterVisualWorkspace({ characterId }),
     ]);
     if (requestId !== loadRequestId || selectedCharacterId.value !== characterId) {
       return;
     }
-    applyExpressionPageData(expressionWorkspace, currentPortraitWorkspace);
+    applyExpressionPageData(expressionWorkspace, currentVisualWorkspace);
   } catch (initializationError: unknown) {
     if (requestId !== loadRequestId) {
       return;
@@ -360,7 +364,7 @@ async function generateExpressionPrompt(): Promise<void> {
 }
 
 // 编辑表情
-function editExpression(record: CharacterExpressionRecord, image: CharacterPortraitImage): void {
+function editExpression(record: CharacterExpressionRecord, image: CharacterVisualImage): void {
   void router.push({
     name: 'image-editor',
     query: {
@@ -416,7 +420,7 @@ onBeforeUnmount(() => {
       title="生成表情需要角色参考"
       description="可以先准备角色视觉，或上传一张已有表情。"
       action-label="前往角色视觉"
-      to="/character-portrait"
+      to="/character-visual"
     />
 
     <SagMissingPrerequisiteAlert
@@ -444,15 +448,22 @@ onBeforeUnmount(() => {
         generatorOpen && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
       ]"
     >
-      <div class="flex min-h-0 min-w-0">
-        <ExpressionGallery
-          v-model:search-query="searchQuery"
-          :polling-state="pollingState"
-          :records="records"
-          class="min-h-0 min-w-0 flex-1"
-          @edit="editExpression"
-        />
-      </div>
+      <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/15" aria-label="表情资产库">
+        <ScrollArea class="min-h-0 flex-1">
+          <ExpressionRecords
+            v-if="filteredRecords.length"
+            :records="filteredRecords"
+            :polling-state="pollingState"
+            @edit="editExpression"
+          />
+
+          <ExpressionEmptyState
+            v-else
+            :search-query="searchQuery"
+            @update:search-query="clearSearch"
+          />
+        </ScrollArea>
+      </section>
 
       <div v-if="generatorOpen" class="flex min-h-0 min-w-0 p-3 sm:p-4 lg:p-5">
         <ExpressionGeneratorPanel

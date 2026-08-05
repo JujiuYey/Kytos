@@ -4,7 +4,7 @@ import { Laugh, X } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
-import type { CharacterExpressionRecord, CharacterPortraitImage } from '@/types';
+import type { CharacterExpressionRecord, CharacterVisualImage } from '@/types';
 import ExpressionRecords from './expression-records.vue';
 
 const props = defineProps<{
@@ -14,7 +14,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: 'edit', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
+  (event: 'edit', record: CharacterExpressionRecord, image: CharacterVisualImage): void;
   (event: 'update:searchQuery', value: string): void;
 }>();
 

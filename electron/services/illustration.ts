@@ -27,18 +27,18 @@ import {
   createEmptyIllustrationBrief,
 } from '../../shared/illustration';
 import type {
-  CharacterPortraitImage,
-  CharacterPortraitResolution,
-  CharacterPortraitSelection,
-  CharacterPortraitTaskStatus,
-} from '../../shared/character-portrait';
-import { CHARACTER_PORTRAIT_RESOLUTIONS } from '../../shared/character-portrait';
+  CharacterVisualImage,
+  CharacterVisualResolution,
+  CharacterVisualAssetSelection,
+  CharacterVisualTaskStatus,
+} from '../../shared/character-visual';
+import { CHARACTER_VISUAL_RESOLUTIONS } from '../../shared/character-visual';
 import { getCharacterExpressionWorkspace } from './character-expression';
 import { getCharacterLibrary } from './character-library';
 import {
-  getCharacterPortraitWorkspace,
+  getCharacterVisualWorkspace,
   getOfficialCharacterVisualReferences,
-} from './character-portrait';
+} from './character-visual';
 import { getCredentialValue } from './credentials';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
@@ -86,11 +86,11 @@ function isSize(value: unknown): value is IllustrationSize {
   return ILLUSTRATION_SIZES.includes(value as IllustrationSize);
 }
 
-function isResolution(value: unknown): value is CharacterPortraitResolution {
-  return CHARACTER_PORTRAIT_RESOLUTIONS.includes(value as CharacterPortraitResolution);
+function isResolution(value: unknown): value is CharacterVisualResolution {
+  return CHARACTER_VISUAL_RESOLUTIONS.includes(value as CharacterVisualResolution);
 }
 
-function isTaskStatus(value: unknown): value is CharacterPortraitTaskStatus {
+function isTaskStatus(value: unknown): value is CharacterVisualTaskStatus {
   return ['submitted', 'pending', 'processing', 'completed', 'failed', 'cancelled'].includes(
     String(value),
   );
@@ -125,7 +125,7 @@ function parseMessages(value: unknown): IllustrationAgentMessage[] {
     .slice(-200) as IllustrationAgentMessage[];
 }
 
-function parseSelection(value: unknown): CharacterPortraitSelection | null {
+function parseSelection(value: unknown): CharacterVisualAssetSelection | null {
   if (
     !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
@@ -145,13 +145,13 @@ function parseCharacterReferenceSelection(
   if (
     !selection ||
     !isPlainObject(value) ||
-    !['expression', 'portrait', 'sheet'].includes(String(value.kind))
+    !['expression', 'visual', 'portrait', 'sheet'].includes(String(value.kind))
   ) {
     return null;
   }
   return {
     ...selection,
-    kind: value.kind as CharacterExpressionReferenceSelection['kind'],
+    kind: value.kind === 'expression' ? 'expression' : 'visual',
   };
 }
 
@@ -176,7 +176,7 @@ function getAssetUrl(fileName: string): string {
   return `app://bundle/workspace-assets/${ASSET_DIRECTORY}/${encodeURIComponent(fileName)}`;
 }
 
-function parseImage(value: unknown): CharacterPortraitImage | null {
+function parseImage(value: unknown): CharacterVisualImage | null {
   if (
     !isPlainObject(value) ||
     typeof value.fileName !== 'string' ||
@@ -235,28 +235,37 @@ function parseVersion(value: unknown): IllustrationVersion | null {
   ) {
     return null;
   }
+  const characterReferences = Array.isArray(value.characterReferences)
+    ? value.characterReferences
+        .map(parseCharacterReferenceSelection)
+        .filter((selection): selection is CharacterExpressionReferenceSelection =>
+          Boolean(selection),
+        )
+        .slice(0, MAX_ILLUSTRATION_REFERENCE_IMAGES)
+    : [];
+  if (!characterReferences.length) {
+    for (const legacySelection of [
+      parseSelection(value.referencePortrait),
+      parseSelection(value.referenceSheet),
+    ]) {
+      if (legacySelection) {
+        characterReferences.push({ ...legacySelection, kind: 'visual' });
+      }
+    }
+  }
   return {
     baseVersion: parseVersionReference(value.baseVersion),
-    characterReferences: Array.isArray(value.characterReferences)
-      ? value.characterReferences
-          .map(parseCharacterReferenceSelection)
-          .filter((selection): selection is CharacterExpressionReferenceSelection =>
-            Boolean(selection),
-          )
-          .slice(0, MAX_ILLUSTRATION_REFERENCE_IMAGES)
-      : [],
+    characterReferences,
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     errorMessage: typeof value.errorMessage === 'string' ? value.errorMessage : null,
     id: value.id,
     images: Array.isArray(value.images)
       ? value.images
           .map(parseImage)
-          .filter((image): image is CharacterPortraitImage => Boolean(image))
+          .filter((image): image is CharacterVisualImage => Boolean(image))
       : [],
     progress: typeof value.progress === 'number' ? Math.min(100, Math.max(0, value.progress)) : 0,
     prompt: value.prompt,
-    referencePortrait: parseSelection(value.referencePortrait),
-    referenceSheet: parseSelection(value.referenceSheet),
     resolution: value.resolution,
     size: value.size,
     status: value.status,
@@ -466,7 +475,11 @@ export async function saveIllustrationConversation(
 }
 
 function getApiErrorMessage(payload: unknown, fallback: string): string {
-  if (isPlainObject(payload) && isPlainObject(payload.error) && typeof payload.error.message === 'string') {
+  if (
+    isPlainObject(payload) &&
+    isPlainObject(payload.error) &&
+    typeof payload.error.message === 'string'
+  ) {
     return payload.error.message;
   }
   return fallback;
@@ -584,7 +597,7 @@ function getUploadedImageExtension(request: UploadIllustrationRequest): string {
 async function downloadTaskImages(
   taskId: string,
   taskData: ApiTaskData,
-): Promise<CharacterPortraitImage[]> {
+): Promise<CharacterVisualImage[]> {
   const imageUrls = taskData.result?.images?.flatMap(image => image.url) ?? [];
   if (imageUrls.length === 0) {
     throw new Error('插画生成任务已完成，但没有返回图片');
@@ -620,10 +633,7 @@ async function downloadTaskImages(
   );
 }
 
-async function readReferenceImage(
-  directory: string,
-  image: CharacterPortraitImage,
-): Promise<string> {
+async function readReferenceImage(directory: string, image: CharacterVisualImage): Promise<string> {
   const imageData = await readFile(
     path.join(await getWorkspaceDirectory(), 'assets', directory, image.fileName),
   );
@@ -695,15 +705,18 @@ export async function generateIllustration(
 
   const referenceImages: string[] = [];
   let characterReferences: CharacterExpressionReferenceSelection[] = [];
-  let referencePortrait: CharacterPortraitSelection | null = null;
-  let referenceSheet: CharacterPortraitSelection | null = null;
   if (topic.useCharacter) {
     const characterLibrary = await getCharacterLibrary();
-    const [portraitWorkspace, expressionWorkspace] = await Promise.all([
-      getCharacterPortraitWorkspace(),
+    const [visualWorkspace, expressionWorkspace] = await Promise.all([
+      getCharacterVisualWorkspace(),
       getCharacterExpressionWorkspace({ characterId: characterLibrary.activeCharacterId }),
     ]);
-    const visualReferences = getOfficialCharacterVisualReferences(portraitWorkspace);
+    const visualReferences = getOfficialCharacterVisualReferences(visualWorkspace).map(
+      reference => ({
+        ...reference,
+        selection: { ...reference.selection, kind: 'visual' as const },
+      }),
+    );
     const expressionReferences = expressionWorkspace.records.flatMap(record =>
       record.status === 'completed'
         ? record.images.map(image => ({
@@ -739,10 +752,6 @@ export async function generateIllustration(
       }
       return match;
     });
-    referencePortrait =
-      references.find(reference => reference.selection.kind === 'portrait')?.selection ?? null;
-    referenceSheet =
-      references.find(reference => reference.selection.kind === 'sheet')?.selection ?? null;
     referenceImages.push(
       ...(await Promise.all(
         references.map(reference => readReferenceImage(reference.directoryName, reference.image)),
@@ -800,8 +809,6 @@ export async function generateIllustration(
     images: [],
     progress: 0,
     prompt,
-    referencePortrait: referencePortrait ? { ...referencePortrait } : null,
-    referenceSheet: referenceSheet ? { ...referenceSheet } : null,
     resolution: request.resolution,
     size: request.size,
     status: 'submitted',

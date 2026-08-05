@@ -10,17 +10,20 @@ import type {
   SelectCharacterRequest,
   UpdateCharacterRequest,
 } from '../../shared/character-library';
-import type { CharacterImageSize, CharacterPortraitSize } from '../../shared/character-portrait';
-import { CHARACTER_PORTRAIT_SIZES, CHARACTER_SHEET_SIZE } from '../../shared/character-portrait';
+import type { CharacterVisualSize } from '../../shared/character-visual';
+import {
+  CHARACTER_VISUAL_SIZES,
+  CHARACTER_REFERENCE_BOARD_SIZE,
+} from '../../shared/character-visual';
 import { isNodeError, readJsonFile, writeJsonFile } from './json-store';
 import { getWorkspaceDirectory } from './workspace';
 import { isPlainObject } from 'es-toolkit';
 
 const STORE_FILE_NAME = 'character-library.json';
 const CHARACTER_DIRECTORY = 'characters';
-const PORTRAIT_STORE_FILE_NAME = 'character-portraits.json';
-const PORTRAIT_ASSET_DIRECTORY = 'character-portraits';
-const SHEET_ASSET_DIRECTORY = 'character-sheets';
+const LEGACY_VISUAL_STORE_FILE_NAME = 'character-portraits.json';
+const LEGACY_ACTION_ASSET_DIRECTORY = 'character-portraits';
+const LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY = 'character-sheets';
 const LEGACY_CHARACTER_FILES = [
   'character-draft.json',
   'character-expressions.json',
@@ -98,12 +101,12 @@ function getStorePath(workspacePath: string): string {
   return path.join(workspacePath, STORE_FILE_NAME);
 }
 
-function isPortraitSize(value: unknown): value is CharacterPortraitSize {
-  return CHARACTER_PORTRAIT_SIZES.includes(value as CharacterPortraitSize);
+function isVisualSize(value: unknown): value is CharacterVisualSize {
+  return CHARACTER_VISUAL_SIZES.includes(value as CharacterVisualSize);
 }
 
-function isImageSize(value: unknown): value is CharacterImageSize {
-  return isPortraitSize(value) || value === CHARACTER_SHEET_SIZE;
+function isImageSize(value: unknown): value is CharacterVisualSize {
+  return isVisualSize(value) || value === CHARACTER_REFERENCE_BOARD_SIZE;
 }
 
 interface VisualAssetCandidate {
@@ -113,22 +116,23 @@ interface VisualAssetCandidate {
 
 function parseVisualAssetRecords(
   value: unknown,
-  kind: CharacterLibraryVisualAsset['kind'],
+  kind: 'portrait' | 'sheet',
   officialAssets: Set<string>,
 ): VisualAssetCandidate[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  const directory = kind === 'portrait' ? PORTRAIT_ASSET_DIRECTORY : SHEET_ASSET_DIRECTORY;
+  const directory =
+    kind === 'portrait' ? LEGACY_ACTION_ASSET_DIRECTORY : LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY;
   const candidates: VisualAssetCandidate[] = [];
   for (const record of value) {
     if (!isPlainObject(record) || !isImageSize(record.size) || !Array.isArray(record.images)) {
       continue;
     }
     if (
-      (kind === 'portrait' && !isPortraitSize(record.size)) ||
-      (kind === 'sheet' && record.size !== CHARACTER_SHEET_SIZE)
+      (kind === 'portrait' && !isVisualSize(record.size)) ||
+      (kind === 'sheet' && record.size !== CHARACTER_REFERENCE_BOARD_SIZE)
     ) {
       continue;
     }
@@ -142,13 +146,12 @@ function parseVisualAssetRecords(
     if (isPlainObject(image) && typeof image.fileName === 'string') {
       candidates.push({
         asset: {
-          kind,
           name:
             typeof image.name === 'string' && image.name.trim()
               ? image.name.trim()
               : kind === 'portrait'
-                ? '定妆照'
-                : '角色表',
+                ? '角色视觉'
+                : '角色参考板',
           size: record.size,
           url: `app://bundle/workspace-assets/${directory}/${encodeURIComponent(image.fileName)}`,
         },
@@ -199,7 +202,7 @@ async function getCharacterVisualAsset(
 ): Promise<CharacterLibraryVisualAsset | null> {
   try {
     const value = await readJsonFile(
-      path.join(workspacePath, CHARACTER_DIRECTORY, characterId, PORTRAIT_STORE_FILE_NAME),
+      path.join(workspacePath, CHARACTER_DIRECTORY, characterId, LEGACY_VISUAL_STORE_FILE_NAME),
     );
     return parseCharacterVisualAsset(value);
   } catch {

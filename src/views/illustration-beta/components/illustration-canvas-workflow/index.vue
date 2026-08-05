@@ -27,15 +27,14 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import type {
-  CharacterImageRecord,
-  CharacterPortraitImage,
-  CharacterPortraitResolution,
-  CharacterPortraitWorkspaceState,
-  CharacterSheetRecord,
+  CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
+  CharacterVisualImage,
+  CharacterVisualResolution,
+  CharacterVisualWorkspaceState,
   CredentialStatus,
 } from '@/types';
-import { MAX_CHARACTER_SHEET_REFERENCE_IMAGES } from '@/types';
+import { MAX_CHARACTER_REFERENCE_IMAGES } from '@/types';
 import WorkflowInspector from './components/workflow-inspector.vue';
 import WorkflowNodeCard from './components/workflow-node.vue';
 import type {
@@ -103,7 +102,7 @@ const generateDisabled = computed(() => {
     ACTIVE_STATUSES.includes(generator.data.status) ||
     !keyConfigured.value ||
     connectedAssetCount.value < 1 ||
-    connectedAssetCount.value > MAX_CHARACTER_SHEET_REFERENCE_IMAGES ||
+    connectedAssetCount.value > MAX_CHARACTER_REFERENCE_IMAGES ||
     !resultNode ||
     !generator.data.prompt.trim() ||
     generator.data.prompt.length > 20_000 ||
@@ -129,20 +128,19 @@ function buildSheetPrompt(): string {
 }
 
 function assetKey(selection: CharacterVisualAssetSelection): string {
-  return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
+  return `${selection.taskId}:${selection.fileName}`;
 }
 
 function findImage(
-  workspace: CharacterPortraitWorkspaceState,
+  workspace: CharacterVisualWorkspaceState,
   selection: CharacterVisualAssetSelection,
-): { image: CharacterPortraitImage; record: CharacterImageRecord } | null {
-  const recordList = selection.kind === 'portrait' ? workspace.records : workspace.sheetRecords;
-  const record = recordList.find(item => item.id === selection.taskId);
+): { image: CharacterVisualImage; record: CharacterVisualAssetRecord } | null {
+  const record = workspace.records.find(item => item.id === selection.taskId);
   const image = record?.images.find(item => item.fileName === selection.fileName);
   return record && image ? { image, record } : null;
 }
 
-function createAssetOptions(workspace: CharacterPortraitWorkspaceState): WorkflowAssetOption[] {
+function createAssetOptions(workspace: CharacterVisualWorkspaceState): WorkflowAssetOption[] {
   return workspace.officialAssets.flatMap(selection => {
     const match = findImage(workspace, selection);
     if (!match) {
@@ -159,15 +157,17 @@ function createAssetOptions(workspace: CharacterPortraitWorkspaceState): Workflo
   });
 }
 
-function toRunStatus(status: CharacterSheetRecord['status'] | undefined): WorkflowRunStatus {
+function toRunStatus(status: CharacterVisualAssetRecord['status'] | undefined): WorkflowRunStatus {
   return status ?? 'idle';
 }
 
 function initializeGraph(
-  workspace: CharacterPortraitWorkspaceState,
+  workspace: CharacterVisualWorkspaceState,
   options: WorkflowAssetOption[],
 ): void {
-  const latestSheet = workspace.sheetRecords.find(record => record.source === 'generated');
+  const latestReferenceBoard = workspace.records.find(
+    record => record.generationMode === 'reference-board',
+  );
   const assetNodes: WorkflowNode[] = options.slice(0, 1).map((option, index) => ({
     ariaLabel: `参考图：${option.label}`,
     data: {
@@ -183,15 +183,15 @@ function initializeGraph(
     type: 'asset',
   }));
   const generatorNodeData: WorkflowGeneratorNodeData = {
-    errorMessage: latestSheet?.errorMessage || '',
+    errorMessage: latestReferenceBoard?.errorMessage || '',
     kind: 'generator',
     label: '图片生成',
-    name: latestSheet?.name || '角色表',
-    prompt: latestSheet?.prompt || buildSheetPrompt(),
-    progress: latestSheet?.progress || 0,
-    resolution: latestSheet?.resolution || '1k',
-    status: toRunStatus(latestSheet?.status),
-    taskId: latestSheet?.id || '',
+    name: latestReferenceBoard?.name || '角色参考板',
+    prompt: latestReferenceBoard?.prompt || buildSheetPrompt(),
+    progress: latestReferenceBoard?.progress || 0,
+    resolution: latestReferenceBoard?.resolution || '1k',
+    status: toRunStatus(latestReferenceBoard?.status),
+    taskId: latestReferenceBoard?.id || '',
   };
   const generator: WorkflowNode = {
     ariaLabel: '图片生成',
@@ -205,12 +205,12 @@ function initializeGraph(
   const result: WorkflowNode = {
     ariaLabel: '生成结果',
     data: {
-      errorMessage: latestSheet?.errorMessage || '',
-      image: latestSheet?.images[0] || null,
+      errorMessage: latestReferenceBoard?.errorMessage || '',
+      image: latestReferenceBoard?.images[0] || null,
       kind: 'result',
-      label: latestSheet?.name || '生成结果',
-      progress: latestSheet?.progress || 0,
-      status: toRunStatus(latestSheet?.status),
+      label: latestReferenceBoard?.name || '生成结果',
+      progress: latestReferenceBoard?.progress || 0,
+      status: toRunStatus(latestReferenceBoard?.status),
     },
     deletable: false,
     draggable: false,
@@ -226,9 +226,9 @@ function initializeGraph(
     createFixedResultEdge(),
   ];
 
-  if (latestSheet && ACTIVE_STATUSES.includes(latestSheet.status)) {
+  if (latestReferenceBoard && ACTIVE_STATUSES.includes(latestReferenceBoard.status)) {
     isSubmitting.value = true;
-    schedulePoll(latestSheet.id);
+    schedulePoll(latestReferenceBoard.id);
   }
 }
 
@@ -262,7 +262,7 @@ const isValidConnection: ValidConnectionFunc = (
   const connectedReferenceCount = new Set(
     graphEdges.filter(edge => edge.target === 'generator').map(edge => edge.source),
   ).size;
-  return sourceAlreadyConnected || connectedReferenceCount < MAX_CHARACTER_SHEET_REFERENCE_IMAGES;
+  return sourceAlreadyConnected || connectedReferenceCount < MAX_CHARACTER_REFERENCE_IMAGES;
 };
 
 function createFixedResultEdge(): Edge {
@@ -304,7 +304,7 @@ function handleConnect(connection: Connection): void {
   if (
     sourceNode.type !== 'asset' ||
     targetNode.type !== 'generator' ||
-    findIncomingNodes(targetNode.id, 'asset').length >= MAX_CHARACTER_SHEET_REFERENCE_IMAGES
+    findIncomingNodes(targetNode.id, 'asset').length >= MAX_CHARACTER_REFERENCE_IMAGES
   ) {
     return;
   }
@@ -411,7 +411,7 @@ function updateGeneratorName(value: string): void {
   nodes.value = [...nodes.value];
 }
 
-function updateGeneratorResolution(value: CharacterPortraitResolution): void {
+function updateGeneratorResolution(value: CharacterVisualResolution): void {
   const node = selectedNode.value;
   if (!node || node.data.kind !== 'generator') {
     return;
@@ -463,7 +463,7 @@ async function pollTask(taskId: string): Promise<void> {
     return;
   }
   try {
-    const record = await window.desktop.character.portrait.getCharacterSheetTask(taskId);
+    const record = await window.desktop.character.assets.getCharacterVisualAssetTask(taskId);
     updateGeneratorStatus('generator', {
       errorMessage: record.errorMessage || '',
       progress: record.progress,
@@ -506,7 +506,7 @@ async function generateFromNode(generatorId = 'generator'): Promise<void> {
     !generator ||
     generator.data.kind !== 'generator' ||
     assetNodes.length < 1 ||
-    assetNodes.length > MAX_CHARACTER_SHEET_REFERENCE_IMAGES ||
+    assetNodes.length > MAX_CHARACTER_REFERENCE_IMAGES ||
     !resultNode ||
     resultNode.data.kind !== 'result'
   ) {
@@ -516,8 +516,7 @@ async function generateFromNode(generatorId = 'generator'): Promise<void> {
     if (node.data.kind !== 'asset') {
       return [];
     }
-    const { fileName, kind, taskId } = node.data.selection;
-    return [{ fileName, kind, taskId }];
+    return [{ ...node.data.selection }];
   });
   if (referenceAssets.length !== assetNodes.length) {
     return;
@@ -534,7 +533,7 @@ async function generateFromNode(generatorId = 'generator'): Promise<void> {
     status: 'submitted',
   });
   try {
-    const record = await window.desktop.character.portrait.generateCharacterSheet({
+    const record = await window.desktop.character.assets.generateCharacterReferenceBoard({
       name: generator.data.name.trim(),
       prompt: generator.data.prompt.trim(),
       referenceAssets,
@@ -561,7 +560,7 @@ async function initialize(): Promise<void> {
   errorMessage.value = '';
   try {
     const [workspace, status] = await Promise.all([
-      window.desktop.character.portrait.getCharacterPortraitWorkspace(),
+      window.desktop.character.assets.getCharacterVisualWorkspace(),
       window.desktop.settings.getCredentialStatus('apimart'),
     ]);
     credentialStatus.value = status;

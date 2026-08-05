@@ -59,30 +59,22 @@ export {
   MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES,
 } from '../../shared/character-expression';
 export type {
-  CharacterImageRecord,
-  CharacterImageSize,
-  CharacterImageSource,
-  CharacterPortraitImage,
-  CharacterPortraitRecord,
-  CharacterPortraitResolution,
-  CharacterPortraitSelection,
-  CharacterPortraitSize,
-  CharacterPortraitTaskStatus,
-  CharacterPortraitWorkspaceState,
-  CharacterSheetRecord,
-  CharacterVisualAssetKind,
+  CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
-  DeleteCharacterPortraitRequest,
-  DeleteCharacterSheetRequest,
+  CharacterVisualAssetUpload,
+  CharacterVisualImage,
+  CharacterVisualResolution,
+  CharacterVisualSize,
+  CharacterVisualSource,
+  CharacterVisualTaskStatus,
+  CharacterVisualWorkspaceState,
+  GenerateCharacterActionRequest,
   GenerateCharacterActionPromptRequest,
-  GenerateCharacterPortraitRequest,
-  GenerateCharacterSheetRequest,
+  GenerateCharacterReferenceBoardRequest,
   RenameCharacterVisualAssetRequest,
-  SelectCharacterPortraitRequest,
-  SelectCharacterSheetRequest,
   SetCharacterVisualAssetOfficialRequest,
   UploadCharacterVisualAssetRequest,
-} from '../../shared/character-portrait';
+} from '../../shared/character-visual';
 export {
   CHARACTER_DRAFT_FIELDS,
   CHARACTER_SEED_FIELDS,
@@ -113,12 +105,12 @@ export type {
   MiniMaxModel,
 } from '../../shared/character';
 export {
-  CHARACTER_PORTRAIT_RESOLUTIONS,
-  CHARACTER_PORTRAIT_SIZES,
-  CHARACTER_SHEET_SIZE,
+  CHARACTER_VISUAL_RESOLUTIONS,
+  CHARACTER_VISUAL_SIZES,
+  CHARACTER_REFERENCE_BOARD_SIZE,
   MAX_CHARACTER_ACTION_LENGTH,
-  MAX_CHARACTER_SHEET_REFERENCE_IMAGES,
-} from '../../shared/character-portrait';
+  MAX_CHARACTER_REFERENCE_IMAGES,
+} from '../../shared/character-visual';
 export type {
   CreateIllustrationTopicRequest,
   DeleteIllustrationUploadRequest,

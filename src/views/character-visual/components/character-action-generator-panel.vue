@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import type { CharacterPortraitResolution, CharacterPortraitSize } from '@/types';
-import { CHARACTER_PORTRAIT_SIZES, MAX_CHARACTER_ACTION_LENGTH } from '@/types';
+import type { CharacterVisualResolution, CharacterVisualSize } from '@/types';
+import { CHARACTER_VISUAL_SIZES, MAX_CHARACTER_ACTION_LENGTH } from '@/types';
 
 defineProps<{
   action: string;
@@ -21,8 +21,8 @@ defineProps<{
   promptGenerationAvailable: boolean;
   promptGenerating: boolean;
   referenceAssets: ImageReferencePickerOption[];
-  resolution: CharacterPortraitResolution;
-  size: CharacterPortraitSize;
+  resolution: CharacterVisualResolution;
+  size: CharacterVisualSize;
 }>();
 
 const emit = defineEmits<{
@@ -33,8 +33,8 @@ const emit = defineEmits<{
   (event: 'update:action', value: string): void;
   (event: 'update:count', value: number): void;
   (event: 'update:name', value: string): void;
-  (event: 'update:resolution', value: CharacterPortraitResolution): void;
-  (event: 'update:size', value: CharacterPortraitSize): void;
+  (event: 'update:resolution', value: CharacterVisualResolution): void;
+  (event: 'update:size', value: CharacterVisualSize): void;
 }>();
 
 const quickActions = [
@@ -197,10 +197,10 @@ function selectQuickAction(action: (typeof quickActions)[number]): void {
           :disabled="busy"
           :resolution="resolution"
           :size="size"
-          :size-options="CHARACTER_PORTRAIT_SIZES"
+          :size-options="CHARACTER_VISUAL_SIZES"
           @update:count="emit('update:count', $event)"
           @update:resolution="emit('update:resolution', $event)"
-          @update:size="emit('update:size', $event as CharacterPortraitSize)"
+          @update:size="emit('update:size', $event as CharacterVisualSize)"
         />
       </div>
     </ScrollArea>

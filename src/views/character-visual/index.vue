@@ -17,26 +17,22 @@ import { SagMissingPrerequisiteAlert } from '@/components/sag/missing-prerequisi
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {
-  CharacterImageRecord,
   CharacterLibraryState,
-  CharacterPortraitImage,
-  CharacterPortraitRecord,
-  CharacterPortraitResolution,
-  CharacterPortraitSize,
-  CharacterPortraitWorkspaceState,
-  CharacterSheetRecord,
+  CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
+  CharacterVisualAssetUpload,
+  CharacterVisualImage,
+  CharacterVisualResolution,
+  CharacterVisualSize,
+  CharacterVisualWorkspaceState,
   CredentialStatus,
   SavedFileResult,
-  UploadCharacterVisualAssetRequest,
 } from '@/types';
 import { getChatModelDefinition, MAX_CHARACTER_ACTION_LENGTH } from '@/types';
-import PortraitGallery from './components/portrait-gallery.vue';
-import PortraitPageHeader from './components/portrait-page-header.vue';
-import PortraitGeneratorPanel from './components/portrait-generator-panel.vue';
+import CharacterActionGeneratorPanel from './components/character-action-generator-panel.vue';
+import VisualGallery from './components/visual-gallery.vue';
+import VisualPageHeader from './components/visual-page-header.vue';
 import VisualAssetRenameDialog from './components/visual-asset-rename-dialog.vue';
-
-type AssetKind = 'portrait' | 'sheet';
 
 interface ActionReferenceOption extends ImageReferencePickerOption {
   selection: CharacterVisualAssetSelection;
@@ -49,13 +45,12 @@ const selectedCharacterId = ref('');
 const credentialStatus = ref<CredentialStatus | null>(null);
 const deepseekStatus = ref<CredentialStatus | null>(null);
 const minimaxStatus = ref<CredentialStatus | null>(null);
-const records = ref<CharacterPortraitRecord[]>([]);
-const sheetRecords = ref<CharacterSheetRecord[]>([]);
+const records = ref<CharacterVisualAssetRecord[]>([]);
 const officialAssets = ref<CharacterVisualAssetSelection[]>([]);
 const action = ref('自然站立，抬起右手挥手，左手自然垂下。');
 const imageName = ref('挥手');
-const size = ref<CharacterPortraitSize>('2:3');
-const resolution = ref<CharacterPortraitResolution>('1k');
+const size = ref<CharacterVisualSize>('2:3');
+const resolution = ref<CharacterVisualResolution>('1k');
 const count = ref(2);
 const errorMessage = ref('');
 const isInitializing = ref(true);
@@ -68,23 +63,21 @@ const renamingFileName = ref('');
 const deletingFileName = ref('');
 const deleteDialogOpen = ref(false);
 const deleteTarget = ref<{
-  image: CharacterPortraitImage;
-  kind: AssetKind;
-  record: CharacterImageRecord;
+  image: CharacterVisualImage;
+  record: CharacterVisualAssetRecord;
 } | null>(null);
 const uploadDialogOpen = ref(false);
 const referenceDialogOpen = ref(false);
 const renameDialogOpen = ref(false);
 const renameTarget = ref<{
-  image: CharacterPortraitImage;
-  kind: AssetKind;
-  record: CharacterImageRecord;
+  image: CharacterVisualImage;
+  record: CharacterVisualAssetRecord;
 } | null>(null);
 const generatorOpen = ref(false);
 const mobilePane = ref<'settings' | 'gallery'>('gallery');
 const selectedReferenceAsset = ref<CharacterVisualAssetSelection | null>(null);
 
-let portraitPollTimer: ReturnType<typeof setTimeout> | null = null;
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let isDisposed = false;
 let loadRequestId = 0;
 
@@ -122,15 +115,12 @@ const operationDisabled = computed(
     Boolean(renamingFileName.value) ||
     Boolean(deletingFileName.value),
 );
-const assetCount = computed(
-  () =>
-    records.value.reduce((total, record) => total + record.images.length, 0) +
-    sheetRecords.value.reduce((total, record) => total + record.images.length, 0),
+const assetCount = computed(() =>
+  records.value.reduce((total, record) => total + record.images.length, 0),
 );
 const referenceOptions = computed<ActionReferenceOption[]>(() =>
   officialAssets.value.flatMap(selection => {
-    const recordList = selection.kind === 'portrait' ? records.value : sheetRecords.value;
-    const record = recordList.find(item => item.id === selection.taskId);
+    const record = records.value.find(item => item.id === selection.taskId);
     const image = record?.images.find(item => item.fileName === selection.fileName);
     if (!record || !image) return [];
     return [
@@ -170,7 +160,7 @@ const uploadTitle = '上传角色视觉图片';
 const uploadDescription = '填写图片名称后上传。上传完成后可按需要设为正式资产。';
 
 function referenceAssetKey(selection: CharacterVisualAssetSelection): string {
-  return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
+  return `${selection.taskId}:${selection.fileName}`;
 }
 
 function syncSelectedReference(preferred?: CharacterVisualAssetSelection | null): void {
@@ -193,7 +183,7 @@ function selectReferenceAsset(keys: string[]): void {
     referenceOptions.value.find(option => option.key === keys[0])?.selection ?? null;
 }
 
-function replaceRecord<TRecord extends CharacterImageRecord>(
+function replaceRecord<TRecord extends CharacterVisualAssetRecord>(
   recordList: TRecord[],
   updatedRecord: TRecord,
 ): TRecord[] {
@@ -203,19 +193,18 @@ function replaceRecord<TRecord extends CharacterImageRecord>(
 }
 
 function applyWorkspace(
-  workspace: CharacterPortraitWorkspaceState,
+  workspace: CharacterVisualWorkspaceState,
   preferredReference?: CharacterVisualAssetSelection | null,
 ) {
   officialAssets.value = workspace.officialAssets;
   records.value = workspace.records;
-  sheetRecords.value = workspace.sheetRecords;
   syncSelectedReference(preferredReference);
 }
 
 function clearPollTimer() {
-  if (portraitPollTimer) {
-    clearTimeout(portraitPollTimer);
-    portraitPollTimer = null;
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
   }
 }
 
@@ -230,12 +219,12 @@ function schedulePoll(taskId: string) {
     phase: 'waiting',
     taskId,
   };
-  portraitPollTimer = setTimeout(() => {
-    void pollPortraitTask(taskId);
+  pollTimer = setTimeout(() => {
+    void pollVisualTask(taskId);
   }, 2500);
 }
 
-async function pollPortraitTask(taskId: string) {
+async function pollVisualTask(taskId: string) {
   if (isDisposed) {
     return;
   }
@@ -246,7 +235,7 @@ async function pollPortraitTask(taskId: string) {
     taskId,
   };
   try {
-    const record = await window.desktop.character.portrait.getCharacterPortraitTask(taskId);
+    const record = await window.desktop.character.assets.getCharacterVisualAssetTask(taskId);
     records.value = replaceRecord(records.value, record);
     errorMessage.value = '';
     if (activeStatuses.includes(record.status)) {
@@ -255,10 +244,10 @@ async function pollPortraitTask(taskId: string) {
     }
     resetPollingState();
     if (record.status === 'completed') {
-      toast.success(`“${record.name}”动作图已生成并保存到角色视觉`);
+      toast.success(`“${record.name}”已生成并保存到角色视觉`);
       mobilePane.value = 'gallery';
     } else {
-      errorMessage.value = record.errorMessage || '角色动作生成任务未完成';
+      errorMessage.value = record.errorMessage || '角色视觉生成任务未完成';
     }
   } catch (pollError: unknown) {
     pollingState.value = { ...pollingState.value, phase: 'paused' };
@@ -268,27 +257,22 @@ async function pollPortraitTask(taskId: string) {
   }
 }
 
-function applyCharacterWorkspace(portraitWorkspace: CharacterPortraitWorkspaceState): void {
-  const latestGeneratedRecord = portraitWorkspace.records.find(
-    record => record.source === 'generated' && record.referenceAsset,
+function applyCharacterWorkspace(visualWorkspace: CharacterVisualWorkspaceState): void {
+  const latestGeneratedRecord = visualWorkspace.records.find(
+    record => record.generationMode === 'action',
   );
-  applyWorkspace(portraitWorkspace, latestGeneratedRecord?.referenceAsset);
+  applyWorkspace(visualWorkspace, latestGeneratedRecord?.referenceAssets[0]);
   action.value = latestGeneratedRecord?.prompt || '自然站立，抬起右手挥手，左手自然垂下。';
   imageName.value = latestGeneratedRecord?.name || '挥手';
   size.value = latestGeneratedRecord?.size ?? '2:3';
   resolution.value = latestGeneratedRecord?.resolution ?? '1k';
   count.value = latestGeneratedRecord?.count ?? 2;
 
-  const unfinishedRecord = portraitWorkspace.records.find(record =>
-    activeStatuses.includes(record.status),
-  );
-  const unfinishedSheet = portraitWorkspace.sheetRecords.find(record =>
+  const unfinishedRecord = visualWorkspace.records.find(record =>
     activeStatuses.includes(record.status),
   );
   if (unfinishedRecord) {
     schedulePoll(unfinishedRecord.id);
-  }
-  if (unfinishedRecord || unfinishedSheet) {
     mobilePane.value = 'gallery';
   }
 }
@@ -301,17 +285,16 @@ async function loadCharacterWorkspace(characterId: string): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   records.value = [];
-  sheetRecords.value = [];
   officialAssets.value = [];
   selectedReferenceAsset.value = null;
   try {
-    const portraitWorkspace = await window.desktop.character.portrait.getCharacterPortraitWorkspace(
-      { characterId },
-    );
+    const visualWorkspace = await window.desktop.character.assets.getCharacterVisualWorkspace({
+      characterId,
+    });
     if (requestId !== loadRequestId || selectedCharacterId.value !== characterId) {
       return;
     }
-    applyCharacterWorkspace(portraitWorkspace);
+    applyCharacterWorkspace(visualWorkspace);
   } catch (initializationError: unknown) {
     if (requestId !== loadRequestId) {
       return;
@@ -374,7 +357,7 @@ async function selectCharacter(characterId: string): Promise<void> {
   }
 }
 
-async function generatePortraits() {
+async function generateActions() {
   const referenceAsset = selectedReferenceAsset.value;
   if (isGenerateDisabled.value || !referenceAsset) {
     return;
@@ -382,21 +365,17 @@ async function generatePortraits() {
   isSubmitting.value = true;
   errorMessage.value = '';
   try {
-    const record = await window.desktop.character.portrait.generateCharacterPortrait({
+    const record = await window.desktop.character.assets.generateCharacterAction({
       action: action.value.trim(),
       count: count.value,
       name: imageName.value.trim(),
-      referenceAsset: {
-        fileName: referenceAsset.fileName,
-        kind: referenceAsset.kind,
-        taskId: referenceAsset.taskId,
-      },
+      referenceAsset: { ...referenceAsset },
       resolution: resolution.value,
       size: size.value,
     });
     records.value = replaceRecord(records.value, record);
     mobilePane.value = 'gallery';
-    await pollPortraitTask(record.id);
+    await pollVisualTask(record.id);
   } catch (generationError: unknown) {
     errorMessage.value =
       generationError instanceof Error ? generationError.message : String(generationError);
@@ -411,7 +390,7 @@ async function generateActionPrompt(): Promise<void> {
   }
   isGeneratingPrompt.value = true;
   try {
-    action.value = await window.desktop.character.portrait.generateCharacterActionPrompt({
+    action.value = await window.desktop.character.assets.generateCharacterActionPrompt({
       model: appStore.settings.fastModel,
       name: imageName.value.trim(),
     });
@@ -428,7 +407,7 @@ function retryPolling() {
     return;
   }
   errorMessage.value = '';
-  void pollPortraitTask(activeRecord.value.id);
+  void pollVisualTask(activeRecord.value.id);
 }
 
 function closeGenerator(): void {
@@ -442,13 +421,13 @@ function openGenerator(): void {
   }
   generatorOpen.value = true;
   mobilePane.value = 'settings';
-  void refreshPortraitWorkspace();
+  void refreshVisualWorkspace();
 }
 
-async function refreshPortraitWorkspace(): Promise<void> {
+async function refreshVisualWorkspace(): Promise<void> {
   try {
     applyWorkspace(
-      await window.desktop.character.portrait.getCharacterPortraitWorkspace({
+      await window.desktop.character.assets.getCharacterVisualWorkspace({
         characterId: selectedCharacterId.value,
       }),
     );
@@ -459,9 +438,8 @@ async function refreshPortraitWorkspace(): Promise<void> {
 }
 
 async function selectAsset(
-  kind: AssetKind,
-  record: CharacterImageRecord,
-  image: CharacterPortraitImage,
+  record: CharacterVisualAssetRecord,
+  image: CharacterVisualImage,
   official: boolean,
 ) {
   if (selectingFileName.value || deletingFileName.value) {
@@ -469,9 +447,8 @@ async function selectAsset(
   }
   selectingFileName.value = image.fileName;
   try {
-    const workspace = await window.desktop.character.portrait.setCharacterVisualAssetOfficial({
+    const workspace = await window.desktop.character.assets.setCharacterVisualAssetOfficial({
       fileName: image.fileName,
-      kind,
       official,
       taskId: record.id,
     });
@@ -484,25 +461,21 @@ async function selectAsset(
   }
 }
 
-function requestDelete(
-  kind: AssetKind,
-  record: CharacterImageRecord,
-  image: CharacterPortraitImage,
-) {
+function requestDelete(record: CharacterVisualAssetRecord, image: CharacterVisualImage) {
   if (selectingFileName.value || deletingFileName.value) {
     return;
   }
-  deleteTarget.value = { image, kind, record };
+  deleteTarget.value = { image, record };
   deleteDialogOpen.value = true;
 }
 
-function editImage(record: CharacterImageRecord, image: CharacterPortraitImage): void {
+function editImage(record: CharacterVisualAssetRecord, image: CharacterVisualImage): void {
   void router.push({
     name: 'image-editor',
     query: {
       fileName: image.name || record.name || image.fileName,
       mimeType: image.mimeType,
-      returnTo: 'character-portrait',
+      returnTo: 'character-visual',
       sourceUrl: image.url,
     },
   });
@@ -512,14 +485,13 @@ async function deleteAsset() {
   if (!deleteTarget.value || deletingFileName.value) {
     return;
   }
-  const { image, kind, record } = deleteTarget.value;
+  const { image, record } = deleteTarget.value;
   deletingFileName.value = image.fileName;
   try {
-    const request = { fileName: image.fileName, taskId: record.id };
-    const workspace =
-      kind === 'portrait'
-        ? await window.desktop.character.portrait.deleteCharacterPortrait(request)
-        : await window.desktop.character.portrait.deleteCharacterSheet(request);
+    const workspace = await window.desktop.character.assets.deleteCharacterVisualAsset({
+      fileName: image.fileName,
+      taskId: record.id,
+    });
     applyWorkspace(workspace);
     deleteDialogOpen.value = false;
     deleteTarget.value = null;
@@ -540,17 +512,20 @@ function openUpload() {
   uploadDialogOpen.value = true;
 }
 
-function uploadVisualAsset(request: UploadCharacterVisualAssetRequest): Promise<SavedFileResult> {
+function uploadVisualAsset(request: CharacterVisualAssetUpload): Promise<SavedFileResult> {
   if (!selectedCharacterId.value) {
     return Promise.reject(new Error('请先选择角色'));
   }
-  return window.desktop.character.portrait.uploadCharacterVisualAsset(request);
+  return window.desktop.character.assets.uploadCharacterVisualAsset({
+    ...request,
+    characterId: selectedCharacterId.value,
+  });
 }
 
 async function handleUploaded() {
   try {
     applyWorkspace(
-      await window.desktop.character.portrait.getCharacterPortraitWorkspace({
+      await window.desktop.character.assets.getCharacterVisualWorkspace({
         characterId: selectedCharacterId.value,
       }),
     );
@@ -561,15 +536,11 @@ async function handleUploaded() {
   }
 }
 
-function requestRename(
-  kind: AssetKind,
-  record: CharacterImageRecord,
-  image: CharacterPortraitImage,
-): void {
+function requestRename(record: CharacterVisualAssetRecord, image: CharacterVisualImage): void {
   if (renamingFileName.value || selectingFileName.value || deletingFileName.value) {
     return;
   }
-  renameTarget.value = { image, kind, record };
+  renameTarget.value = { image, record };
   renameDialogOpen.value = true;
 }
 
@@ -581,9 +552,8 @@ async function renameAsset(name: string): Promise<void> {
   renamingFileName.value = target.image.fileName;
   try {
     applyWorkspace(
-      await window.desktop.character.portrait.renameCharacterVisualAsset({
+      await window.desktop.character.assets.renameCharacterVisualAsset({
         fileName: target.image.fileName,
-        kind: target.kind,
         name,
         taskId: target.record.id,
       }),
@@ -615,7 +585,7 @@ onBeforeUnmount(() => {
     </template>
 
     <template #header-actions>
-      <PortraitPageHeader
+      <VisualPageHeader
         v-model:mobile-pane="mobilePane"
         :characters="characters"
         :character-selection-disabled="characterSelectionDisabled"
@@ -672,14 +642,13 @@ onBeforeUnmount(() => {
           !generatorOpen || mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex',
         ]"
       >
-        <PortraitGallery
+        <VisualGallery
           :deleting-file-name="deletingFileName"
           :official-assets="officialAssets"
           :polling-state="pollingState"
-          :portrait-records="records"
+          :records="records"
           :renaming-file-name="renamingFileName"
           :selecting-file-name="selectingFileName"
-          :sheet-records="sheetRecords"
           class="min-h-0 min-w-0 flex-1"
           @delete="requestDelete"
           @edit="editImage"
@@ -694,7 +663,7 @@ onBeforeUnmount(() => {
           mobilePane === 'settings' ? 'flex' : 'hidden lg:flex',
         ]"
       >
-        <PortraitGeneratorPanel
+        <CharacterActionGeneratorPanel
           v-model:action="action"
           v-model:count="count"
           v-model:name="imageName"
@@ -707,7 +676,7 @@ onBeforeUnmount(() => {
           :reference-assets="selectedReferenceOptions"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @close="closeGenerator"
-          @generate="generatePortraits"
+          @generate="generateActions"
           @generate-prompt="generateActionPrompt"
           @open-reference-picker="referenceDialogOpen = true"
         />

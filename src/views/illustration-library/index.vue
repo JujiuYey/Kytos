@@ -26,7 +26,7 @@ import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import type {
-  CharacterPortraitImage,
+  CharacterVisualImage,
   IllustrationTopic,
   IllustrationWorkspaceState,
   SaveFileRequest,
@@ -42,7 +42,7 @@ interface IllustrationLibraryItem {
   createdAt: string;
   detail: string;
   id: string;
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   source: IllustrationLibrarySource;
   title: string;
   topicId: string | null;

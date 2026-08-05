@@ -27,8 +27,8 @@ import { ImageViewer } from '@/components/sag/image-viewer';
 import { ImageOutputSettings } from '@/components/sag/image-output-settings';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import type {
-  CharacterPortraitResolution,
-  CharacterPortraitImage,
+  CharacterVisualResolution,
+  CharacterVisualImage,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,
@@ -36,7 +36,7 @@ import type {
 import { ILLUSTRATION_SIZES } from '@/types';
 
 interface IllustrationCharacterReferencePreview {
-  image: CharacterPortraitImage;
+  image: CharacterVisualImage;
   label: string;
 }
 
@@ -47,7 +47,7 @@ const props = defineProps<{
   pollingStates: GenerationPollingStateMap;
   prompt: string;
   referencesReady: boolean;
-  resolution: CharacterPortraitResolution;
+  resolution: CharacterVisualResolution;
   size: IllustrationSize;
   topic: IllustrationTopic;
 }>();
@@ -59,7 +59,7 @@ const emit = defineEmits<{
   (event: 'rename', title: string): void;
   (event: 'revise', version: IllustrationVersion): void;
   (event: 'update:prompt', value: string): void;
-  (event: 'update:resolution', value: CharacterPortraitResolution): void;
+  (event: 'update:resolution', value: CharacterVisualResolution): void;
   (event: 'update:size', value: IllustrationSize): void;
   (event: 'update:useCharacter', value: boolean): void;
 }>();

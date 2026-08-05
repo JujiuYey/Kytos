@@ -1,11 +1,11 @@
 // 故事模块的类型定义与请求/响应模型
 import type { UIMessage } from 'ai';
 import type {
-  CharacterPortraitImage,
-  CharacterPortraitResolution,
-  CharacterPortraitSelection,
-  CharacterPortraitTaskStatus,
-} from './character-portrait';
+  CharacterVisualImage,
+  CharacterVisualResolution,
+  CharacterVisualAssetSelection,
+  CharacterVisualTaskStatus,
+} from './character-visual';
 import type { IllustrationSize } from './illustration';
 
 // 故事 Agent 端点
@@ -69,6 +69,8 @@ export interface StoryVersionReference {
 export interface StoryShotVersion {
   // 基础版本
   baseVersion: StoryVersionReference | null;
+  // 角色视觉引用列表
+  characterReferences: CharacterVisualAssetSelection[];
   // 衔接版本
   continuityVersion: StoryVersionReference | null;
   // 创建时间
@@ -78,21 +80,17 @@ export interface StoryShotVersion {
   // 版本ID
   id: string;
   // 图片列表
-  images: CharacterPortraitImage[];
+  images: CharacterVisualImage[];
   // 生成进度
   progress: number;
   // 提示词
   prompt: string;
-  // 引用头像
-  referencePortrait: CharacterPortraitSelection | null;
-  // 引用设定图
-  referenceSheet: CharacterPortraitSelection | null;
   // 分辨率
-  resolution: CharacterPortraitResolution;
+  resolution: CharacterVisualResolution;
   // 尺寸
   size: IllustrationSize;
   // 任务状态
-  status: CharacterPortraitTaskStatus;
+  status: CharacterVisualTaskStatus;
   // 更新时间
   updatedAt: string;
   // 版本号
@@ -126,7 +124,7 @@ export interface StoryProject {
   // 会话消息
   messages: StoryAgentMessage[];
   // 分辨率
-  resolution: CharacterPortraitResolution;
+  resolution: CharacterVisualResolution;
   // 分镜列表
   shots: StoryShot[];
   // 尺寸
@@ -237,7 +235,7 @@ export interface UpdateStoryRequest {
   // 关键分镜ID
   keyShotId?: string;
   // 分辨率
-  resolution?: CharacterPortraitResolution;
+  resolution?: CharacterVisualResolution;
   // 尺寸
   size?: IllustrationSize;
   // 故事ID

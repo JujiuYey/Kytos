@@ -1,5 +1,5 @@
 // 角色库与角色作用域的类型定义
-import type { CharacterImageSize } from './character-portrait';
+import type { CharacterVisualSize } from './character-visual';
 
 // 角色概要
 export interface CharacterSummary {
@@ -15,12 +15,10 @@ export interface CharacterSummary {
 
 // 角色库中的视觉素材
 export interface CharacterLibraryVisualAsset {
-  // 素材类型（头像 / 设定图）
-  kind: 'portrait' | 'sheet';
   // 素材名称
   name: string;
   // 素材尺寸
-  size: CharacterImageSize;
+  size: CharacterVisualSize;
   // 访问地址
   url: string;
 }

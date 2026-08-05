@@ -31,7 +31,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type {
-  CharacterPortraitResolution,
+  CharacterVisualResolution,
   IllustrationSize,
   StoryProject,
   StoryShot,
@@ -66,7 +66,7 @@ const emit = defineEmits<{
   (event: 'select-version', payload: { shot: StoryShot; version: StoryShotVersion }): void;
   (event: 'set-base', payload: { reference: StoryVersionReference; shot: StoryShot }): void;
   (event: 'set-key-shot', shot: StoryShot): void;
-  (event: 'update:resolution', value: CharacterPortraitResolution): void;
+  (event: 'update:resolution', value: CharacterVisualResolution): void;
   (event: 'update:size', value: IllustrationSize): void;
   (event: 'update:tab', value: 'story' | 'storyboard' | 'final'): void;
 }>();

@@ -20,7 +20,7 @@ import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
 import type {
   CharacterCreateAgentMessage,
-  CharacterPortraitImage,
+  CharacterVisualImage,
   CharacterVisualGeneration,
   SaveFileRequest,
   SavedFileResult,
@@ -62,7 +62,7 @@ const candidateGeneration = ref<CharacterVisualGeneration | null>(null);
 const pendingFinalGeneration = ref<CharacterVisualGeneration | null>(null);
 const finalVersions = ref<CharacterVisualGeneration[]>([]);
 const selectedFinalGenerationId = ref('');
-const baseImage = ref<CharacterPortraitImage | null>(null);
+const baseImage = ref<CharacterVisualImage | null>(null);
 const isCandidateGenerating = ref(false);
 const isFinalGenerating = ref(false);
 const skipRefinement = ref(false);
@@ -234,7 +234,7 @@ async function generateCandidates(): Promise<void> {
   }
 }
 
-function selectCandidate(image: CharacterPortraitImage): void {
+function selectCandidate(image: CharacterVisualImage): void {
   baseImage.value = image;
   pendingFinalGeneration.value = null;
   finalVersions.value = [];
@@ -463,7 +463,7 @@ async function initialize(): Promise<void> {
     await window.desktop.character.library.selectCharacter({ characterId: character.id });
     if (character.visualAsset) {
       toast.info('这个角色已经有正式视觉，请在角色视觉中继续管理');
-      await router.replace({ name: 'character-portrait' });
+      await router.replace({ name: 'character-visual' });
       return;
     }
     characterName.value = character.name;

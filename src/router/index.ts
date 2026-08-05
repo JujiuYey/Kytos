@@ -32,9 +32,10 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '角色管理' },
       },
       {
-        path: '/character-portrait',
-        name: 'character-portrait',
-        component: () => import('@/views/character-portrait/index.vue'),
+        path: '/character-visual',
+        alias: '/character-portrait',
+        name: 'character-visual',
+        component: () => import('@/views/character-visual/index.vue'),
         meta: { title: '角色视觉' },
       },
       {

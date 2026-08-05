@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { CharacterPortraitImage } from '@/types';
+import type { CharacterVisualImage } from '@/types';
 import {
   CHARACTER_DRAFT_PRESETS,
   CORE_DRAFT_FIELDS,
@@ -14,17 +14,17 @@ import {
 } from '../workflow-data';
 
 const props = defineProps<{
-  candidates: CharacterPortraitImage[];
+  candidates: CharacterVisualImage[];
   candidateExpectedCount: number;
   draft: CharacterPromptDraft;
   isGenerating: boolean;
-  selectedCandidate: CharacterPortraitImage | null;
+  selectedCandidate: CharacterVisualImage | null;
   styleName: string;
 }>();
 
 const emit = defineEmits<{
   (event: 'generate'): void;
-  (event: 'selectCandidate', image: CharacterPortraitImage): void;
+  (event: 'selectCandidate', image: CharacterVisualImage): void;
   (event: 'update:draft', value: CharacterPromptDraft): void;
 }>();
 

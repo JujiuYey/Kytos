@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import type { CharacterExpressionSize, CharacterPortraitResolution } from '@/types';
+import type { CharacterExpressionSize, CharacterVisualResolution } from '@/types';
 import { CHARACTER_EXPRESSION_SIZES } from '@/types';
 import type { ExpressionReferenceOption } from '../expression-reference';
 
@@ -21,7 +21,7 @@ defineProps<{
   promptGenerationAvailable: boolean;
   promptGenerating: boolean;
   referenceAssets: ExpressionReferenceOption[];
-  resolution: CharacterPortraitResolution;
+  resolution: CharacterVisualResolution;
   size: CharacterExpressionSize;
 }>();
 
@@ -33,7 +33,7 @@ const emit = defineEmits<{
   (event: 'update:count', value: number): void;
   (event: 'update:description', value: string): void;
   (event: 'update:name', value: string): void;
-  (event: 'update:resolution', value: CharacterPortraitResolution): void;
+  (event: 'update:resolution', value: CharacterVisualResolution): void;
   (event: 'update:size', value: CharacterExpressionSize): void;
 }>();
 </script>

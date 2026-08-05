@@ -10,13 +10,13 @@ import {
 import { FileUpload } from '@/components/sag/file-upload';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { SaveFileRequest, SavedFileResult, UploadCharacterVisualAssetRequest } from '@/types';
+import type { CharacterVisualAssetUpload, SaveFileRequest, SavedFileResult } from '@/types';
 
 const props = defineProps<{
   description: string;
   open: boolean;
   title: string;
-  uploadHandler: (request: UploadCharacterVisualAssetRequest) => Promise<SavedFileResult>;
+  uploadHandler: (request: CharacterVisualAssetUpload) => Promise<SavedFileResult>;
 }>();
 
 const emit = defineEmits<{
@@ -67,7 +67,7 @@ function upload(request: SaveFileRequest): Promise<SavedFileResult> {
           id="character-visual-name"
           v-model="name"
           maxlength="80"
-          placeholder="例如：角色表、定妆照、冬季造型"
+          placeholder="例如：基础形象、冬季造型、挥手动作"
         />
       </div>
       <FileUpload

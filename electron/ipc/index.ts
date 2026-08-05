@@ -3,7 +3,7 @@ import type { BrowserWindow } from 'electron';
 import { registerCharacterExpressionIpc } from './character-expression';
 import { registerCharacterIpc } from './character';
 import { registerCharacterLibraryIpc } from './character-library';
-import { registerCharacterPortraitIpc } from './character-portrait';
+import { registerCharacterVisualIpc } from './character-visual';
 import { registerCredentialsIpc } from './credentials';
 import { registerFilesIpc } from './files';
 import { registerIllustrationIpc } from './illustration';
@@ -21,8 +21,8 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): 
   registerCharacterLibraryIpc(assertTrustedSender);
   // 角色表情
   registerCharacterExpressionIpc(assertTrustedSender);
-  // 角色头像 / 设定图 / 视觉素材管理
-  registerCharacterPortraitIpc(assertTrustedSender);
+  // 角色视觉资产
+  registerCharacterVisualIpc(assertTrustedSender);
   // 桌面设置、主题、目录选择、工作区
   registerSettingsIpc(assertTrustedSender);
   // 凭据

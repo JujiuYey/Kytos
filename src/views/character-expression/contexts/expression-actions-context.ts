@@ -1,10 +1,10 @@
 import { inject, provide, type InjectionKey, type Ref } from 'vue';
-import type { CharacterExpressionRecord, CharacterPortraitImage } from '@/types';
+import type { CharacterExpressionRecord, CharacterVisualImage } from '@/types';
 
 interface ExpressionActionsContext {
   deletingFileName: Readonly<Ref<string>>;
   renamingTaskId: Readonly<Ref<string>>;
-  requestDelete: (record: CharacterExpressionRecord, image: CharacterPortraitImage) => void;
+  requestDelete: (record: CharacterExpressionRecord, image: CharacterVisualImage) => void;
   requestRename: (record: CharacterExpressionRecord) => void;
 }
 

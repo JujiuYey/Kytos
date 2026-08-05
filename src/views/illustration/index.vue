@@ -18,10 +18,10 @@ import { useCredentialStatus } from '@/composables/use-credential-status';
 import { useGenerationPolling } from '@/composables/use-generation-polling';
 import { useAppStore } from '@/stores/app';
 import type {
-  CharacterPortraitResolution,
+  CharacterVisualResolution,
   CharacterExpressionReferenceSelection,
   CharacterExpressionWorkspaceState,
-  CharacterPortraitWorkspaceState,
+  CharacterVisualWorkspaceState,
   CharacterVisualAssetSelection,
   IllustrationAgentMessage,
   IllustrationBriefUpdateResult,
@@ -50,7 +50,7 @@ const router = useRouter();
 const topics = ref<IllustrationTopic[]>([]);
 const uploads = ref<UploadedIllustration[]>([]);
 const activeTopicId = ref('');
-const portraitWorkspace = ref<CharacterPortraitWorkspaceState | null>(null);
+const visualWorkspace = ref<CharacterVisualWorkspaceState | null>(null);
 const expressionWorkspace = ref<CharacterExpressionWorkspaceState | null>(null);
 const initializationError = ref('');
 const generationError = ref('');
@@ -63,7 +63,7 @@ const referenceDialogOpen = ref(false);
 const mobilePane = ref<'chat' | 'workspace'>('chat');
 const prompt = ref('');
 const size = ref<IllustrationSize>('16:9');
-const resolution = ref<CharacterPortraitResolution>('1k');
+const resolution = ref<CharacterVisualResolution>('1k');
 const selectedCharacterReferences = ref<CharacterExpressionReferenceSelection[]>([]);
 const revisionTarget = ref<IllustrationVersion | null>(null);
 
@@ -108,18 +108,18 @@ const referenceFilters: ImageReferencePickerFilter[] = [
   { label: '已有表情', value: 'expression' },
 ];
 const characterReferenceOptions = computed<IllustrationCharacterReferenceOption[]>(() => {
-  const visualOptions = (portraitWorkspace.value?.officialAssets ?? []).flatMap(selection => {
+  const visualOptions = (visualWorkspace.value?.officialAssets ?? []).flatMap(selection => {
     const match = findOfficialVisual(selection);
     if (!match) {
       return [];
     }
     return [
       {
-        detail: selection.kind === 'portrait' ? `角色图片 · ${match.record.size}` : '角色表 · 16:9',
+        detail: `角色视觉 · ${match.record.size}`,
         image: match.image,
-        key: characterReferenceKey(selection),
+        key: characterReferenceKey({ ...selection, kind: 'visual' }),
         label: match.image.name || match.record.name || '正式角色视觉',
-        selection,
+        selection: { ...selection, kind: 'visual' as const },
         source: 'visual',
       },
     ];
@@ -166,12 +166,11 @@ function characterReferenceKey(selection: CharacterExpressionReferenceSelection)
 }
 
 function findOfficialVisual(selection: CharacterVisualAssetSelection) {
-  const workspace = portraitWorkspace.value;
+  const workspace = visualWorkspace.value;
   if (!workspace) {
     return null;
   }
-  const records = selection.kind === 'sheet' ? workspace.sheetRecords : workspace.records;
-  const record = records.find(record => record.id === selection.taskId);
+  const record = workspace.records.find(record => record.id === selection.taskId);
   const image = record?.images.find(image => image.fileName === selection.fileName);
   return record && image ? { image, record } : null;
 }
@@ -325,9 +324,9 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   initializationError.value = '';
   try {
-    const [workspace, portraits, library] = await Promise.all([
+    const [workspace, visuals, library] = await Promise.all([
       window.desktop.illustration.getIllustrationWorkspace(),
-      window.desktop.character.portrait.getCharacterPortraitWorkspace(),
+      window.desktop.character.assets.getCharacterVisualWorkspace(),
       window.desktop.character.library.getCharacterLibrary(),
       refreshCredentialStatus(),
     ]);
@@ -336,7 +335,7 @@ async function initialize(): Promise<void> {
     });
     topics.value = workspace.topics;
     uploads.value = workspace.uploads;
-    portraitWorkspace.value = portraits;
+    visualWorkspace.value = visuals;
     expressionWorkspace.value = expressions;
 
     const requestedTopicId = route.query.revisionTopicId;
