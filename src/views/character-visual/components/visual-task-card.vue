@@ -54,10 +54,11 @@ function getStatusLabel(record: CharacterVisualAssetRecord): string {
       <p class="mt-4 text-sm">GPT-Image-2 正在绘制“{{ props.record.name }}”</p>
       <GenerationPollingStatus
         class="mt-4"
-        :attempt="props.pollingState.taskId === props.record.id ? props.pollingState.attempt : 0"
         :phase="
           props.pollingState.taskId === props.record.id ? props.pollingState.phase : 'waiting'
         "
+        :progress="props.record.progress"
+        :status="props.record.status"
       />
     </template>
 

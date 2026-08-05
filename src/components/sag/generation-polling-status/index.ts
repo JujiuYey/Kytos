@@ -4,4 +4,5 @@ export type {
   GenerationPollingState,
   GenerationPollingStateMap,
   GenerationTaskPollingState,
+  GenerationTaskStatus,
 } from './types';

@@ -32,10 +32,10 @@ export function useGenerationPolling<TVersion>(
   const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let disposed = false;
 
-  function setState(taskId: string, state: { attempt: number; phase: GenerationPollingPhase }): void {
+  function setState(taskId: string, phase: GenerationPollingPhase): void {
     pollingStates.value = {
       ...pollingStates.value,
-      [taskId]: state,
+      [taskId]: { phase },
     };
   }
 
@@ -60,11 +60,7 @@ export function useGenerationPolling<TVersion>(
     if (disposed) {
       return;
     }
-    const previous = pollingStates.value[taskId];
-    setState(taskId, {
-      attempt: (previous?.attempt ?? 0) + 1,
-      phase: 'requesting',
-    });
+    setState(taskId, 'requesting');
     try {
       const version = await options.fetchTask(taskId);
       options.onPollSuccess?.(taskId, version);
@@ -82,11 +78,7 @@ export function useGenerationPolling<TVersion>(
     } catch (pollError: unknown) {
       options.onError?.(taskId, pollError);
       clearTimer(taskId);
-      const current = pollingStates.value[taskId];
-      setState(taskId, {
-        attempt: current?.attempt ?? 1,
-        phase: 'paused',
-      });
+      setState(taskId, 'paused');
     }
   }
 
@@ -95,11 +87,7 @@ export function useGenerationPolling<TVersion>(
       return;
     }
     clearTimer(taskId);
-    const previous = pollingStates.value[taskId];
-    setState(taskId, {
-      attempt: previous?.attempt ?? 0,
-      phase: 'waiting',
-    });
+    setState(taskId, 'waiting');
     pollTimers.set(
       taskId,
       setTimeout(() => {

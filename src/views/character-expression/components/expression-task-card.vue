@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import { Loader } from '@/components/ai-elements/loader';
-import {
-  GenerationPollingStatus,
-  type GenerationTaskPollingState,
-} from '@/components/sag/generation-polling-status';
+import { GenerationPollingStatus } from '@/components/sag/generation-polling-status';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { CharacterExpressionTask } from '@/types';
+import { useExpressionRecords } from '../contexts/expression-records-context';
 
 const props = defineProps<{
-  pollingState: GenerationTaskPollingState;
   task: CharacterExpressionTask;
 }>();
+
+const { pollingState } = useExpressionRecords();
 
 const activeStatuses: CharacterExpressionTask['status'][] = ['submitted', 'pending', 'processing'];
 
@@ -41,8 +40,9 @@ function isActive(task: CharacterExpressionTask): boolean {
       <p class="mt-4 text-sm">GPT-Image-2 正在绘制“{{ props.task.name }}”</p>
       <GenerationPollingStatus
         class="mt-4"
-        :attempt="props.pollingState.taskId === props.task.id ? props.pollingState.attempt : 0"
-        :phase="props.pollingState.taskId === props.task.id ? props.pollingState.phase : 'waiting'"
+        :phase="pollingState.taskId === props.task.id ? pollingState.phase : 'waiting'"
+        :progress="props.task.progress"
+        :status="props.task.status"
       />
     </template>
 

@@ -458,8 +458,9 @@ function handleTitleChange(event: Event): void {
                       >
                         <GenerationPollingStatus
                           compact
-                          :attempt="pollingStates[version.id]?.attempt ?? 0"
                           :phase="pollingStates[version.id]?.phase ?? 'waiting'"
+                          :progress="version.progress"
+                          :status="version.status"
                         />
                       </div>
                       <div

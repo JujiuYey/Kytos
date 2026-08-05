@@ -36,7 +36,7 @@ import { useExpressionSearch } from './composables/use-expression-search';
 import { useGeneratorOpen } from './composables/use-generator-open';
 import { useReferenceDialog } from './composables/use-reference-dialog';
 import { useUpload } from './composables/use-upload';
-import { provideExpressionActions } from './contexts/expression-actions-context';
+import { provideExpressionRecords } from './contexts/expression-records-context';
 import { toErrorMessage } from '@/utils/helpers';
 import { ACTIVE_STATUSES, REFERENCE_FILTERS } from './constants/index';
 
@@ -90,13 +90,6 @@ const { renameDialogOpen, renameExpression, renameTarget, renamingTaskId, reques
     },
   });
 
-provideExpressionActions({
-  deletingFileName,
-  renamingTaskId,
-  requestDelete,
-  requestRename,
-});
-
 const name = ref('');
 const description = ref('');
 const size = ref<CharacterExpressionSize>('1:1');
@@ -108,7 +101,17 @@ const isSubmitting = ref(false);
 const isGeneratingPrompt = ref(false);
 
 const isPolling = ref(false);
-const pollingState = ref<GenerationTaskPollingState>({ attempt: 0, phase: 'idle', taskId: '' });
+const pollingState = ref<GenerationTaskPollingState>({ phase: 'idle', taskId: '' });
+
+provideExpressionRecords({
+  deletingFileName,
+  editExpression,
+  pollingState,
+  renamingTaskId,
+  requestDelete,
+  requestRename,
+});
+
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let isDisposed = false;
 let loadRequestId = 0;
@@ -173,13 +176,12 @@ function clearPollTimer(): void {
 function resetPolling(): void {
   clearPollTimer();
   isPolling.value = false;
-  pollingState.value = { attempt: 0, phase: 'idle', taskId: '' };
+  pollingState.value = { phase: 'idle', taskId: '' };
 }
 
 function schedulePoll(taskId: string, characterId: string): void {
   clearPollTimer();
   pollingState.value = {
-    attempt: pollingState.value.taskId === taskId ? pollingState.value.attempt : 0,
     phase: 'waiting',
     taskId,
   };
@@ -194,7 +196,6 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
   }
   isPolling.value = true;
   pollingState.value = {
-    attempt: pollingState.value.taskId === taskId ? pollingState.value.attempt + 1 : 1,
     phase: 'requesting',
     taskId,
   };
@@ -210,7 +211,7 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
     if (result.record) {
       removeTask(taskId);
       replaceRecord(result.record);
-      pollingState.value = { attempt: 0, phase: 'idle', taskId: '' };
+      pollingState.value = { phase: 'idle', taskId: '' };
       toast.success(`“${result.record.name}”表情已生成并保存到工作区`);
       return;
     }
@@ -222,7 +223,7 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
       schedulePoll(taskId, characterId);
       return;
     }
-    pollingState.value = { attempt: 0, phase: 'idle', taskId: '' };
+    pollingState.value = { phase: 'idle', taskId: '' };
     errorMessage.value = result.task.errorMessage || '表情生成任务未完成';
   } catch (pollError: unknown) {
     if (selectedCharacterId.value !== characterId) {
@@ -475,9 +476,7 @@ onBeforeUnmount(() => {
           <ExpressionRecords
             v-if="filteredRecords.length || filteredTasks.length"
             :records="filteredRecords"
-            :polling-state="pollingState"
             :tasks="filteredTasks"
-            @edit="editExpression"
           />
 
           <ExpressionEmptyState

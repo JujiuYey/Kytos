@@ -463,10 +463,9 @@ function schedulePoll(taskId: string): void {
   if (currentTimer) {
     clearTimeout(currentTimer);
   }
-  const previousState = pollingStates.value[taskId];
   pollingStates.value = {
     ...pollingStates.value,
-    [taskId]: { attempt: previousState?.attempt ?? 0, phase: 'waiting' },
+    [taskId]: { phase: 'waiting' },
   };
   pollTimers.set(
     taskId,
@@ -480,10 +479,9 @@ async function pollTask(taskId: string): Promise<void> {
   if (disposed) {
     return;
   }
-  const previousState = pollingStates.value[taskId];
   pollingStates.value = {
     ...pollingStates.value,
-    [taskId]: { attempt: (previousState?.attempt ?? 0) + 1, phase: 'requesting' },
+    [taskId]: { phase: 'requesting' },
   };
   try {
     const version = await window.desktop.story.getStoryShotTask(taskId);
@@ -509,7 +507,7 @@ async function pollTask(taskId: string): Promise<void> {
     pollTimers.delete(taskId);
     pollingStates.value = {
       ...pollingStates.value,
-      [taskId]: { attempt: pollingStates.value[taskId]?.attempt ?? 1, phase: 'paused' },
+      [taskId]: { phase: 'paused' },
     };
   }
 }

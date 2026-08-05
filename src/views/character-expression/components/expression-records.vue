@@ -1,26 +1,12 @@
 <script setup lang="ts">
-import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
-import type {
-  CharacterExpressionRecord,
-  CharacterExpressionTask,
-  CharacterVisualImage,
-} from '@/types';
+import type { CharacterExpressionRecord, CharacterExpressionTask } from '@/types';
 import ExpressionImageCard from './expression-image-card.vue';
 import ExpressionTaskCard from './expression-task-card.vue';
 
 defineProps<{
   records: CharacterExpressionRecord[];
-  pollingState: GenerationTaskPollingState;
   tasks: CharacterExpressionTask[];
 }>();
-
-const emit = defineEmits<{
-  (event: 'edit', record: CharacterExpressionRecord, image: CharacterVisualImage): void;
-}>();
-
-function getRecordStatusLabel(record: CharacterExpressionRecord): string {
-  return record.source === 'uploaded' ? '已上传' : '已完成';
-}
 </script>
 
 <template>
@@ -29,7 +15,7 @@ function getRecordStatusLabel(record: CharacterExpressionRecord): string {
   >
     <template v-for="task in tasks" :key="task.id">
       <article class="min-w-0 overflow-hidden rounded-md border bg-background">
-        <ExpressionTaskCard :polling-state="pollingState" :task="task" />
+        <ExpressionTaskCard :task="task" />
       </article>
     </template>
 
@@ -40,8 +26,6 @@ function getRecordStatusLabel(record: CharacterExpressionRecord): string {
         :record="record"
         :image="image"
         :image-index="imageIndex"
-        :status-label="getRecordStatusLabel(record)"
-        @edit="(editedRecord, editedImage) => emit('edit', editedRecord, editedImage)"
       />
     </template>
   </div>

@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { HTMLAttributes } from 'vue';
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import type { GenerationPollingPhase } from './types';
+import type { GenerationPollingPhase, GenerationTaskStatus } from './types';
 
 const props = withDefaults(
   defineProps<{
-    attempt: number;
     class?: HTMLAttributes['class'];
     compact?: boolean;
     description?: string | null;
     phase: GenerationPollingPhase;
+    progress: number;
+    status: GenerationTaskStatus;
   }>(),
   {
     compact: false,
@@ -18,26 +20,25 @@ const props = withDefaults(
   },
 );
 
+const normalizedProgress = computed(() => Math.min(100, Math.max(0, props.progress)));
+
 const statusLabel = computed(() => {
-  if (props.attempt === 0) {
-    return '等待首次查询';
+  if (props.phase === 'paused') {
+    return '进度查询已暂停';
   }
-  const labels: Record<GenerationPollingPhase, string> = {
-    idle: '等待首次查询',
-    paused: '查询暂停',
-    requesting: '正在查询任务状态',
-    waiting: '等待下一次查询',
+  if (props.phase === 'requesting') {
+    return '正在同步生成进度';
+  }
+  const labels: Record<GenerationTaskStatus, string> = {
+    cancelled: '生成已取消',
+    completed: '生成已完成',
+    failed: '生成失败',
+    pending: '等待生成服务处理',
+    processing: '图像生成中',
+    submitted: '生成任务已提交',
   };
-  return labels[props.phase];
+  return labels[props.status];
 });
-
-const attemptLabel = computed(() =>
-  props.attempt === 0 ? '尚未查询' : `已查询 ${props.attempt} 次`,
-);
-
-function isCurrentStep(step: number): boolean {
-  return props.attempt > 0 && (props.attempt - 1) % 5 === step;
-}
 </script>
 
 <template>
@@ -62,18 +63,9 @@ function isCurrentStep(step: number): boolean {
         </span>
         <span class="truncate">{{ statusLabel }}</span>
       </span>
-      <span class="shrink-0 tabular-nums">{{ attemptLabel }}</span>
+      <span class="shrink-0 tabular-nums">{{ normalizedProgress }}%</span>
     </div>
-    <div class="mt-3 flex items-center gap-1.5" aria-hidden="true">
-      <span
-        v-for="step in 5"
-        :key="step"
-        :class="[
-          'size-1.5 rounded-full transition-colors duration-300',
-          isCurrentStep(step - 1) ? 'bg-primary' : 'bg-muted-foreground/15',
-        ]"
-      />
-    </div>
+    <Progress :model-value="normalizedProgress" class="mt-3 h-1.5" />
     <p v-if="description && !compact" class="mt-2 text-xs leading-5 text-muted-foreground">
       {{ description }}
     </p>

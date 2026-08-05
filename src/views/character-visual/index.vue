@@ -58,7 +58,7 @@ const isInitializing = ref(true);
 const isSubmitting = ref(false);
 const isPolling = ref(false);
 const isGeneratingPrompt = ref(false);
-const pollingState = ref<GenerationTaskPollingState>({ attempt: 0, phase: 'idle', taskId: '' });
+const pollingState = ref<GenerationTaskPollingState>({ phase: 'idle', taskId: '' });
 const selectingFileName = ref('');
 const deletingFileName = ref('');
 const deleteDialogOpen = ref(false);
@@ -205,13 +205,12 @@ function clearPollTimer() {
 }
 
 function resetPollingState(): void {
-  pollingState.value = { attempt: 0, phase: 'idle', taskId: '' };
+  pollingState.value = { phase: 'idle', taskId: '' };
 }
 
 function schedulePoll(taskId: string) {
   clearPollTimer();
   pollingState.value = {
-    attempt: pollingState.value.taskId === taskId ? pollingState.value.attempt : 0,
     phase: 'waiting',
     taskId,
   };
@@ -226,7 +225,6 @@ async function pollVisualTask(taskId: string) {
   }
   isPolling.value = true;
   pollingState.value = {
-    attempt: pollingState.value.taskId === taskId ? pollingState.value.attempt + 1 : 1,
     phase: 'requesting',
     taskId,
   };

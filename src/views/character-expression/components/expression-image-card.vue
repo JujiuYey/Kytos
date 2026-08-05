@@ -8,20 +8,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { CharacterExpressionRecord, CharacterVisualImage } from '@/types';
-import { useExpressionActions } from '../contexts/expression-actions-context';
+import { useExpressionRecords } from '../contexts/expression-records-context';
 
 const props = defineProps<{
   record: CharacterExpressionRecord;
   image: CharacterVisualImage;
   imageIndex: number;
-  statusLabel: string;
 }>();
 
-const emit = defineEmits<{
-  (event: 'edit', record: CharacterExpressionRecord, image: CharacterVisualImage): void;
-}>();
-
-const { deletingFileName, renamingTaskId, requestDelete, requestRename } = useExpressionActions();
+const { deletingFileName, editExpression, renamingTaskId, requestDelete, requestRename } =
+  useExpressionRecords();
 
 function getAspectClass(size: CharacterExpressionRecord['size']): string {
   return {
@@ -32,6 +28,7 @@ function getAspectClass(size: CharacterExpressionRecord['size']): string {
 }
 
 const formattedDate = computed(() => dayjs(props.record.createdAt).format('MM/DD HH:mm'));
+const statusLabel = computed(() => (props.record.source === 'uploaded' ? '已上传' : '已完成'));
 </script>
 
 <template>
@@ -63,7 +60,7 @@ const formattedDate = computed(() => dayjs(props.record.createdAt).format('MM/DD
         <h3 class="truncate text-sm font-medium">{{ props.record.name }}</h3>
         <SagStatusBadge tone="success" class="shrink-0">
           <Check class="size-3" />
-          {{ props.statusLabel }}
+          {{ statusLabel }}
         </SagStatusBadge>
       </div>
 
@@ -81,7 +78,7 @@ const formattedDate = computed(() => dayjs(props.record.createdAt).format('MM/DD
         <Button
           size="sm"
           :aria-label="`编辑${props.record.name}的第 ${props.imageIndex + 1} 张表情`"
-          @click="emit('edit', props.record, props.image)"
+          @click="editExpression(props.record, props.image)"
         >
           <Crop class="size-4" />
           <span>编辑图片</span>
