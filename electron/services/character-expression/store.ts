@@ -1,11 +1,19 @@
 // character-expression 工作区的 JSON 持久化
 import path from 'node:path';
 import { isPlainObject } from 'es-toolkit';
-import type { CharacterExpressionRecord } from '../../../shared/character-expression';
+import type {
+  CharacterExpressionRecord,
+  CharacterExpressionTask,
+} from '../../../shared/character-expression';
 import { getCharacterDirectory } from '../character-library';
 import { readJsonFile, writeJsonFile } from '../../storage/json-store';
 import { EXPRESSION_STORE_FILE_NAME, EXPRESSION_STORE_VERSION } from './constants';
-import { parseExpressionRecord } from './parsers';
+import { parseExpressionRecord, parseExpressionTask } from './parsers';
+import {
+  loadExpressionTaskStore,
+  saveExpressionTaskStore,
+  upsertExpressionTask,
+} from './task-store';
 import type { StoredExpressionWorkspace } from './types';
 
 // 定位指定角色表情库的 JSON 文件路径
@@ -23,15 +31,34 @@ export async function loadExpressionStore(characterId: string): Promise<StoredEx
   if (value.version !== EXPRESSION_STORE_VERSION) {
     throw new Error('表情数据版本无效');
   }
-  const records = Array.isArray(value.records)
-    ? (value.records as unknown[])
-        .map(parseExpressionRecord)
-        .filter((record): record is CharacterExpressionRecord => Boolean(record))
-    : [];
-  return {
+  const records: CharacterExpressionRecord[] = [];
+  const legacyTasks: CharacterExpressionTask[] = [];
+  if (Array.isArray(value.records)) {
+    for (const storedValue of value.records as unknown[]) {
+      const record = parseExpressionRecord(storedValue);
+      if (record) {
+        records.push(record);
+        continue;
+      }
+      const task = parseExpressionTask(storedValue);
+      if (task) {
+        legacyTasks.push(task);
+      }
+    }
+  }
+  const store: StoredExpressionWorkspace = {
     records: records.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
     version: EXPRESSION_STORE_VERSION,
   };
+  if (legacyTasks.length > 0) {
+    let taskStore = await loadExpressionTaskStore(characterId);
+    for (const task of legacyTasks) {
+      taskStore = upsertExpressionTask(taskStore, task);
+    }
+    await saveExpressionTaskStore(characterId, taskStore);
+    await saveExpressionStore(characterId, store);
+  }
+  return store;
 }
 
 // 把表情库整体写回 JSON，覆盖式持久化

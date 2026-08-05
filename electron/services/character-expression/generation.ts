@@ -9,6 +9,8 @@ import {
 import type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceSelection,
+  CharacterExpressionTask,
+  CharacterExpressionTaskResult,
   GenerateCharacterExpressionPromptRequest,
   GenerateCharacterExpressionRequest,
   GetCharacterExpressionTaskRequest,
@@ -23,6 +25,12 @@ import { EXPRESSION_ASSET_DIRECTORY } from './constants';
 import { parseReferenceSelection, selectionKey } from './parsers';
 import { buildExpressionPrompt, resolveChatModel } from './prompts';
 import { loadExpressionStore, replaceRecord, saveExpressionStore } from './store';
+import {
+  loadExpressionTaskStore,
+  removeExpressionTask,
+  saveExpressionTaskStore,
+  upsertExpressionTask,
+} from './task-store';
 import {
   buildGptImage2RequestBody,
   idSchema,
@@ -64,17 +72,15 @@ export function getAvailableReferences(
     selection: { ...reference.selection, kind: 'visual' as const },
   }));
   const expressionReferences = expressionStore.records.flatMap(record =>
-    record.status === 'completed'
-      ? record.images.map(image => ({
-          directoryName: EXPRESSION_ASSET_DIRECTORY,
-          image,
-          selection: {
-            fileName: image.fileName,
-            kind: 'expression' as const,
-            taskId: record.id,
-          },
-        }))
-      : [],
+    record.images.map(image => ({
+      directoryName: EXPRESSION_ASSET_DIRECTORY,
+      image,
+      selection: {
+        fileName: image.fileName,
+        kind: 'expression' as const,
+        taskId: record.id,
+      },
+    })),
   );
   return [...characterVisualReferences, ...expressionReferences];
 }
@@ -97,7 +103,7 @@ function validateGenerateRequest(
 
 export async function generateCharacterExpression(
   request: GenerateCharacterExpressionRequest,
-): Promise<CharacterExpressionRecord> {
+): Promise<CharacterExpressionTask> {
   const requestedAssets = validateGenerateRequest(request);
   const [visualWorkspace, expressionStore] = await Promise.all([
     getCharacterVisualWorkspace(request.characterId),
@@ -135,40 +141,39 @@ export async function generateCharacterExpression(
 
   const now = new Date().toISOString();
   const prompt = buildExpressionPrompt(request);
-  const record: CharacterExpressionRecord = {
+  const task: CharacterExpressionTask = {
     count: request.count,
     createdAt: now,
     description: request.description.trim(),
     errorMessage: null,
     id: taskId,
-    images: [],
     name: request.name.trim(),
-    originalName: null,
     progress: 0,
     prompt,
     referenceAssets: requestedAssets.map(asset => ({ ...asset })),
     resolution: request.resolution,
     size: request.size,
-    source: 'generated',
     status: 'submitted',
     updatedAt: now,
   };
-  const latestStore = await loadExpressionStore(request.characterId);
-  await saveExpressionStore(request.characterId, replaceRecord(latestStore, record));
-  return record;
+  const taskStore = await loadExpressionTaskStore(request.characterId);
+  await saveExpressionTaskStore(request.characterId, upsertExpressionTask(taskStore, task));
+  return task;
 }
 
 export async function getCharacterExpressionTask(
   request: GetCharacterExpressionTaskRequest,
-): Promise<CharacterExpressionRecord> {
+): Promise<CharacterExpressionTaskResult> {
   const { characterId, taskId } = parseRequest(request, getTaskRequestSchema);
-  const store = await loadExpressionStore(characterId);
-  const existingRecord = store.records.find(record => record.id === taskId);
-  if (!existingRecord) {
+  const taskStore = await loadExpressionTaskStore(characterId);
+  const existingTask = taskStore.tasks[taskId];
+  if (!existingTask) {
+    const expressionStore = await loadExpressionStore(characterId);
+    const completedRecord = expressionStore.records.find(record => record.id === taskId);
+    if (completedRecord) {
+      return { record: completedRecord, task: null };
+    }
     throw new Error('未找到表情生成任务');
-  }
-  if (existingRecord.status === 'completed' && existingRecord.images.length > 0) {
-    return existingRecord;
   }
 
   const apiKey = await getCredentialValue('apimart');
@@ -176,26 +181,43 @@ export async function getCharacterExpressionTask(
   if (!isTaskStatus(taskData.status)) {
     throw new Error('图片生成服务返回了未知任务状态');
   }
-  const images =
-    taskData.status === 'completed'
-      ? await downloadTaskImages(taskId, taskData)
-      : existingRecord.images;
-  const updatedRecord: CharacterExpressionRecord = {
-    ...existingRecord,
+  if (taskData.status === 'completed') {
+    const expressionStore = await loadExpressionStore(characterId);
+    const completedRecord = expressionStore.records.find(record => record.id === taskId);
+    if (completedRecord) {
+      await saveExpressionTaskStore(characterId, removeExpressionTask(taskStore, taskId));
+      return { record: completedRecord, task: null };
+    }
+    const images = await downloadTaskImages(taskId, taskData);
+    const now = new Date().toISOString();
+    const record: CharacterExpressionRecord = {
+      ...existingTask,
+      images,
+      originalName: null,
+      progress: 100,
+      source: 'generated',
+      status: 'completed',
+      updatedAt: now,
+    };
+    await saveExpressionStore(characterId, replaceRecord(expressionStore, record));
+    await saveExpressionTaskStore(characterId, removeExpressionTask(taskStore, taskId));
+    return { record, task: null };
+  }
+
+  const updatedTask: CharacterExpressionTask = {
+    ...existingTask,
     errorMessage:
       taskData.status === 'failed' || taskData.status === 'cancelled'
         ? taskData.error?.message || '表情生成任务未完成'
         : null,
-    images,
-    progress:
-      taskData.status === 'completed'
-        ? 100
-        : Math.min(100, Math.max(0, taskData.progress ?? existingRecord.progress)),
+    progress: Math.min(100, Math.max(0, taskData.progress ?? existingTask.progress)),
     status: taskData.status,
     updatedAt: new Date().toISOString(),
   };
-  await saveExpressionStore(characterId, replaceRecord(store, updatedRecord));
-  return updatedRecord;
+  if (updatedTask.status === 'failed' || updatedTask.status === 'cancelled') {
+    await saveExpressionTaskStore(characterId, upsertExpressionTask(taskStore, updatedTask));
+  }
+  return { record: null, task: updatedTask };
 }
 
 // 生成表情提示词

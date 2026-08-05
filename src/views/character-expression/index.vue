@@ -15,6 +15,7 @@ import { useAppStore } from '@/stores/app';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionSize,
+  CharacterExpressionTask,
   CharacterExpressionWorkspaceState,
   CharacterLibraryState,
   CharacterVisualImage,
@@ -55,6 +56,7 @@ const {
 const library = ref<CharacterLibraryState | null>(null);
 const selectedCharacterId = ref('');
 const records = ref<CharacterExpressionRecord[]>([]);
+const tasks = ref<CharacterExpressionTask[]>([]);
 
 const visualWorkspace = ref<CharacterVisualWorkspaceState | null>(null);
 
@@ -76,7 +78,10 @@ const { deleteDialogOpen, deleteExpression, deletingFileName, requestDelete } = 
     },
   },
 );
-const { searchQuery, filteredRecords, cleanQuery } = useExpressionSearch({ records });
+const { searchQuery, filteredRecords, filteredTasks, cleanQuery } = useExpressionSearch({
+  records,
+  tasks,
+});
 const { renameDialogOpen, renameExpression, renameTarget, renamingTaskId, requestRename } =
   useExpressionRename({
     characterId: selectedCharacterId,
@@ -109,9 +114,7 @@ let isDisposed = false;
 let loadRequestId = 0;
 
 const characters = computed(() => library.value?.characters ?? []);
-const activeRecord = computed(() =>
-  records.value.find(record => ACTIVE_STATUSES.includes(record.status)),
-);
+const activeTask = computed(() => tasks.value.find(task => ACTIVE_STATUSES.includes(task.status)));
 const keyConfigured = apimartConfigured;
 const fastModelProvider = computed(
   () => getChatModelDefinition(appStore.settings.fastModel).provider,
@@ -119,7 +122,7 @@ const fastModelProvider = computed(
 const promptGenerationAvailable = computed(() =>
   fastModelProvider.value === 'minimax' ? minimaxConfigured.value : deepseekConfigured.value,
 );
-const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
+const isBusy = computed(() => isSubmitting.value || Boolean(activeTask.value));
 const characterSelectionDisabled = computed(
   () =>
     isInitializing.value ||
@@ -148,6 +151,16 @@ function replaceRecord(updatedRecord: CharacterExpressionRecord): void {
     updatedRecord,
     ...records.value.filter(record => record.id !== updatedRecord.id),
   ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+function replaceTask(updatedTask: CharacterExpressionTask): void {
+  tasks.value = [updatedTask, ...tasks.value.filter(task => task.id !== updatedTask.id)].sort(
+    (left, right) => right.createdAt.localeCompare(left.createdAt),
+  );
+}
+
+function removeTask(taskId: string): void {
+  tasks.value = tasks.value.filter(task => task.id !== taskId);
 }
 
 function clearPollTimer(): void {
@@ -186,25 +199,31 @@ async function pollExpressionTask(taskId: string, characterId: string): Promise<
     taskId,
   };
   try {
-    const record = await window.desktop.character.expression.getCharacterExpressionTask({
+    const result = await window.desktop.character.expression.getCharacterExpressionTask({
       characterId,
       taskId,
     });
     if (selectedCharacterId.value !== characterId) {
       return;
     }
-    replaceRecord(record);
     errorMessage.value = '';
-    if (ACTIVE_STATUSES.includes(record.status)) {
+    if (result.record) {
+      removeTask(taskId);
+      replaceRecord(result.record);
+      pollingState.value = { attempt: 0, phase: 'idle', taskId: '' };
+      toast.success(`“${result.record.name}”表情已生成并保存到工作区`);
+      return;
+    }
+    if (!result.task) {
+      throw new Error('表情任务返回结果无效');
+    }
+    replaceTask(result.task);
+    if (ACTIVE_STATUSES.includes(result.task.status)) {
       schedulePoll(taskId, characterId);
       return;
     }
     pollingState.value = { attempt: 0, phase: 'idle', taskId: '' };
-    if (record.status === 'completed') {
-      toast.success(`“${record.name}”表情已生成并保存到工作区`);
-    } else {
-      errorMessage.value = record.errorMessage || '表情生成任务未完成';
-    }
+    errorMessage.value = result.task.errorMessage || '表情生成任务未完成';
   } catch (pollError: unknown) {
     if (selectedCharacterId.value !== characterId) {
       return;
@@ -221,6 +240,7 @@ function applyExpressionPageData(
   currentVisualWorkspace: CharacterVisualWorkspaceState,
 ): void {
   records.value = expressionWorkspace.records;
+  tasks.value = expressionWorkspace.tasks;
   visualWorkspace.value = currentVisualWorkspace;
   resetReferences();
 
@@ -233,9 +253,9 @@ function applyExpressionPageData(
   resolution.value = latestGeneratedRecord?.resolution ?? '1k';
   count.value = latestGeneratedRecord?.count ?? 2;
 
-  if (activeRecord.value) {
+  if (activeTask.value) {
     openGenerator();
-    schedulePoll(activeRecord.value.id, selectedCharacterId.value);
+    schedulePoll(activeTask.value.id, selectedCharacterId.value);
   }
 }
 
@@ -246,6 +266,7 @@ async function loadExpressionPageData(characterId: string): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   records.value = [];
+  tasks.value = [];
   visualWorkspace.value = null;
   resetReferences();
 
@@ -311,7 +332,7 @@ async function generateExpression(): Promise<void> {
   isSubmitting.value = true;
   errorMessage.value = '';
   try {
-    const record = await window.desktop.character.expression.generateCharacterExpression({
+    const task = await window.desktop.character.expression.generateCharacterExpression({
       characterId,
       count: count.value,
       description: description.value.trim(),
@@ -324,8 +345,8 @@ async function generateExpression(): Promise<void> {
       resolution: resolution.value,
       size: size.value,
     });
-    replaceRecord(record);
-    await pollExpressionTask(record.id, characterId);
+    replaceTask(task);
+    await pollExpressionTask(task.id, characterId);
   } catch (generationError: unknown) {
     errorMessage.value = toErrorMessage(generationError);
   } finally {
@@ -335,11 +356,11 @@ async function generateExpression(): Promise<void> {
 
 // 重试
 function retryPolling(): void {
-  if (!activeRecord.value || isPolling.value) {
+  if (!activeTask.value || isPolling.value) {
     return;
   }
   errorMessage.value = '';
-  void pollExpressionTask(activeRecord.value.id, selectedCharacterId.value);
+  void pollExpressionTask(activeTask.value.id, selectedCharacterId.value);
 }
 
 // 生成表情提示词
@@ -383,6 +404,7 @@ async function refreshExpressionsAfterUpload(): Promise<void> {
       characterId: selectedCharacterId.value,
     });
     records.value = workspace.records;
+    tasks.value = workspace.tasks;
     toast.success('表情已上传并保存到工作区');
   } catch (uploadError: unknown) {
     toast.error(toErrorMessage(uploadError));
@@ -438,7 +460,7 @@ onBeforeUnmount(() => {
       title="表情流程暂时中断"
       :error-message="errorMessage"
       retry-label="继续查询"
-      :can-retry="activeRecord && !isPolling"
+      :can-retry="activeTask && !isPolling"
       @retry="retryPolling"
     />
 
@@ -451,9 +473,10 @@ onBeforeUnmount(() => {
       <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/15" aria-label="表情资产库">
         <ScrollArea class="min-h-0 flex-1">
           <ExpressionRecords
-            v-if="filteredRecords.length"
+            v-if="filteredRecords.length || filteredTasks.length"
             :records="filteredRecords"
             :polling-state="pollingState"
+            :tasks="filteredTasks"
             @edit="editExpression"
           />
 

@@ -45,6 +45,8 @@ export type {
   CharacterExpressionReferenceKind,
   CharacterExpressionReferenceSelection,
   CharacterExpressionSize,
+  CharacterExpressionTask,
+  CharacterExpressionTaskResult,
   CharacterExpressionWorkspaceState,
   DeleteCharacterExpressionRequest,
   GenerateCharacterExpressionRequest,

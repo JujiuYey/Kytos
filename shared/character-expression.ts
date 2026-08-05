@@ -3,6 +3,7 @@ import type {
   CharacterVisualAssetRecord,
   CharacterVisualResolution,
   CharacterVisualAssetSelection,
+  CharacterVisualTaskStatus,
 } from './character-visual';
 import type { CharacterScopeRequest } from './character-library';
 import type { ChatModel } from './chat-model';
@@ -43,13 +44,37 @@ export interface GenerateCharacterExpressionRequest extends CharacterScopeReques
 // 角色表情记录
 export interface CharacterExpressionRecord
   extends
-    Omit<CharacterVisualAssetRecord<CharacterExpressionSize>, 'referenceAssets'>,
-    Omit<GenerateCharacterExpressionRequest, 'characterId'> {}
+    Omit<CharacterVisualAssetRecord<CharacterExpressionSize>, 'referenceAssets' | 'status'>,
+    Omit<GenerateCharacterExpressionRequest, 'characterId'> {
+  status: 'completed';
+}
+
+// 尚未转为正式表情资产的异步生成任务
+export interface CharacterExpressionTask extends Omit<
+  GenerateCharacterExpressionRequest,
+  'characterId'
+> {
+  createdAt: string;
+  errorMessage: string | null;
+  id: string;
+  progress: number;
+  prompt: string;
+  status: Exclude<CharacterVisualTaskStatus, 'completed'>;
+  updatedAt: string;
+}
+
+// 单次任务查询结果：处理中返回 task，完成后返回正式 record
+export interface CharacterExpressionTaskResult {
+  record: CharacterExpressionRecord | null;
+  task: CharacterExpressionTask | null;
+}
 
 // 角色表情工作区状态
 export interface CharacterExpressionWorkspaceState {
   // 表情记录列表
   records: CharacterExpressionRecord[];
+  // 尚未完成或需要展示错误状态的任务
+  tasks: CharacterExpressionTask[];
 }
 
 // 删除角色表情请求
@@ -106,7 +131,7 @@ export interface CharacterExpressionApi {
   // 生成角色表情
   generateCharacterExpression: (
     request: GenerateCharacterExpressionRequest,
-  ) => Promise<CharacterExpressionRecord>;
+  ) => Promise<CharacterExpressionTask>;
   // 生成角色表情提示词
   generateCharacterExpressionPrompt: (
     request: GenerateCharacterExpressionPromptRequest,
@@ -114,7 +139,7 @@ export interface CharacterExpressionApi {
   // 查询角色表情任务
   getCharacterExpressionTask: (
     request: GetCharacterExpressionTaskRequest,
-  ) => Promise<CharacterExpressionRecord>;
+  ) => Promise<CharacterExpressionTaskResult>;
   // 查询角色表情工作区
   getCharacterExpressionWorkspace: (
     request: GetCharacterExpressionWorkspaceRequest,

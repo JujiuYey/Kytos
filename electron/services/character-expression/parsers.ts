@@ -9,6 +9,7 @@ import type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceSelection,
   CharacterExpressionSize,
+  CharacterExpressionTask,
 } from '../../../shared/character-expression';
 import { CHARACTER_VISUAL_RESOLUTIONS } from '../../../shared/character-visual';
 import type {
@@ -71,7 +72,25 @@ export function parseImage(value: unknown): CharacterVisualImage | null {
   };
 }
 
-export function parseExpressionRecord(value: unknown): CharacterExpressionRecord | null {
+interface ParsedExpressionFields {
+  count: number;
+  createdAt: string;
+  description: string;
+  errorMessage: string | null;
+  id: string;
+  name: string;
+  progress: number;
+  prompt: string;
+  referenceAssets: CharacterExpressionReferenceSelection[];
+  resolution: CharacterVisualResolution;
+  size: CharacterExpressionSize;
+  updatedAt: string;
+}
+
+function parseExpressionFields(
+  value: unknown,
+  allowEmptyReferences: boolean,
+): ParsedExpressionFields | null {
   if (
     !isPlainObject(value) ||
     typeof value.id !== 'string' ||
@@ -89,15 +108,11 @@ export function parseExpressionRecord(value: unknown): CharacterExpressionRecord
     !Number.isInteger(value.count) ||
     value.count < 1 ||
     value.count > 4 ||
-    !isTaskStatus(value.status) ||
     !Array.isArray(value.referenceAssets)
   ) {
     return null;
   }
 
-  const images = Array.isArray(value.images)
-    ? value.images.map(parseImage).filter((image): image is CharacterVisualImage => Boolean(image))
-    : [];
   const parsedReferenceAssets = value.referenceAssets.map(parseReferenceSelection);
   if (parsedReferenceAssets.some(asset => !asset)) {
     return null;
@@ -108,7 +123,7 @@ export function parseExpressionRecord(value: unknown): CharacterExpressionRecord
   if (
     referenceAssets.length > MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES ||
     new Set(referenceAssets.map(selectionKey)).size !== referenceAssets.length ||
-    (value.source !== 'uploaded' && referenceAssets.length < 1)
+    (!allowEmptyReferences && referenceAssets.length < 1)
   ) {
     return null;
   }
@@ -119,17 +134,54 @@ export function parseExpressionRecord(value: unknown): CharacterExpressionRecord
     description: value.description,
     errorMessage: typeof value.errorMessage === 'string' ? value.errorMessage : null,
     id: value.id,
-    images,
     name: value.name.trim(),
-    originalName: typeof value.originalName === 'string' ? value.originalName : null,
     progress: typeof value.progress === 'number' ? Math.min(100, Math.max(0, value.progress)) : 0,
     prompt: value.prompt,
     referenceAssets,
     resolution: value.resolution,
     size: value.size,
-    source: value.source === 'uploaded' ? 'uploaded' : 'generated',
-    status: value.status,
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
+  };
+}
+
+export function parseExpressionRecord(value: unknown): CharacterExpressionRecord | null {
+  if (
+    !isPlainObject(value) ||
+    value.status !== 'completed' ||
+    !['generated', 'uploaded'].includes(String(value.source))
+  ) {
+    return null;
+  }
+  const source = value.source === 'uploaded' ? 'uploaded' : 'generated';
+  const fields = parseExpressionFields(value, source === 'uploaded');
+  const images = Array.isArray(value.images)
+    ? value.images.map(parseImage).filter((image): image is CharacterVisualImage => Boolean(image))
+    : [];
+  if (!fields || images.length < 1) {
+    return null;
+  }
+  return {
+    ...fields,
+    images,
+    originalName: typeof value.originalName === 'string' ? value.originalName : null,
+    progress: 100,
+    source,
+    status: 'completed',
+  };
+}
+
+export function parseExpressionTask(value: unknown): CharacterExpressionTask | null {
+  if (!isPlainObject(value) || !isTaskStatus(value.status)) {
+    return null;
+  }
+  const fields = parseExpressionFields(value, false);
+  if (!fields) {
+    return null;
+  }
+  return {
+    ...fields,
+    // 旧 store 可能在图片下载完成前已记录 completed，迁移后继续轮询即可恢复。
+    status: value.status === 'completed' ? 'processing' : value.status,
   };
 }
 

@@ -19,6 +19,7 @@ import {
   replaceRecord,
   saveExpressionStore,
 } from './store';
+import { loadExpressionTaskStore } from './task-store';
 import type { StoredExpressionWorkspace } from './types';
 
 const getWorkspaceRequestSchema = z.object({ characterId: z.string() });
@@ -38,7 +39,18 @@ export async function getCharacterExpressionWorkspace(
 ): Promise<CharacterExpressionWorkspaceState> {
   const { characterId } = parseRequest(request, getWorkspaceRequestSchema);
   const store = await loadExpressionStore(characterId);
-  return { records: store.records };
+  return toWorkspaceState(characterId, store.records);
+}
+
+async function toWorkspaceState(
+  characterId: string,
+  records: CharacterExpressionRecord[],
+): Promise<CharacterExpressionWorkspaceState> {
+  const taskStore = await loadExpressionTaskStore(characterId);
+  const tasks = Object.values(taskStore.tasks).sort((left, right) =>
+    right.createdAt.localeCompare(left.createdAt),
+  );
+  return { records, tasks };
 }
 
 export async function uploadCharacterExpression(
@@ -90,7 +102,7 @@ export async function renameCharacterExpression(
 
   const nextStore = patchRecordName(store, record.id, name, new Date().toISOString());
   await saveExpressionStore(characterId, nextStore);
-  return { records: nextStore.records };
+  return toWorkspaceState(characterId, nextStore.records);
 }
 
 export async function deleteCharacterExpression(
@@ -121,5 +133,5 @@ export async function deleteCharacterExpression(
       );
     }
   }
-  return { records: nextStore.records };
+  return toWorkspaceState(characterId, nextStore.records);
 }
