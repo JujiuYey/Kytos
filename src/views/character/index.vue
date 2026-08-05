@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { Plus, UserRoundPlus, UsersRound } from '@lucide/vue';
+import { UserRoundPlus, UsersRound } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,19 +12,16 @@ import { SagPage } from '@/components/sag/sag-page';
 import type { CharacterLibraryCharacter, CharacterLibraryState, CharacterSummary } from '@/types';
 import CharacterCard from './components/character-card.vue';
 import CharacterCardSkeleton from './components/character-card-skeleton.vue';
-import CharacterSummaryDialog from './components/character-summary-dialog.vue';
+import CharacterRenameDialog from './components/character-rename-dialog.vue';
 
 const router = useRouter();
-const library = ref<CharacterLibraryState | null>(null);
-const loading = ref(true);
-const busy = ref(false);
-const errorMessage = ref('');
-const deleteTarget = ref<CharacterSummary | null>(null);
-const summaryDialogOpen = ref(false);
-const summaryDialogMode = ref<'create' | 'rename'>('create');
-const summaryTarget = ref<CharacterSummary | null>(null);
 
+const library = ref<CharacterLibraryState | null>(null);
 const characters = computed(() => library.value?.characters ?? []);
+const busy = ref(false);
+
+const loading = ref(true);
+const errorMessage = ref('');
 
 async function loadLibrary(): Promise<void> {
   loading.value = true;
@@ -38,37 +35,33 @@ async function loadLibrary(): Promise<void> {
   }
 }
 
+onMounted(() => {
+  void loadLibrary();
+});
+
 function createCharacter(): void {
-  summaryDialogMode.value = 'create';
-  summaryTarget.value = null;
-  summaryDialogOpen.value = true;
+  void router.push({ name: 'character-create', query: { new: '1' } });
 }
+
+const renameDialogOpen = ref(false);
+const renameTarget = ref<CharacterSummary | null>(null);
 
 function renameCharacter(character: CharacterSummary): void {
-  summaryDialogMode.value = 'rename';
-  summaryTarget.value = character;
-  summaryDialogOpen.value = true;
+  renameTarget.value = character;
+  renameDialogOpen.value = true;
 }
 
-async function submitCharacterSummary(name: string): Promise<void> {
+async function submitCharacterRename(name: string): Promise<void> {
   if (busy.value) return;
+  const target = renameTarget.value;
+  if (!target) return;
   busy.value = true;
   try {
-    if (summaryDialogMode.value === 'create') {
-      library.value = await window.desktop.character.library.createCharacter({ name });
-      const characterId = library.value.activeCharacterId;
-      summaryDialogOpen.value = false;
-      toast.success('角色概要已创建');
-      await router.push({ name: 'character-create', query: { characterId } });
-      return;
-    }
-    const target = summaryTarget.value;
-    if (!target) return;
     library.value = await window.desktop.character.library.updateCharacter({
       characterId: target.id,
       name,
     });
-    summaryDialogOpen.value = false;
+    renameDialogOpen.value = false;
     toast.success('角色名称已更新');
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : String(error));
@@ -98,6 +91,8 @@ async function openCharacterVisual(character: CharacterLibraryCharacter): Promis
   }
 }
 
+const deleteTarget = ref<CharacterSummary | null>(null);
+
 function requestDelete(character: CharacterSummary): void {
   deleteTarget.value = character;
 }
@@ -120,10 +115,6 @@ async function confirmDelete(): Promise<void> {
     busy.value = false;
   }
 }
-
-onMounted(() => {
-  void loadLibrary();
-});
 </script>
 
 <template>
@@ -132,13 +123,6 @@ onMounted(() => {
       <Badge variant="secondary" class="shrink-0 tabular-nums">
         {{ characters.length }}
       </Badge>
-    </template>
-
-    <template #header-actions>
-      <Button :disabled="busy" @click="createCharacter">
-        <Plus class="size-4" />
-        新建角色
-      </Button>
     </template>
 
     <SagErrorRetryAlert
@@ -197,13 +181,12 @@ onMounted(() => {
       @confirm="confirmDelete"
     />
 
-    <CharacterSummaryDialog
-      :current-name="summaryTarget?.name || ''"
+    <CharacterRenameDialog
+      :current-name="renameTarget?.name || ''"
       :loading="busy"
-      :mode="summaryDialogMode"
-      :open="summaryDialogOpen"
-      @submit="submitCharacterSummary"
-      @update:open="summaryDialogOpen = $event"
+      :open="renameDialogOpen"
+      @submit="submitCharacterRename"
+      @update:open="renameDialogOpen = $event"
     />
   </SagPage>
 </template>

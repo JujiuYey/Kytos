@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label';
 const props = defineProps<{
   currentName: string;
   loading: boolean;
-  mode: 'create' | 'rename';
   open: boolean;
 }>();
 
@@ -31,7 +30,7 @@ const submitDisabled = computed(
     props.loading ||
     !normalizedName.value ||
     name.value.length > 100 ||
-    (props.mode === 'rename' && normalizedName.value === props.currentName),
+    normalizedName.value === props.currentName,
 );
 
 watch(
@@ -56,23 +55,17 @@ function submit(): void {
     <DialogContent class="sm:max-w-md">
       <form class="space-y-5" @submit.prevent="submit">
         <DialogHeader>
-          <DialogTitle>{{ mode === 'create' ? '新建角色' : '修改角色名称' }}</DialogTitle>
-          <DialogDescription>
-            {{
-              mode === 'create'
-                ? '先建立角色概要，下一步只负责创建这个角色的第一个形象。'
-                : '角色名称会同步到角色概要和相关工作区。'
-            }}
-          </DialogDescription>
+          <DialogTitle>修改角色名称</DialogTitle>
+          <DialogDescription>角色名称会同步到角色概要和相关工作区。</DialogDescription>
         </DialogHeader>
 
         <div class="space-y-2">
           <div class="flex items-center justify-between gap-3">
-            <Label for="character-summary-name">角色名称</Label>
+            <Label for="character-name">角色名称</Label>
             <span class="text-xs tabular-nums text-muted-foreground">{{ name.length }} / 100</span>
           </div>
           <Input
-            id="character-summary-name"
+            id="character-name"
             v-model="name"
             autofocus
             maxlength="100"
@@ -90,7 +83,7 @@ function submit(): void {
             取消
           </Button>
           <Button type="submit" :disabled="submitDisabled">
-            {{ loading ? '保存中' : mode === 'create' ? '创建并继续' : '保存名称' }}
+            {{ loading ? '保存中' : '保存名称' }}
           </Button>
         </DialogFooter>
       </form>

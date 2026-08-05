@@ -1,14 +1,9 @@
 <script setup lang="ts">
-import { Camera, Check, ImagePlus, MoreHorizontal, Pencil, Trash2, UserRound } from '@lucide/vue';
+import { Camera, Check, ImagePlus, Pencil, Trash2, UserRound } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { SagStatusBadge } from '@/components/sag/status-badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { CharacterImageSize, CharacterLibraryCharacter } from '@/types';
 
 const visualAssetAspectClasses: Record<CharacterImageSize, string> = {
@@ -98,36 +93,41 @@ defineEmits<{
           <ImagePlus v-else class="size-4" />
           {{ character.visualAsset ? '管理视觉' : '创建第一个形象' }}
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              :disabled="busy"
-              :aria-label="`管理角色 ${character.name}`"
-            >
-              <MoreHorizontal class="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem @select="$emit('rename', character)">
-              <Pencil class="size-4" />
-              修改名称
-            </DropdownMenuItem>
-            <DropdownMenuItem @select="$emit('open-visual', character)">
-              <Camera v-if="character.visualAsset" class="size-4" />
-              <ImagePlus v-else class="size-4" />
-              {{ character.visualAsset ? '管理角色视觉' : '创建第一个形象' }}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              class="text-destructive focus:text-destructive"
-              @select="$emit('request-delete', character)"
-            >
-              <Trash2 class="size-4" />
-              移除角色
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div class="flex shrink-0 items-center gap-1">
+          <TooltipProvider :delay-duration="300">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  :disabled="busy"
+                  :aria-label="`修改${character.name}名称`"
+                  @click="$emit('rename', character)"
+                >
+                  <Pencil class="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>修改名称</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider :delay-duration="300">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  class="text-muted-foreground hover:text-destructive"
+                  :disabled="busy"
+                  :aria-label="`移除${character.name}`"
+                  @click="$emit('request-delete', character)"
+                >
+                  <Trash2 class="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>移除角色</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
     </div>
   </article>

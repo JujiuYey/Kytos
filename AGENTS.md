@@ -64,6 +64,8 @@
 - TypeScript 保持 `strict`。不要使用 `any` 逃避建模；优先用明确的 interface、type union 和类型收窄。
 - props 使用 `defineProps`，事件使用带类型的 `defineEmits`，并显式声明所有 emit。
 - 简单派生状态使用 `computed`，可变状态使用 `ref`；不要把可以计算出的值重复存进 store。
+- Composition API 代码按业务逻辑组织，不按 `ref`、`computed`、生命周期和函数等代码类型分区。属于同一逻辑的状态、派生值、副作用和操作方法应相邻放置，形成一块可以独立阅读的代码。
+- 不要为了形式统一把整个组件的状态机械地合并进一个 `reactive` 对象。逻辑块过大、需要复用或拥有独立生命周期时，再提取为明确命名的 composable。
 - 异步操作必须有 loading、empty、error 和 disabled 状态。付费生图操作必须有明确的人为触发和进行中反馈。
 - 页面组件负责流程编排；复杂展示、交互和可复用逻辑下沉到 feature component、store 或 composable。
 - 注释解释约束和原因，不复述代码。过时注释与实现一起更新。

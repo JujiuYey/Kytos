@@ -100,6 +100,7 @@ const selectedStyleDetails = computed(() =>
 const characterId = computed(() =>
   typeof route.query.characterId === 'string' ? route.query.characterId : '',
 );
+const isNewCharacterRequested = computed(() => route.query.new === '1');
 const currentStepDetails = computed(() => CHARACTER_WORKFLOW_STEPS[currentStep.value - 1]);
 const canContinue = computed(() => {
   if (currentStep.value === 1) return true;
@@ -444,9 +445,9 @@ async function initialize(): Promise<void> {
   try {
     if (!characterId.value) {
       const library = await window.desktop.character.library.getCharacterLibrary();
-      const activeCharacter = library.characters.find(
-        character => character.id === library.activeCharacterId,
-      );
+      const activeCharacter = isNewCharacterRequested.value
+        ? undefined
+        : library.characters.find(character => character.id === library.activeCharacterId);
       if (activeCharacter && !activeCharacter.visualAsset) {
         summaryTargetId.value = activeCharacter.id;
         summaryInitialName.value = activeCharacter.name;
