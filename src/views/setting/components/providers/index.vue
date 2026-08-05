@@ -1,8 +1,44 @@
 <script setup lang="ts">
-import ApimartKey from './apimart-key.vue';
-import DeepseekKey from './deepseek-key.vue';
-import MinimaxKey from './minimax-key.vue';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ApiKeySetting from './api-key-setting.vue';
+import ProviderSidebar from './provider-sidebar.vue';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import type { CredentialService } from '@/types';
+
+interface ProviderSetting {
+  category: string;
+  description: string;
+  docsUrl: string;
+  placeholder: string;
+  service: CredentialService;
+  title: string;
+}
+
+const providers: ProviderSetting[] = [
+  {
+    service: 'apimart',
+    title: 'APIMart',
+    category: '生图模型厂商',
+    description: '用于图片生成服务。Key 只在调用服务时由主进程读取。',
+    placeholder: '输入 APIMart API Key',
+    docsUrl: 'https://apimart.ai',
+  },
+  {
+    service: 'deepseek',
+    title: 'DeepSeek',
+    category: '聊天模型厂商',
+    description: '用于角色对话和内容整理。已保存的 Key 不会回传到界面。',
+    placeholder: 'sk-...',
+    docsUrl: 'https://platform.deepseek.com/api_keys',
+  },
+  {
+    service: 'minimax',
+    title: 'MiniMax',
+    category: '聊天模型厂商',
+    description: '用于接入 MiniMax 文本与多模态模型。已保存的 Key 不会回传到界面。',
+    placeholder: '输入 MiniMax API Key',
+    docsUrl: 'https://platform.minimaxi.com/docs/guides/quickstart-preparation',
+  },
+];
 </script>
 
 <template>
@@ -15,48 +51,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
     </div>
 
     <Tabs default-value="apimart" orientation="vertical" class="gap-4 sm:flex-row sm:gap-8">
-      <TabsList
-        aria-label="模型厂商"
-        class="h-auto w-full shrink-0 flex-col items-stretch justify-start rounded-md p-1 sm:w-56"
+      <ProviderSidebar :providers="providers" />
+
+      <TabsContent
+        v-for="provider in providers"
+        :key="provider.service"
+        :value="provider.service"
+        class="min-w-0 flex-1 sm:mt-0"
       >
-        <TabsTrigger
-          value="apimart"
-          class="h-auto w-full flex-none flex-col items-start justify-center gap-0.5 px-3 py-3 text-left"
-        >
-          <span class="font-medium">APIMart</span>
-          <span class="text-xs font-normal text-muted-foreground">生图模型厂商</span>
-        </TabsTrigger>
-        <TabsTrigger
-          value="deepseek"
-          class="h-auto w-full flex-none flex-col items-start justify-center gap-0.5 px-3 py-3 text-left"
-        >
-          <span class="font-medium">DeepSeek</span>
-          <span class="text-xs font-normal text-muted-foreground">聊天模型厂商</span>
-        </TabsTrigger>
-        <TabsTrigger
-          value="minimax"
-          class="h-auto w-full flex-none flex-col items-start justify-center gap-0.5 px-3 py-3 text-left"
-        >
-          <span class="font-medium">MiniMax</span>
-          <span class="text-xs font-normal text-muted-foreground">聊天模型厂商</span>
-        </TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="apimart" class="min-w-0 flex-1 sm:mt-0">
         <div class="rounded-md border">
-          <ApimartKey />
-        </div>
-      </TabsContent>
-
-      <TabsContent value="deepseek" class="min-w-0 flex-1 sm:mt-0">
-        <div class="rounded-md border">
-          <DeepseekKey />
-        </div>
-      </TabsContent>
-
-      <TabsContent value="minimax" class="min-w-0 flex-1 sm:mt-0">
-        <div class="rounded-md border">
-          <MinimaxKey />
+          <ApiKeySetting
+            :service="provider.service"
+            :title="provider.title"
+            :description="provider.description"
+            :placeholder="provider.placeholder"
+            :docs-url="provider.docsUrl"
+          />
         </div>
       </TabsContent>
     </Tabs>

@@ -95,7 +95,7 @@
 
 ## 验证
 
-根据改动范围执行最小且充分的验证：
+如果任务复杂程度，则根据改动范围执行最小且充分的验证：
 
 ```bash
 # Vue / TypeScript 构建
@@ -109,3 +109,5 @@ pnpm exec oxfmt --check <changed-files>
 常规代码验证只要求 `pnpm build:web` 通过。不要为验证改动运行 `pnpm build`、`pnpm package`、`pnpm make` 或其他 Electron Forge 打包命令；完整 Electron 打包由用户按需执行。
 
 交付前同时运行 `git diff --check`，并确认生成文件、缓存和无关格式化没有混入 diff。
+
+否则根据用户指令，精准快速完成任务并向用户报告
