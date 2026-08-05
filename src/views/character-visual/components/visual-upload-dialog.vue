@@ -10,61 +10,62 @@ import {
 import { FileUpload } from '@/components/sag/file-upload';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { CharacterVisualAssetUpload, SaveFileRequest, SavedFileResult } from '@/types';
+import type { SaveFileRequest, SavedFileResult } from '@/types';
 
 const props = defineProps<{
-  description: string;
-  open: boolean;
-  title: string;
-  uploadHandler: (request: CharacterVisualAssetUpload) => Promise<SavedFileResult>;
+  characterId: string;
 }>();
+
+const open = defineModel<boolean>('open', { required: true });
 
 const emit = defineEmits<{
   (event: 'uploaded', result: SavedFileResult): void;
-  (event: 'update:open', value: boolean): void;
 }>();
 
 const uploadKey = ref(0);
 const name = ref('角色视觉');
 const normalizedName = computed(() => name.value.trim());
 
-watch(
-  () => props.open,
-  open => {
-    if (open) {
-      uploadKey.value += 1;
-      name.value = '角色视觉';
-    }
-  },
-);
-
-function handleUploaded(result: SavedFileResult) {
-  emit('uploaded', result);
-  emit('update:open', false);
-}
+watch(open, value => {
+  if (value) {
+    uploadKey.value += 1;
+    name.value = '角色视觉';
+  }
+});
 
 function upload(request: SaveFileRequest): Promise<SavedFileResult> {
   if (!normalizedName.value) {
     return Promise.reject(new Error('请先填写图片名称'));
   }
-  return props.uploadHandler({ ...request, name: normalizedName.value });
+  return window.desktop.character.assets.uploadCharacterVisualAsset({
+    ...request,
+    characterId: props.characterId,
+    name: normalizedName.value,
+  });
+}
+
+function handleUploaded(result: SavedFileResult): void {
+  emit('uploaded', result);
+  open.value = false;
 }
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
+  <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
-        <DialogTitle>{{ title }}</DialogTitle>
-        <DialogDescription>{{ description }}</DialogDescription>
+        <DialogTitle>上传角色视觉图片</DialogTitle>
+        <DialogDescription>
+          填写图片名称后上传。上传完成后可按需要设为正式资产。
+        </DialogDescription>
       </DialogHeader>
       <div class="space-y-2">
         <div class="flex items-center justify-between gap-3">
-          <Label for="character-visual-name">图片名称</Label>
+          <Label for="visual-asset-name">图片名称</Label>
           <span class="text-xs tabular-nums text-muted-foreground">{{ name.length }} / 80</span>
         </div>
         <Input
-          id="character-visual-name"
+          id="visual-asset-name"
           v-model="name"
           maxlength="80"
           placeholder="例如：基础形象、冬季造型、挥手动作"

@@ -6,7 +6,6 @@ import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CharacterAssetUploadDialog } from '@/components/sag/character-asset-upload-dialog';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import {
   ImageReferencePickerDialog,
@@ -20,19 +19,21 @@ import type {
   CharacterLibraryState,
   CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
-  CharacterVisualAssetUpload,
   CharacterVisualImage,
   CharacterVisualResolution,
   CharacterVisualSize,
   CharacterVisualWorkspaceState,
   CredentialStatus,
-  SavedFileResult,
 } from '@/types';
 import { getChatModelDefinition, MAX_CHARACTER_ACTION_LENGTH } from '@/types';
+import { useCharacterVisualUpload } from './composables/use-character-visual-upload';
+import { useCharacterVisualRename } from './composables/use-character-visual-rename';
+import { useCharacterVisualGenerator } from './composables/use-character-visual-generator';
 import CharacterActionGeneratorPanel from './components/character-action-generator-panel.vue';
 import VisualGallery from './components/visual-gallery.vue';
 import VisualPageHeader from './components/visual-page-header.vue';
 import VisualAssetRenameDialog from './components/visual-asset-rename-dialog.vue';
+import VisualUploadDialog from './components/visual-upload-dialog.vue';
 
 interface ActionReferenceOption extends ImageReferencePickerOption {
   selection: CharacterVisualAssetSelection;
@@ -59,22 +60,20 @@ const isPolling = ref(false);
 const isGeneratingPrompt = ref(false);
 const pollingState = ref<GenerationTaskPollingState>({ attempt: 0, phase: 'idle', taskId: '' });
 const selectingFileName = ref('');
-const renamingFileName = ref('');
 const deletingFileName = ref('');
 const deleteDialogOpen = ref(false);
 const deleteTarget = ref<{
   image: CharacterVisualImage;
   record: CharacterVisualAssetRecord;
 } | null>(null);
-const uploadDialogOpen = ref(false);
+const { openUploadDialog, uploadDialogOpen } = useCharacterVisualUpload();
+const { renameAsset, renameDialogOpen, renamingFileName, renameTarget, requestRename } =
+  useCharacterVisualRename({
+    onRenamed(nextRecords) {
+      records.value = nextRecords;
+    },
+  });
 const referenceDialogOpen = ref(false);
-const renameDialogOpen = ref(false);
-const renameTarget = ref<{
-  image: CharacterVisualImage;
-  record: CharacterVisualAssetRecord;
-} | null>(null);
-const generatorOpen = ref(false);
-const mobilePane = ref<'settings' | 'gallery'>('gallery');
 const selectedReferenceAsset = ref<CharacterVisualAssetSelection | null>(null);
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -156,9 +155,6 @@ const isGenerateDisabled = computed(
     !action.value.trim() ||
     action.value.length > MAX_CHARACTER_ACTION_LENGTH,
 );
-const uploadTitle = '上传角色视觉图片';
-const uploadDescription = '填写图片名称后上传。上传完成后可按需要设为正式资产。';
-
 function referenceAssetKey(selection: CharacterVisualAssetSelection): string {
   return `${selection.taskId}:${selection.fileName}`;
 }
@@ -245,7 +241,6 @@ async function pollVisualTask(taskId: string) {
     resetPollingState();
     if (record.status === 'completed') {
       toast.success(`“${record.name}”已生成并保存到角色视觉`);
-      mobilePane.value = 'gallery';
     } else {
       errorMessage.value = record.errorMessage || '角色视觉生成任务未完成';
     }
@@ -273,7 +268,6 @@ function applyCharacterWorkspace(visualWorkspace: CharacterVisualWorkspaceState)
   );
   if (unfinishedRecord) {
     schedulePoll(unfinishedRecord.id);
-    mobilePane.value = 'gallery';
   }
 }
 
@@ -374,7 +368,6 @@ async function generateActions() {
       size: size.value,
     });
     records.value = replaceRecord(records.value, record);
-    mobilePane.value = 'gallery';
     await pollVisualTask(record.id);
   } catch (generationError: unknown) {
     errorMessage.value =
@@ -408,20 +401,6 @@ function retryPolling() {
   }
   errorMessage.value = '';
   void pollVisualTask(activeRecord.value.id);
-}
-
-function closeGenerator(): void {
-  generatorOpen.value = false;
-  mobilePane.value = 'gallery';
-}
-
-function openGenerator(): void {
-  if (operationDisabled.value) {
-    return;
-  }
-  generatorOpen.value = true;
-  mobilePane.value = 'settings';
-  void refreshVisualWorkspace();
 }
 
 async function refreshVisualWorkspace(): Promise<void> {
@@ -507,19 +486,8 @@ function openUpload() {
   if (operationDisabled.value) {
     return;
   }
-  generatorOpen.value = false;
-  mobilePane.value = 'gallery';
-  uploadDialogOpen.value = true;
-}
-
-function uploadVisualAsset(request: CharacterVisualAssetUpload): Promise<SavedFileResult> {
-  if (!selectedCharacterId.value) {
-    return Promise.reject(new Error('请先选择角色'));
-  }
-  return window.desktop.character.assets.uploadCharacterVisualAsset({
-    ...request,
-    characterId: selectedCharacterId.value,
-  });
+  closeGenerator();
+  openUploadDialog();
 }
 
 async function handleUploaded() {
@@ -529,44 +497,16 @@ async function handleUploaded() {
         characterId: selectedCharacterId.value,
       }),
     );
-    mobilePane.value = 'gallery';
     toast.success('角色视觉图片已上传');
   } catch (uploadError: unknown) {
     toast.error(uploadError instanceof Error ? uploadError.message : String(uploadError));
   }
 }
 
-function requestRename(record: CharacterVisualAssetRecord, image: CharacterVisualImage): void {
-  if (renamingFileName.value || selectingFileName.value || deletingFileName.value) {
-    return;
-  }
-  renameTarget.value = { image, record };
-  renameDialogOpen.value = true;
-}
-
-async function renameAsset(name: string): Promise<void> {
-  const target = renameTarget.value;
-  if (!target || renamingFileName.value) {
-    return;
-  }
-  renamingFileName.value = target.image.fileName;
-  try {
-    applyWorkspace(
-      await window.desktop.character.assets.renameCharacterVisualAsset({
-        fileName: target.image.fileName,
-        name,
-        taskId: target.record.id,
-      }),
-    );
-    renameDialogOpen.value = false;
-    renameTarget.value = null;
-    toast.success('图片名称已更新');
-  } catch (renameError: unknown) {
-    toast.error(renameError instanceof Error ? renameError.message : String(renameError));
-  } finally {
-    renamingFileName.value = '';
-  }
-}
+const { closeGenerator, generatorOpen, openGenerator } = useCharacterVisualGenerator({
+  disabled: operationDisabled,
+  onOpen: refreshVisualWorkspace,
+});
 
 onMounted(() => {
   void initialize();
@@ -586,7 +526,6 @@ onBeforeUnmount(() => {
 
     <template #header-actions>
       <VisualPageHeader
-        v-model:mobile-pane="mobilePane"
         :characters="characters"
         :character-selection-disabled="characterSelectionDisabled"
         :generator-open="generatorOpen"
@@ -636,12 +575,7 @@ onBeforeUnmount(() => {
         generatorOpen && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
       ]"
     >
-      <div
-        :class="[
-          'min-h-0 min-w-0 lg:flex',
-          !generatorOpen || mobilePane === 'gallery' ? 'flex' : 'hidden lg:flex',
-        ]"
-      >
+      <div class="flex min-h-0 min-w-0 lg:flex">
         <VisualGallery
           :deleting-file-name="deletingFileName"
           :official-assets="officialAssets"
@@ -656,13 +590,7 @@ onBeforeUnmount(() => {
           @rename="requestRename"
         />
       </div>
-      <div
-        v-if="generatorOpen"
-        :class="[
-          'min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5',
-          mobilePane === 'settings' ? 'flex' : 'hidden lg:flex',
-        ]"
-      >
+      <div v-if="generatorOpen" class="flex min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5">
         <CharacterActionGeneratorPanel
           v-model:action="action"
           v-model:count="count"
@@ -683,11 +611,9 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <CharacterAssetUploadDialog
+    <VisualUploadDialog
       v-model:open="uploadDialogOpen"
-      :description="uploadDescription"
-      :title="uploadTitle"
-      :upload-handler="uploadVisualAsset"
+      :character-id="selectedCharacterId"
       @uploaded="handleUploaded"
     />
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Images, PersonStanding, SlidersHorizontal, Upload } from '@lucide/vue';
+import { PersonStanding, Upload } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -14,7 +14,6 @@ defineProps<{
   generatorOpen: boolean;
   characters: CharacterLibraryCharacter[];
   characterSelectionDisabled: boolean;
-  mobilePane: 'settings' | 'gallery';
   operationDisabled: boolean;
   selectedCharacterId: string;
 }>();
@@ -22,7 +21,6 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'ai-create'): void;
   (event: 'upload'): void;
-  (event: 'update:mobilePane', value: 'settings' | 'gallery'): void;
   (event: 'update:selectedCharacterId', value: string): void;
 }>();
 </script>
@@ -57,23 +55,4 @@ const emit = defineEmits<{
     <PersonStanding class="size-4" />
     生成动作
   </Button>
-  <div class="flex items-center gap-1 lg:hidden">
-    <Button
-      v-if="generatorOpen"
-      size="icon"
-      :variant="mobilePane === 'settings' ? 'secondary' : 'ghost'"
-      aria-label="显示设置"
-      @click="emit('update:mobilePane', 'settings')"
-    >
-      <SlidersHorizontal class="size-4" />
-    </Button>
-    <Button
-      size="icon"
-      :variant="mobilePane === 'gallery' ? 'secondary' : 'ghost'"
-      aria-label="显示图片"
-      @click="emit('update:mobilePane', 'gallery')"
-    >
-      <Images class="size-4" />
-    </Button>
-  </div>
 </template>
