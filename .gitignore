@@ -27,3 +27,6 @@ out
 .specstory/
 .cursorindexingignore
 .worktrees/
+
+
+.belay

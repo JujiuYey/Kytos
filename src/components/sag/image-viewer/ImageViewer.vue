@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { ImageOff, LoaderCircle, Maximize2, Minus, Plus } from '@lucide/vue';
+import { Download, ImageOff, LoaderCircle, Maximize2, Minus, Plus } from '@lucide/vue';
+import { toast } from 'vue-sonner';
 import { Button } from '@/components/ui/button';
+import { getPreferredImageExtension, type ExportFileRequest } from '@/types';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +43,7 @@ const panStartX = ref(0);
 const panStartY = ref(0);
 const isLoaded = ref(false);
 const hasError = ref(false);
+const isDownloading = ref(false);
 
 const isDragging = computed(() => activePointerId.value !== null);
 const scaleLabel = computed(() => `${Math.round(scale.value * 100)}%`);
@@ -161,6 +164,38 @@ function handleImageError() {
   hasError.value = true;
 }
 
+function sanitizeFileName(name: string): string {
+  const sanitized = name.replace(/[^\p{L}\p{N}._-]+/gu, '');
+  return sanitized || 'image';
+}
+
+async function handleDownload(): Promise<void> {
+  isDownloading.value = true;
+  try {
+    const response = await fetch(props.src);
+    if (!response.ok) {
+      throw new Error('图片读取失败');
+    }
+    const blob = await response.blob();
+    const mimeType = blob.type || 'image/png';
+    const extension = getPreferredImageExtension(mimeType);
+    const fileName = `${sanitizeFileName(props.alt || props.title || 'image')}.${extension}`;
+    const request: ExportFileRequest = {
+      fileName,
+      mimeType,
+      fileData: new Uint8Array(await blob.arrayBuffer()),
+    };
+    const result = await window.desktop.file.exportFile(request);
+    if (!result.canceled) {
+      toast.success('图片已导出');
+    }
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : '图片下载失败');
+  } finally {
+    isDownloading.value = false;
+  }
+}
+
 watch(
   () => props.src,
   () => {
@@ -276,6 +311,23 @@ watch(
                 </Button>
               </TooltipTrigger>
               <TooltipContent>适合窗口</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  class="size-8 border border-white/20 bg-black/35 text-white shadow-md backdrop-blur-sm hover:bg-black/50 hover:text-white"
+                  :disabled="!isLoaded || hasError || isDownloading"
+                  aria-label="下载图片"
+                  @click="handleDownload"
+                >
+                  <LoaderCircle v-if="isDownloading" class="size-4 animate-spin" />
+                  <Download v-else class="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>下载</TooltipContent>
             </Tooltip>
           </div>
         </TooltipProvider>

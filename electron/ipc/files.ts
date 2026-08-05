@@ -7,6 +7,7 @@ import type {
   SaveFileRequest,
   SavedFileResult,
 } from '../../shared/desktop';
+import { getMimeTypeExtensions } from '../../shared/image-formats';
 import { saveWorkspaceFile } from '../services/workspace';
 import type { TrustedSenderGuard } from './trusted-sender';
 
@@ -34,13 +35,4 @@ export function registerFilesIpc(assertTrustedSender: TrustedSenderGuard): void 
     assertTrustedSender(event);
     return saveWorkspaceFile(request);
   });
-}
-
-function getMimeTypeExtensions(mimeType: string): string[] {
-  const extensions: Record<string, string[]> = {
-    'image/jpeg': ['jpg', 'jpeg'],
-    'image/png': ['png'],
-    'image/webp': ['webp'],
-  };
-  return extensions[mimeType] ?? ['png'];
 }

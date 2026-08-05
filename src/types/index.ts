@@ -39,6 +39,7 @@ export type {
   SaveCharacterVisualResult,
 } from '../../shared/character-create';
 export { CHARACTER_CREATE_AGENT_ENDPOINT } from '../../shared/character-create';
+export { getMimeTypeExtensions, getPreferredImageExtension } from '../../shared/image-formats';
 export type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceKind,
