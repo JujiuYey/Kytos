@@ -1,4 +1,4 @@
-import type { CharacterCreateDraft } from '../../shared/character-create';
+import type { CharacterCreateDraft } from '../../../shared/character-create';
 
 export interface CharacterCreateInstructionsInput {
   draft: CharacterCreateDraft;

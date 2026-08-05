@@ -3,9 +3,9 @@ import { z } from 'zod';
 import type {
   CharacterCreateDraft,
   CharacterCreatePromptResult,
-} from '../../shared/character-create';
-import type { ChatModel } from '../../shared/chat-model';
-import { createChatLanguageModel, getChatProviderOptions } from '../providers/chat-provider';
+} from '../../../shared/character-create';
+import type { ChatModel } from '../../../shared/chat-model';
+import { createChatLanguageModel, getChatProviderOptions } from '../../providers/chat-provider';
 import { buildCharacterCreateInstructions } from './instructions';
 
 const draftFields = {

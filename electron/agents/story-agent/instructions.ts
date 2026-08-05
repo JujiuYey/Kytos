@@ -1,5 +1,5 @@
-import { STORY_SHOT_LIMITS } from '../../shared/story';
-import type { StoryDraft, StoryShot } from '../../shared/story';
+import { STORY_SHOT_LIMITS } from '../../../shared/story';
+import type { StoryDraft, StoryShot } from '../../../shared/story';
 
 export type StoryShotDisplay = Omit<StoryShot, 'versions'> & { generatedVersionCount: number };
 

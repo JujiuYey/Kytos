@@ -1,8 +1,8 @@
 import { createAgentUIStreamResponse } from 'ai';
-import { DEFAULT_CHAT_MODEL, getChatModelDefinition, isChatModel } from '../../shared/chat-model';
-import type { ChatModel } from '../../shared/chat-model';
-import type { CharacterCreateDraft } from '../../shared/character-create';
-import { getCredentialValue } from '../services/credentials';
+import { DEFAULT_CHAT_MODEL, getChatModelDefinition, isChatModel } from '../../../shared/chat-model';
+import type { ChatModel } from '../../../shared/chat-model';
+import type { CharacterCreateDraft } from '../../../shared/character-create';
+import { getCredentialValue } from '../../services/credentials';
 import { createCharacterCreateAgent } from './agent';
 import { isPlainObject } from 'es-toolkit';
 

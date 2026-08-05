@@ -1,4 +1,4 @@
-import type { IllustrationBrief } from '../../shared/illustration';
+import type { IllustrationBrief } from '../../../shared/illustration';
 
 export interface IllustrationInstructionsInput {
   brief: IllustrationBrief;

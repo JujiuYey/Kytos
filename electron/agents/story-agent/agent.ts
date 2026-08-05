@@ -1,15 +1,15 @@
 import { ToolLoopAgent, isStepCount, tool } from 'ai';
 import { z } from 'zod';
-import type { ChatModel } from '../../shared/chat-model';
-import type { StoryDraft, StoryProject, StoryShotContent } from '../../shared/story';
-import { STORY_SHOT_LIMITS } from '../../shared/story';
+import type { ChatModel } from '../../../shared/chat-model';
+import type { StoryDraft, StoryProject, StoryShotContent } from '../../../shared/story';
+import { STORY_SHOT_LIMITS } from '../../../shared/story';
 import {
   confirmStoryboard,
   patchStoryShot,
   presentStoryboard,
   updateStoryDraft,
-} from '../services/story';
-import { createChatLanguageModel, getChatProviderOptions } from '../providers/chat-provider';
+} from '../../services/story';
+import { createChatLanguageModel, getChatProviderOptions } from '../../providers/chat-provider';
 import { buildStoryInstructions, type StoryShotDisplay } from './instructions';
 
 const draftFields = {

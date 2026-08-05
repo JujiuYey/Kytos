@@ -2,9 +2,9 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { net, protocol } from 'electron';
-import { handleCharacterCreateAgentRequest } from './character-create-agent/route';
-import { handleIllustrationAgentRequest } from './illustration-agent/route';
-import { handleStoryAgentRequest } from './story-agent/route';
+import { handleCharacterCreateAgentRequest } from './agents/character-create-agent/route';
+import { handleIllustrationAgentRequest } from './agents/illustration-agent/route';
+import { handleStoryAgentRequest } from './agents/story-agent/route';
 import { getWorkspaceDirectory } from './services/workspace';
 
 // 自定义协议名
