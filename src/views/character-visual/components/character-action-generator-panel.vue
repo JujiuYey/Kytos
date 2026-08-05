@@ -186,7 +186,7 @@ function selectQuickAction(action: (typeof quickActions)[number]): void {
               @update:model-value="emit('update:action', String($event))"
             />
             <p v-if="!promptGenerationAvailable" class="text-xs text-muted-foreground">
-              配置 DeepSeek API Key 后可根据动作名称生成提示词。
+              配置所选快速模型的 API Key 后可根据动作名称生成提示词。
             </p>
           </div>
         </section>

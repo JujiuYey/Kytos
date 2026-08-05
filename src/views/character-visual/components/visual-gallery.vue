@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import dayjs from 'dayjs';
 import { Check, Clock3, Crop, Image as ImageIcon, Pencil, Trash2 } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Loader } from '@/components/ai-elements/loader';
@@ -140,16 +141,8 @@ function getAspectClass(size: CharacterVisualAssetRecord['size']): string {
 }
 
 function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  return new Intl.DateTimeFormat('zh-CN', {
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    month: '2-digit',
-  }).format(date);
+  const date = dayjs(value);
+  return date.isValid() ? date.format('MM/DD HH:mm') : '';
 }
 </script>
 

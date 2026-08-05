@@ -6,7 +6,7 @@ import 'vue-sonner/style.css';
 </script>
 
 <template>
-  <Toaster />
+  <Toaster position="top-center" :rich-colors="true" />
 
   <RouterView #default="{ Component, route }">
     <component :is="Component" :key="route" />

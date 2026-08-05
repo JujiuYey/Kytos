@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import dayjs from 'dayjs';
 import {
   BookMarked,
   BookOpen,
@@ -101,17 +102,8 @@ function getDescription(story: StoryProject): string {
 }
 
 function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  return new Intl.DateTimeFormat('zh-CN', {
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date);
+  const date = dayjs(value);
+  return date.isValid() ? date.format('YYYY/MM/DD HH:mm') : '';
 }
 
 async function loadWorkspace(): Promise<void> {

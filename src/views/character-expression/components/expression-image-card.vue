@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import dayjs from 'dayjs';
 import { Check, Clock3, Crop, Pencil, Trash2 } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Button } from '@/components/ui/button';
@@ -29,18 +31,7 @@ function getAspectClass(size: CharacterExpressionRecord['size']): string {
   }[size];
 }
 
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  return new Intl.DateTimeFormat('zh-CN', {
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    month: '2-digit',
-  }).format(date);
-}
+const formattedDate = computed(() => dayjs(props.record.createdAt).format('MM/DD HH:mm'));
 </script>
 
 <template>
@@ -69,49 +60,20 @@ function formatDate(value: string): string {
 
     <div class="space-y-2 border-t px-3 py-3">
       <div class="flex min-w-0 items-center justify-between gap-2">
-        <div class="flex min-w-0 items-center gap-1">
-          <h3 class="truncate text-sm font-medium">{{ props.record.name }}</h3>
-          <TooltipProvider :delay-duration="300">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  class="size-7 shrink-0 text-muted-foreground"
-                  :disabled="Boolean(renamingTaskId)"
-                  :aria-label="`重命名${props.record.name}`"
-                  @click="requestRename(props.record)"
-                >
-                  <Pencil class="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>重命名表情</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        <h3 class="truncate text-sm font-medium">{{ props.record.name }}</h3>
         <SagStatusBadge tone="success" class="shrink-0">
           <Check class="size-3" />
           {{ props.statusLabel }}
         </SagStatusBadge>
       </div>
 
-      <p
-        v-if="props.record.description"
-        class="line-clamp-2 text-xs leading-5 text-muted-foreground"
-      >
-        {{ props.record.description }}
-      </p>
-
       <div class="flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground">
         <span class="min-w-0 truncate">
-          {{ props.record.source === 'uploaded' ? '上传图片' : `候选 ${props.imageIndex + 1}` }}
-          <template v-if="props.record.source === 'generated'">
-            · {{ props.record.size }} · {{ props.record.resolution.toUpperCase() }}
-          </template>
+          {{ props.record.source === 'uploaded' ? '上传图片' : `AI生成` }}
         </span>
         <span class="flex shrink-0 items-center gap-1">
           <Clock3 class="size-3.5" />
-          {{ formatDate(props.record.createdAt) }}
+          {{ formattedDate }}
         </span>
       </div>
 
@@ -125,23 +87,43 @@ function formatDate(value: string): string {
           <span>编辑图片</span>
         </Button>
 
-        <TooltipProvider :delay-duration="300">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                size="icon"
-                variant="ghost"
-                class="size-8 text-muted-foreground hover:text-destructive"
-                :disabled="Boolean(deletingFileName)"
-                :aria-label="`删除${props.record.name}的第 ${props.imageIndex + 1} 张表情`"
-                @click="requestDelete(props.record, props.image)"
-              >
-                <Trash2 class="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>删除表情</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div class="flex items-center gap-1">
+          <TooltipProvider :delay-duration="300">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  class="size-8 text-muted-foreground"
+                  :disabled="Boolean(renamingTaskId)"
+                  :aria-label="`重命名${props.record.name}`"
+                  @click="requestRename(props.record)"
+                >
+                  <Pencil class="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>重命名表情</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider :delay-duration="300">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  class="size-8 text-muted-foreground hover:text-destructive"
+                  :disabled="Boolean(deletingFileName)"
+                  :aria-label="`删除${props.record.name}的第 ${props.imageIndex + 1} 张表情`"
+                  @click="requestDelete(props.record, props.image)"
+                >
+                  <Trash2 class="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>删除表情</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
     </div>
   </article>

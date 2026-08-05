@@ -134,7 +134,7 @@ const emit = defineEmits<{
               @update:model-value="emit('update:description', String($event))"
             />
             <p v-if="!promptGenerationAvailable" class="text-xs text-muted-foreground">
-              配置 DeepSeek API Key 后可根据表情名称生成提示词。
+              配置所选快速模型的 API Key 后可根据表情名称生成提示词。
             </p>
             <p class="text-xs tabular-nums text-muted-foreground text-right">
               {{ description.length }} / 20000

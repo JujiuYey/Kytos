@@ -1,7 +1,11 @@
 // 角色表情的生成操作：生成表情 / 任务轮询 / 聊天模型提示词
 import { generateText } from 'ai';
-import { isPlainObject } from 'es-toolkit';
+import { z } from 'zod';
 import { getChatModelDefinition } from '../../../shared/chat-model';
+import {
+  CHARACTER_EXPRESSION_SIZES,
+  MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES,
+} from '../../../shared/character-expression';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceSelection,
@@ -9,25 +13,47 @@ import type {
   GenerateCharacterExpressionRequest,
   GetCharacterExpressionTaskRequest,
 } from '../../../shared/character-expression';
-import { MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '../../../shared/character-expression';
-import { ID_PATTERN, MAX_NAME_LENGTH, MAX_PROMPT_LENGTH } from '../../constants';
+import { CHARACTER_VISUAL_RESOLUTIONS } from '../../../shared/character-visual';
+import { MAX_NAME_LENGTH, MAX_PROMPT_LENGTH } from '../../constants';
 import { createChatLanguageModel, getChatProviderOptions } from '../../providers/chat-provider';
 import { getCredentialValue } from '../credentials';
 import { getCharacterVisualReferences, getCharacterVisualWorkspace } from '../character-visual';
 import { downloadTaskImages, getReferenceData } from './assets';
 import { EXPRESSION_ASSET_DIRECTORY } from './constants';
-import { isExpressionSize, isResolution, parseReferenceSelection, selectionKey } from './parsers';
+import { parseReferenceSelection, selectionKey } from './parsers';
 import { buildExpressionPrompt, resolveChatModel } from './prompts';
 import { loadExpressionStore, replaceRecord, saveExpressionStore } from './store';
 import {
   buildGptImage2RequestBody,
+  idSchema,
   isTaskStatus,
+  nameSchema,
+  parseRequest,
   pollImageTask,
   submitImageTask,
 } from '../../utils';
 import type { GptImage2Resolution } from '../../utils';
 import type { ExpressionReferenceData } from './types';
 import type { StoredExpressionWorkspace } from './types';
+
+const generateRequestSchema = z.object({
+  characterId: z.string(),
+  count: z.number().int().min(1).max(4),
+  description: nameSchema(MAX_PROMPT_LENGTH),
+  name: nameSchema(MAX_NAME_LENGTH),
+  referenceAssets: z.array(z.unknown()).min(1).max(MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES),
+  resolution: z.enum(CHARACTER_VISUAL_RESOLUTIONS),
+  size: z.enum(CHARACTER_EXPRESSION_SIZES),
+});
+
+const getTaskRequestSchema = z.object({
+  characterId: z.string(),
+  taskId: idSchema,
+});
+
+const generatePromptRequestSchema = z.object({
+  name: nameSchema(MAX_NAME_LENGTH),
+});
 
 export function getAvailableReferences(
   visualReferences: ReturnType<typeof getCharacterVisualReferences>,
@@ -56,33 +82,13 @@ export function getAvailableReferences(
 function validateGenerateRequest(
   request: GenerateCharacterExpressionRequest,
 ): CharacterExpressionReferenceSelection[] {
-  if (
-    !isPlainObject(request) ||
-    typeof request.characterId !== 'string' ||
-    typeof request.name !== 'string' ||
-    !request.name.trim() ||
-    request.name.length > MAX_NAME_LENGTH ||
-    typeof request.description !== 'string' ||
-    !request.description.trim() ||
-    request.description.length > MAX_PROMPT_LENGTH ||
-    !Number.isInteger(request.count) ||
-    request.count < 1 ||
-    request.count > 4 ||
-    !isExpressionSize(request.size) ||
-    !isResolution(request.resolution) ||
-    !Array.isArray(request.referenceAssets) ||
-    request.referenceAssets.length < 1 ||
-    request.referenceAssets.length > MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES
-  ) {
-    throw new Error('表情生成参数无效');
-  }
-  const referenceAssets = request.referenceAssets.map(parseReferenceSelection);
-  if (referenceAssets.some(asset => !asset)) {
+  const parsed = parseRequest(request, generateRequestSchema);
+  const selections = parsed.referenceAssets
+    .map(parseReferenceSelection)
+    .filter((selection): selection is CharacterExpressionReferenceSelection => Boolean(selection));
+  if (selections.length !== parsed.referenceAssets.length) {
     throw new Error('选择的角色参考图无效');
   }
-  const selections = referenceAssets.filter(
-    (asset): asset is CharacterExpressionReferenceSelection => Boolean(asset),
-  );
   if (new Set(selections.map(selectionKey)).size !== selections.length) {
     throw new Error('角色参考图不能重复选择');
   }
@@ -155,16 +161,7 @@ export async function generateCharacterExpression(
 export async function getCharacterExpressionTask(
   request: GetCharacterExpressionTaskRequest,
 ): Promise<CharacterExpressionRecord> {
-  if (!isPlainObject(request)) {
-    throw new Error('表情任务参数无效');
-  }
-  const { characterId, taskId } = request;
-  if (typeof characterId !== 'string') {
-    throw new Error('角色编号无效');
-  }
-  if (!ID_PATTERN.test(taskId)) {
-    throw new Error('表情生成任务编号无效');
-  }
+  const { characterId, taskId } = parseRequest(request, getTaskRequestSchema);
   const store = await loadExpressionStore(characterId);
   const existingRecord = store.records.find(record => record.id === taskId);
   if (!existingRecord) {
@@ -201,24 +198,18 @@ export async function getCharacterExpressionTask(
   return updatedRecord;
 }
 
+// 生成表情提示词
 export async function generateCharacterExpressionPrompt(
   request: GenerateCharacterExpressionPromptRequest,
 ): Promise<string> {
-  if (
-    !isPlainObject(request) ||
-    typeof request.name !== 'string' ||
-    !request.name.trim() ||
-    request.name.length > MAX_NAME_LENGTH
-  ) {
-    throw new Error('请先填写有效的表情名称');
-  }
+  const { name } = parseRequest(request, generatePromptRequestSchema);
   const model = resolveChatModel(request.model);
   const apiKey = await getCredentialValue(getChatModelDefinition(model).provider);
   const providerOptions = getChatProviderOptions(model);
   const { text } = await generateText({
     maxOutputTokens: 600,
     model: createChatLanguageModel(apiKey, model),
-    prompt: `表情名称：${request.name.trim()}`,
+    prompt: `表情名称：${name.trim()}`,
     ...(providerOptions ? { providerOptions } : {}),
     system: `你负责为角色表情图生图编写中文提示词。根据用户给出的表情名称，输出一段可直接编辑和用于生图的表情描述。
 
