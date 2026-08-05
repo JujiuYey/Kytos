@@ -95,7 +95,6 @@ const emit = defineEmits<{
         </section>
 
         <section class="space-y-4" aria-labelledby="expression-content-heading">
-          <h2 id="expression-content-heading" class="text-sm font-medium">表情内容</h2>
           <div class="space-y-2">
             <div class="flex items-center justify-between gap-3">
               <Label for="expression-name">表情名称</Label>
@@ -114,9 +113,6 @@ const emit = defineEmits<{
             <div class="flex items-center justify-between gap-3">
               <Label for="expression-description">表情提示词</Label>
               <div class="flex items-center gap-2">
-                <span class="text-xs tabular-nums text-muted-foreground">
-                  {{ description.length }} / 20000
-                </span>
                 <Button
                   size="sm"
                   variant="outline"
@@ -139,6 +135,9 @@ const emit = defineEmits<{
             />
             <p v-if="!promptGenerationAvailable" class="text-xs text-muted-foreground">
               配置 DeepSeek API Key 后可根据表情名称生成提示词。
+            </p>
+            <p class="text-xs tabular-nums text-muted-foreground text-right">
+              {{ description.length }} / 20000
             </p>
           </div>
         </section>

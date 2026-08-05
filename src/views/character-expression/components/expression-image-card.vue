@@ -6,21 +6,20 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { CharacterExpressionRecord, CharacterPortraitImage } from '@/types';
+import { useExpressionActions } from '../contexts/expression-actions-context';
 
 const props = defineProps<{
   record: CharacterExpressionRecord;
   image: CharacterPortraitImage;
   imageIndex: number;
   statusLabel: string;
-  deletingFileName: string;
-  renamingTaskId: string;
 }>();
 
 const emit = defineEmits<{
-  (event: 'delete', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
   (event: 'edit', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
-  (event: 'rename', record: CharacterExpressionRecord): void;
 }>();
+
+const { deletingFileName, renamingTaskId, requestDelete, requestRename } = useExpressionActions();
 
 function getAspectClass(size: CharacterExpressionRecord['size']): string {
   return {
@@ -79,9 +78,9 @@ function formatDate(value: string): string {
                   size="icon"
                   variant="ghost"
                   class="size-7 shrink-0 text-muted-foreground"
-                  :disabled="Boolean(props.deletingFileName) || Boolean(props.renamingTaskId)"
+                  :disabled="Boolean(renamingTaskId)"
                   :aria-label="`重命名${props.record.name}`"
-                  @click="emit('rename', props.record)"
+                  @click="requestRename(props.record)"
                 >
                   <Pencil class="size-3.5" />
                 </Button>
@@ -116,23 +115,16 @@ function formatDate(value: string): string {
         </span>
       </div>
 
-      <div class="flex justify-end gap-1">
-        <TooltipProvider :delay-duration="300">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                size="icon"
-                variant="ghost"
-                class="size-8 text-muted-foreground"
-                :aria-label="`编辑${props.record.name}的第 ${props.imageIndex + 1} 张表情`"
-                @click="emit('edit', props.record, props.image)"
-              >
-                <Crop class="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>编辑图片</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      <div class="flex justify-between gap-1">
+        <Button
+          size="sm"
+          :aria-label="`编辑${props.record.name}的第 ${props.imageIndex + 1} 张表情`"
+          @click="emit('edit', props.record, props.image)"
+        >
+          <Crop class="size-4" />
+          <span>编辑图片</span>
+        </Button>
+
         <TooltipProvider :delay-duration="300">
           <Tooltip>
             <TooltipTrigger as-child>
@@ -140,9 +132,9 @@ function formatDate(value: string): string {
                 size="icon"
                 variant="ghost"
                 class="size-8 text-muted-foreground hover:text-destructive"
-                :disabled="Boolean(props.deletingFileName)"
+                :disabled="Boolean(deletingFileName)"
                 :aria-label="`删除${props.record.name}的第 ${props.imageIndex + 1} 张表情`"
-                @click="emit('delete', props.record, props.image)"
+                @click="requestDelete(props.record, props.image)"
               >
                 <Trash2 class="size-4" />
               </Button>

@@ -86,7 +86,9 @@ watch(
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="flex h-[76vh] max-h-[820px] max-w-4xl flex-col gap-0 overflow-hidden p-0">
+    <DialogContent
+      class="flex h-[76vh] max-h-[820px] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
+    >
       <DialogHeader class="shrink-0 border-b px-5 py-4">
         <div class="flex items-center gap-2">
           <DialogTitle>{{ title }}</DialogTitle>
@@ -95,7 +97,7 @@ watch(
         <DialogDescription>{{ description }}</DialogDescription>
       </DialogHeader>
 
-      <div v-if="filters.length" class="flex shrink-0 border-b px-5 py-3">
+      <div v-if="filters.length" class="flex shrink-0 px-5 py-3">
         <Tabs :model-value="filter" @update:model-value="filter = String($event)">
           <TabsList>
             <TabsTrigger value="all">全部 {{ options.length }}</TabsTrigger>

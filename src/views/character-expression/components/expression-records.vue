@@ -15,14 +15,10 @@ import ExpressionImageCard from './expression-image-card.vue';
 defineProps<{
   records: CharacterExpressionRecord[];
   pollingState: GenerationTaskPollingState;
-  deletingFileName: string;
-  renamingTaskId: string;
 }>();
 
 const emit = defineEmits<{
-  (event: 'delete', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
   (event: 'edit', record: CharacterExpressionRecord, image: CharacterPortraitImage): void;
-  (event: 'rename', record: CharacterExpressionRecord): void;
 }>();
 
 const activeStatuses: CharacterPortraitTaskStatus[] = ['submitted', 'pending', 'processing'];
@@ -91,11 +87,7 @@ function getStatusLabel(record: CharacterExpressionRecord): string {
           :image="image"
           :image-index="imageIndex"
           :status-label="getStatusLabel(record)"
-          :deleting-file-name="deletingFileName"
-          :renaming-task-id="renamingTaskId"
-          @delete="(deletedRecord, deletedImage) => emit('delete', deletedRecord, deletedImage)"
           @edit="(editedRecord, editedImage) => emit('edit', editedRecord, editedImage)"
-          @rename="renamedRecord => emit('rename', renamedRecord)"
         />
       </template>
     </template>
