@@ -65,6 +65,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      cropperjs:
+        specifier: ^1.6.2
+        version: 1.6.2
       dayjs:
         specifier: ^1.11.18
         version: 1.11.18
@@ -119,6 +122,9 @@ importers:
       vue:
         specifier: ^3.5.17
         version: 3.5.17(typescript@5.8.3)
+      vue-picture-cropper:
+        specifier: ^1.0.0
+        version: 1.0.0(cropperjs@1.6.2)(vue@3.5.17(typescript@5.8.3))
       vue-router:
         specifier: ^4.5.1
         version: 4.5.1(vue@3.5.17(typescript@5.8.3))
@@ -3491,6 +3497,9 @@ packages:
   croner@9.1.0:
     resolution: {integrity: sha512-p9nwwR4qyT5W996vBZhdvBCnMhicY5ytZkR4D1Xj0wuTDEiMnjwR57Q3RXYY/s0EpX6Ay3vgIcfaR+ewGHsi+g==}
     engines: {node: '>=18.0'}
+
+  cropperjs@1.6.2:
+    resolution: {integrity: sha512-nhymn9GdnV3CqiEHJVai54TULFAE3VshJTXSqSJKa8yXAKyBKDWdhHarnlIPrshJ0WMFTGuFvG02YjLXfPiuOA==}
 
   cross-dirname@0.1.0:
     resolution: {integrity: sha512-+R08/oI0nl3vfPcqftZRpytksBXDzOUveBq/NBVx0sUp1axwzPQrKinNx5yd5sxPu8j1wIy8AfnVQ+5eFdha6Q==}
@@ -7453,6 +7462,12 @@ packages:
   vue-devtools-stub@0.1.0:
     resolution: {integrity: sha512-RutnB7X8c5hjq39NceArgXg28WZtZpGc3+J16ljMiYnFhKvd8hITxSWQSQ5bvldxMDU6gG5mkxl1MTQLXckVSQ==}
 
+  vue-picture-cropper@1.0.0:
+    resolution: {integrity: sha512-zp4OdK8SHqhvrLYqu+0XL9La8dHf0664RRjM5seWqohWyZ8c8pXOZ0KqEJAW5AT9hU6UBDrvZC5QzeTqCXl7ww==}
+    peerDependencies:
+      cropperjs: ^1
+      vue: '>=3.2.13'
+
   vue-router@4.5.1:
     resolution: {integrity: sha512-ogAF3P97NPm8fJsE4by9dwSYtDwXIY1nFY9T6DyQnGHd1E2Da94w9JIolpe42LJGIl0DwOHBi8TcRPlPGwbTtw==}
     peerDependencies:
@@ -11341,6 +11356,8 @@ snapshots:
       luxon: 3.7.1
 
   croner@9.1.0: {}
+
+  cropperjs@1.6.2: {}
 
   cross-dirname@0.1.0: {}
 
@@ -15869,6 +15886,11 @@ snapshots:
       vue: 3.5.17(typescript@5.8.3)
 
   vue-devtools-stub@0.1.0: {}
+
+  vue-picture-cropper@1.0.0(cropperjs@1.6.2)(vue@3.5.17(typescript@5.8.3)):
+    dependencies:
+      cropperjs: 1.6.2
+      vue: 3.5.17(typescript@5.8.3)
 
   vue-router@4.5.1(vue@3.5.17(typescript@5.8.3)):
     dependencies:
