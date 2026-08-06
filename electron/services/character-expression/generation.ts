@@ -63,6 +63,7 @@ const generatePromptRequestSchema = z.object({
   name: nameSchema(MAX_NAME_LENGTH),
 });
 
+// 获取可用的参考图
 export function getAvailableReferences(
   visualReferences: ReturnType<typeof getCharacterVisualReferences>,
   expressionStore: StoredExpressionWorkspace,
@@ -101,6 +102,7 @@ function validateGenerateRequest(
   return selections;
 }
 
+// 创建表情描述
 export async function generateCharacterExpression(
   request: GenerateCharacterExpressionRequest,
 ): Promise<CharacterExpressionTask> {
@@ -161,6 +163,7 @@ export async function generateCharacterExpression(
   return task;
 }
 
+// 表情生成任务
 export async function getCharacterExpressionTask(
   request: GetCharacterExpressionTaskRequest,
 ): Promise<CharacterExpressionTaskResult> {

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { Laugh } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { useCredentialStatus } from '@/composables/use-credential-status';
+import { useGenerationPolling } from '@/composables/use-generation-polling';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import { ImageReferencePickerDialog } from '@/components/sag/image-reference-picker-dialog';
@@ -16,6 +17,7 @@ import type {
   CharacterExpressionRecord,
   CharacterExpressionSize,
   CharacterExpressionTask,
+  CharacterExpressionTaskResult,
   CharacterExpressionWorkspaceState,
   CharacterLibraryState,
   CharacterVisualImage,
@@ -100,8 +102,52 @@ const isInitializing = ref(true);
 const isSubmitting = ref(false);
 const isGeneratingPrompt = ref(false);
 
-const isPolling = ref(false);
-const pollingState = ref<GenerationTaskPollingState>({ phase: 'idle', taskId: '' });
+interface ExpressionPollingTarget {
+  characterId: string;
+  taskId: string;
+}
+
+const {
+  cancelAll: resetPolling,
+  pollingStates,
+  pollNow: pollExpressionTask,
+  schedulePoll,
+} = useGenerationPolling<CharacterExpressionTaskResult, ExpressionPollingTarget>({
+  async fetchTask(target) {
+    const result = await window.desktop.character.expression.getCharacterExpressionTask(target);
+    if (!result.record && !result.task) {
+      throw new Error('表情任务返回结果无效');
+    }
+    return result;
+  },
+  isStillRunning: result => Boolean(result.task && ACTIVE_STATUSES.includes(result.task.status)),
+  isTerminalSuccess: result => Boolean(result.record),
+  onPollSuccess(taskId, result) {
+    errorMessage.value = '';
+    if (result.record) {
+      removeTask(taskId);
+      replaceRecord(result.record);
+    } else if (result.task) {
+      replaceTask(result.task);
+    }
+  },
+  onCompleted(_taskId, result) {
+    if (result.record) {
+      toast.success(`“${result.record.name}”表情已生成并保存到工作区`);
+    }
+  },
+  onFailed(_taskId, result) {
+    errorMessage.value = result.task?.errorMessage || '表情生成任务未完成';
+  },
+  onError(_taskId, error) {
+    errorMessage.value = toErrorMessage(error);
+  },
+});
+const pollingState = computed<GenerationTaskPollingState>(() => {
+  const entry = Object.entries(pollingStates.value)[0];
+  return entry ? { phase: entry[1].phase, taskId: entry[0] } : { phase: 'idle', taskId: '' };
+});
+const isPolling = computed(() => pollingState.value.phase === 'requesting');
 
 provideExpressionRecords({
   deletingFileName,
@@ -112,8 +158,6 @@ provideExpressionRecords({
   requestRename,
 });
 
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
-let isDisposed = false;
 let loadRequestId = 0;
 
 const characters = computed(() => library.value?.characters ?? []);
@@ -166,76 +210,6 @@ function removeTask(taskId: string): void {
   tasks.value = tasks.value.filter(task => task.id !== taskId);
 }
 
-function clearPollTimer(): void {
-  if (pollTimer) {
-    clearTimeout(pollTimer);
-    pollTimer = null;
-  }
-}
-
-function resetPolling(): void {
-  clearPollTimer();
-  isPolling.value = false;
-  pollingState.value = { phase: 'idle', taskId: '' };
-}
-
-function schedulePoll(taskId: string, characterId: string): void {
-  clearPollTimer();
-  pollingState.value = {
-    phase: 'waiting',
-    taskId,
-  };
-  pollTimer = setTimeout(() => {
-    void pollExpressionTask(taskId, characterId);
-  }, 2500);
-}
-
-async function pollExpressionTask(taskId: string, characterId: string): Promise<void> {
-  if (isDisposed || selectedCharacterId.value !== characterId) {
-    return;
-  }
-  isPolling.value = true;
-  pollingState.value = {
-    phase: 'requesting',
-    taskId,
-  };
-  try {
-    const result = await window.desktop.character.expression.getCharacterExpressionTask({
-      characterId,
-      taskId,
-    });
-    if (selectedCharacterId.value !== characterId) {
-      return;
-    }
-    errorMessage.value = '';
-    if (result.record) {
-      removeTask(taskId);
-      replaceRecord(result.record);
-      pollingState.value = { phase: 'idle', taskId: '' };
-      toast.success(`“${result.record.name}”表情已生成并保存到工作区`);
-      return;
-    }
-    if (!result.task) {
-      throw new Error('表情任务返回结果无效');
-    }
-    replaceTask(result.task);
-    if (ACTIVE_STATUSES.includes(result.task.status)) {
-      schedulePoll(taskId, characterId);
-      return;
-    }
-    pollingState.value = { phase: 'idle', taskId: '' };
-    errorMessage.value = result.task.errorMessage || '表情生成任务未完成';
-  } catch (pollError: unknown) {
-    if (selectedCharacterId.value !== characterId) {
-      return;
-    }
-    pollingState.value = { ...pollingState.value, phase: 'paused' };
-    errorMessage.value = toErrorMessage(pollError);
-  } finally {
-    isPolling.value = false;
-  }
-}
-
 function applyExpressionPageData(
   expressionWorkspace: CharacterExpressionWorkspaceState,
   currentVisualWorkspace: CharacterVisualWorkspaceState,
@@ -256,7 +230,10 @@ function applyExpressionPageData(
 
   if (activeTask.value) {
     openGenerator();
-    schedulePoll(activeTask.value.id, selectedCharacterId.value);
+    schedulePoll({
+      characterId: selectedCharacterId.value,
+      taskId: activeTask.value.id,
+    });
   }
 }
 
@@ -347,7 +324,7 @@ async function generateExpression(): Promise<void> {
       size: size.value,
     });
     replaceTask(task);
-    await pollExpressionTask(task.id, characterId);
+    await pollExpressionTask({ characterId, taskId: task.id });
   } catch (generationError: unknown) {
     errorMessage.value = toErrorMessage(generationError);
   } finally {
@@ -361,7 +338,10 @@ function retryPolling(): void {
     return;
   }
   errorMessage.value = '';
-  void pollExpressionTask(activeTask.value.id, selectedCharacterId.value);
+  void pollExpressionTask({
+    characterId: selectedCharacterId.value,
+    taskId: activeTask.value.id,
+  });
 }
 
 // 生成表情提示词
@@ -414,11 +394,6 @@ async function refreshExpressionsAfterUpload(): Promise<void> {
 
 onMounted(() => {
   void initialize();
-});
-
-onBeforeUnmount(() => {
-  isDisposed = true;
-  clearPollTimer();
 });
 </script>
 

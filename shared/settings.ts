@@ -1,4 +1,5 @@
 // 桌面凭据、主题与工作区设置类型
+
 // 凭据服务类型
 export type CredentialService = 'apimart' | 'deepseek' | 'minimax';
 // 桌面主题
