@@ -1,25 +1,24 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, useTemplateRef } from 'vue';
 import { toast } from 'vue-sonner';
+import { Download, RotateCcw } from '@lucide/vue';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import type { ExportFileRequest } from '@/types';
-import EditorSettings from './components/editor-settings.vue';
+import CompressionSettings from './components/compression-settings.vue';
+import CropSettings from './components/crop-settings.vue';
 import EditorStage from './components/editor-stage.vue';
+import FormatSettings from './components/format-settings.vue';
+import OutputSizeSettings from './components/output-size-settings.vue';
+import TransformSettings from './components/transform-settings.vue';
 import type { CompressionMode, CropRatio, CropRect, ExportFormat } from './components/types';
 
-interface EncodedImage {
-  blob: Blob;
-  height: number;
-  quality: number | null;
-  width: number;
-}
-
-const TARGET_MIN_QUALITY = 0.4;
-const QUALITY_SEARCH_STEPS = 8;
-const MAX_RESIZE_ATTEMPTS = 12;
-
 const props = defineProps<{
+  /** 原始文件名，用于页面展示和生成导出文件名。 */
   fileName: string;
+  /** 图片的 MIME 类型，用于确定默认导出格式。 */
   mimeType: string;
+  /** 编辑器读取图片内容的来源地址。 */
   sourceUrl: string;
 }>();
 
@@ -28,32 +27,63 @@ const emit = defineEmits<{
 }>();
 
 const editorStageRef = useTemplateRef<InstanceType<typeof EditorStage>>('editorStageRef');
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+// 原图加载
 const editorSourceUrl = ref('');
 const sourceWidth = ref(0);
 const sourceHeight = ref(0);
 const isLoading = ref(true);
 const errorMessage = ref('');
-const isExporting = ref(false);
+let sourceObjectUrl: string | null = null;
+
+async function loadImage(): Promise<void> {
+  isLoading.value = true;
+  errorMessage.value = '';
+  let nextObjectUrl: string | null = null;
+  try {
+    const response = await fetch(props.sourceUrl);
+    if (!response.ok) throw new Error('原图读取失败');
+    const blob = await response.blob();
+    nextObjectUrl = URL.createObjectURL(blob);
+    const image = new Image();
+    image.src = nextObjectUrl;
+    await image.decode();
+    if (sourceObjectUrl) URL.revokeObjectURL(sourceObjectUrl);
+    sourceObjectUrl = nextObjectUrl;
+    editorSourceUrl.value = nextObjectUrl;
+    nextObjectUrl = null;
+    sourceWidth.value = image.naturalWidth;
+    sourceHeight.value = image.naturalHeight;
+    exportFormat.value =
+      props.mimeType === 'image/jpeg' ? 'jpeg' : props.mimeType === 'image/webp' ? 'webp' : 'png';
+    resetCrop();
+  } catch (error: unknown) {
+    if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl);
+    errorMessage.value = error instanceof Error ? error.message : '原图读取失败';
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  void loadImage();
+});
+
+onBeforeUnmount(() => {
+  if (sourceObjectUrl) URL.revokeObjectURL(sourceObjectUrl);
+});
+
+// 裁剪与输出尺寸
 const cropRatio = ref<CropRatio>('free');
-const flipX = ref(false);
-const flipY = ref(false);
+const crop = reactive<CropRect>({ x: 0, y: 0, width: 0, height: 0 });
 const outputWidth = ref(0);
 const outputHeight = ref(0);
 const lockRatio = ref(true);
-const exportFormat = ref<ExportFormat>('png');
-const compressionMode = ref<CompressionMode>('quality');
-const quality = ref(90);
-const targetSizeKb = ref(500);
-const crop = reactive<CropRect>({ x: 0, y: 0, width: 0, height: 0 });
-let sourceObjectUrl: string | null = null;
-
 const outputAspect = computed(() => crop.width / Math.max(crop.height, 1));
-const extension = computed(() => (exportFormat.value === 'jpeg' ? 'jpg' : exportFormat.value));
-const outputMimeType = computed(() => `image/${exportFormat.value}`);
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
 
 function syncOutputFromCrop(): void {
   outputWidth.value = Math.max(1, Math.round(crop.width));
@@ -92,6 +122,28 @@ function fitCropToRatio(nextRatio: CropRatio): void {
   syncOutputFromCrop();
 }
 
+function updateCropWidth(value: number): void {
+  if (editorStageRef.value?.setCropWidth(value || 24)) return;
+  crop.width = clamp(value || 24, 24, sourceWidth.value);
+  crop.x = Math.min(crop.x, sourceWidth.value - crop.width);
+  syncOutputFromCrop();
+}
+
+function updateCropHeight(value: number): void {
+  if (editorStageRef.value?.setCropHeight(value || 24)) return;
+  crop.height = clamp(value || 24, 24, sourceHeight.value);
+  crop.y = Math.min(crop.y, sourceHeight.value - crop.height);
+  syncOutputFromCrop();
+}
+
+function handleCropUpdate(next: CropRect): void {
+  crop.x = next.x;
+  crop.y = next.y;
+  crop.width = next.width;
+  crop.height = next.height;
+  syncOutputFromCrop();
+}
+
 function updateOutputWidth(value: number): void {
   const nextWidth = clamp(Math.round(value || 1), 1, 16_000);
   outputWidth.value = nextWidth;
@@ -112,27 +164,9 @@ function updateOutputHeight(value: number): void {
   }
 }
 
-function updateCropWidth(value: number): void {
-  if (editorStageRef.value?.setCropWidth(value || 24)) return;
-  crop.width = clamp(value || 24, 24, sourceWidth.value);
-  crop.x = Math.min(crop.x, sourceWidth.value - crop.width);
-  syncOutputFromCrop();
-}
-
-function updateCropHeight(value: number): void {
-  if (editorStageRef.value?.setCropHeight(value || 24)) return;
-  crop.height = clamp(value || 24, 24, sourceHeight.value);
-  crop.y = Math.min(crop.y, sourceHeight.value - crop.height);
-  syncOutputFromCrop();
-}
-
-function updateQuality(value: number): void {
-  quality.value = clamp(Math.round(value || 90), 10, 100);
-}
-
-function updateTargetSize(value: number): void {
-  targetSizeKb.value = clamp(Math.round(value || 500), 10, 102_400);
-}
+// 图片变换
+const flipX = ref(false);
+const flipY = ref(false);
 
 function rotateImage(direction: 'left' | 'right'): void {
   void editorStageRef.value?.rotateImage(direction);
@@ -144,25 +178,32 @@ function toggleFlip(axis: 'x' | 'y'): void {
   if (axis === 'y') flipY.value = !flipY.value;
 }
 
-function handleCropUpdate(next: CropRect): void {
-  crop.x = next.x;
-  crop.y = next.y;
-  crop.width = next.width;
-  crop.height = next.height;
-  syncOutputFromCrop();
+// 压缩与导出
+interface EncodedImage {
+  blob: Blob;
+  height: number;
+  quality: number | null;
+  width: number;
 }
 
-function resetEditor(): void {
-  flipX.value = false;
-  flipY.value = false;
-  cropRatio.value = 'free';
-  resetCrop();
-  void editorStageRef.value?.resetEditor('free');
-  compressionMode.value = 'quality';
-  quality.value = 90;
-  targetSizeKb.value = 500;
-  exportFormat.value = 'png';
-  toast.success('编辑已重置');
+const TARGET_MIN_QUALITY = 0.4;
+const QUALITY_SEARCH_STEPS = 8;
+const MAX_RESIZE_ATTEMPTS = 12;
+
+const exportFormat = ref<ExportFormat>('png');
+const compressionMode = ref<CompressionMode>('quality');
+const quality = ref(90);
+const targetSizeKb = ref(500);
+const isExporting = ref(false);
+const extension = computed(() => (exportFormat.value === 'jpeg' ? 'jpg' : exportFormat.value));
+const outputMimeType = computed(() => `image/${exportFormat.value}`);
+
+function updateQuality(value: number): void {
+  quality.value = clamp(Math.round(value || 90), 10, 100);
+}
+
+function updateTargetSize(value: number): void {
+  targetSizeKb.value = clamp(Math.round(value || 500), 10, 102_400);
 }
 
 function stripExtension(fileName: string): string {
@@ -194,6 +235,7 @@ async function renderOutputCanvas(width: number, height: number): Promise<HTMLCa
   return canvas;
 }
 
+// 在目标文件大小内寻找尽可能高的编码质量
 async function encodeForTargetSize(
   canvas: HTMLCanvasElement,
   targetBytes: number,
@@ -230,6 +272,7 @@ async function encodeForTargetSize(
   return { blob: bestBlob, quality: bestQuality };
 }
 
+// 质量仍无法达标时，按比例缩小输出像素尺寸
 async function createTargetSizeOutput(): Promise<EncodedImage> {
   const targetBytes = targetSizeKb.value * 1024;
   let width = outputWidth.value;
@@ -253,6 +296,7 @@ async function createTargetSizeOutput(): Promise<EncodedImage> {
   throw new Error('无法在有效图片尺寸内达到目标文件大小');
 }
 
+// 根据当前压缩模式创建最终导出文件
 async function createExportOutput(): Promise<EncodedImage> {
   if (compressionMode.value === 'target-size') return createTargetSizeOutput();
 
@@ -290,42 +334,19 @@ async function exportImage(): Promise<void> {
   }
 }
 
-async function loadImage(): Promise<void> {
-  isLoading.value = true;
-  errorMessage.value = '';
-  let nextObjectUrl: string | null = null;
-  try {
-    const response = await fetch(props.sourceUrl);
-    if (!response.ok) throw new Error('原图读取失败');
-    const blob = await response.blob();
-    nextObjectUrl = URL.createObjectURL(blob);
-    const image = new Image();
-    image.src = nextObjectUrl;
-    await image.decode();
-    if (sourceObjectUrl) URL.revokeObjectURL(sourceObjectUrl);
-    sourceObjectUrl = nextObjectUrl;
-    editorSourceUrl.value = nextObjectUrl;
-    nextObjectUrl = null;
-    sourceWidth.value = image.naturalWidth;
-    sourceHeight.value = image.naturalHeight;
-    exportFormat.value =
-      props.mimeType === 'image/jpeg' ? 'jpeg' : props.mimeType === 'image/webp' ? 'webp' : 'png';
-    resetCrop();
-  } catch (error: unknown) {
-    if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl);
-    errorMessage.value = error instanceof Error ? error.message : '原图读取失败';
-  } finally {
-    isLoading.value = false;
-  }
+// 编辑器重置
+function resetEditor(): void {
+  flipX.value = false;
+  flipY.value = false;
+  cropRatio.value = 'free';
+  resetCrop();
+  void editorStageRef.value?.resetEditor('free');
+  compressionMode.value = 'quality';
+  quality.value = 90;
+  targetSizeKb.value = 500;
+  exportFormat.value = 'png';
+  toast.success('编辑已重置');
 }
-
-onMounted(() => {
-  void loadImage();
-});
-
-onBeforeUnmount(() => {
-  if (sourceObjectUrl) URL.revokeObjectURL(sourceObjectUrl);
-});
 </script>
 
 <template>
@@ -343,37 +364,69 @@ onBeforeUnmount(() => {
       @update:crop="handleCropUpdate"
     />
 
-    <EditorSettings
-      :crop="crop"
-      :crop-ratio="cropRatio"
-      :flip-x="flipX"
-      :flip-y="flipY"
-      :source-width="sourceWidth"
-      :source-height="sourceHeight"
-      :output-width="outputWidth"
-      :output-height="outputHeight"
-      :lock-ratio="lockRatio"
-      :export-format="exportFormat"
-      :compression-mode="compressionMode"
-      :quality="quality"
-      :target-size-kb="targetSizeKb"
-      :is-loading="isLoading"
-      :has-error="Boolean(errorMessage)"
-      :is-exporting="isExporting"
-      @reset="resetEditor"
-      @export="exportImage"
-      @rotate="rotateImage"
-      @flip="toggleFlip"
-      @crop-width-input="updateCropWidth"
-      @crop-height-input="updateCropHeight"
-      @update:crop-ratio="fitCropToRatio"
-      @output-width-input="updateOutputWidth"
-      @output-height-input="updateOutputHeight"
-      @update:lock-ratio="lockRatio = $event"
-      @update:export-format="exportFormat = $event"
-      @update:compression-mode="compressionMode = $event"
-      @quality-input="updateQuality"
-      @target-size-input="updateTargetSize"
-    />
+    <section
+      class="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-background text-card-foreground shadow-md transition-all hover:shadow-lg"
+      aria-label="图片编辑设置"
+    >
+      <header class="flex h-12 shrink-0 items-center justify-between border-b bg-background px-4">
+        <h2 class="text-sm font-medium">编辑设置</h2>
+        <Button size="sm" variant="ghost" @click="resetEditor">
+          <RotateCcw class="size-3.5" />
+          重置
+        </Button>
+      </header>
+
+      <ScrollArea class="min-h-0 flex-1">
+        <div class="space-y-6 px-5 py-5">
+          <CropSettings
+            :crop="crop"
+            :crop-ratio="cropRatio"
+            @crop-width-input="updateCropWidth"
+            @crop-height-input="updateCropHeight"
+            @update:crop-ratio="fitCropToRatio"
+          />
+          <TransformSettings
+            :flip-x="flipX"
+            :flip-y="flipY"
+            @rotate="rotateImage"
+            @flip="toggleFlip"
+          />
+          <OutputSizeSettings
+            :crop="crop"
+            :source-width="sourceWidth"
+            :source-height="sourceHeight"
+            :output-width="outputWidth"
+            :output-height="outputHeight"
+            :lock-ratio="lockRatio"
+            @output-width-input="updateOutputWidth"
+            @output-height-input="updateOutputHeight"
+            @update:lock-ratio="lockRatio = $event"
+          />
+          <FormatSettings
+            :export-format="exportFormat"
+            @update:export-format="exportFormat = $event"
+          />
+          <CompressionSettings
+            :compression-mode="compressionMode"
+            :quality="quality"
+            :target-size-kb="targetSizeKb"
+            @update:compression-mode="compressionMode = $event"
+            @quality-input="updateQuality"
+            @target-size-input="updateTargetSize"
+          />
+        </div>
+      </ScrollArea>
+
+      <footer class="shrink-0 border-t bg-background px-5 py-4">
+        <Button
+          class="w-full"
+          :disabled="isLoading || Boolean(errorMessage) || isExporting"
+          @click="exportImage"
+        >
+          <Download class="size-4" />
+          导出新图片
+        </Button>
+      </footer>
+    </section>
   </div>
 </template>

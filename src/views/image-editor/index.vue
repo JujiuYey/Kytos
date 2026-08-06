@@ -7,8 +7,11 @@ import { SagPage } from '@/components/sag/sag-page';
 import ImageEditor from './image-editor.vue';
 
 interface ImageSource {
+  /** 原始文件名，用于页面展示和生成导出文件名。 */
   fileName: string;
+  /** 图片的 MIME 类型，用于确定默认导出格式。 */
   mimeType: string;
+  /** 编辑器读取图片内容的来源地址。 */
   sourceUrl: string;
 }
 
