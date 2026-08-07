@@ -19,6 +19,7 @@ import type {
   SetCredentialRequest,
   DesktopSettings,
   DesktopTheme,
+  AppSettings,
   SettingsApi,
 } from './settings';
 
@@ -40,6 +41,7 @@ export type {
   SetCredentialRequest,
   DesktopSettings,
   DesktopTheme,
+  AppSettings,
   SettingsApi,
 };
 

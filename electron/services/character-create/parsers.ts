@@ -1,4 +1,4 @@
-// 角色视觉候选工作区的 JSON 字段解析
+// 角色视觉候选任务的字段解析
 import path from 'node:path';
 import { isPlainObject } from 'es-toolkit';
 import type { CharacterVisualImage } from '../../../shared/character-visual';

@@ -9,7 +9,7 @@ import type {
   UploadCharacterExpressionRequest,
 } from '../../../shared/character-expression';
 import { MAX_NAME_LENGTH } from '../../constants';
-import { isNodeError } from '../../storage/json-store';
+import { isNodeError } from '../../utils/node-error';
 import { idSchema, nameSchema, parseRequest, safeFileNameSchema } from '../../utils';
 import { deleteExpressionAssetFile, saveUploadedExpressionFile } from './assets';
 import {

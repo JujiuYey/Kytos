@@ -96,4 +96,10 @@ export const CHARACTER_EXPRESSION_MIGRATIONS: readonly DatabaseMigration[] = [
     migrate: createCharacterExpressionTables,
     name: '001_character_expression_tables',
   },
+  {
+    migrate(database) {
+      database.exec('DROP TABLE IF EXISTS character_expression_legacy_imports;');
+    },
+    name: '007_remove_character_expression_legacy_imports',
+  },
 ];

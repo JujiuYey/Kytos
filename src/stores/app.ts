@@ -18,86 +18,79 @@ const defaultSettings: AppSettings = {
   imageModel: DEFAULT_IMAGE_MODEL,
 };
 
-export const useAppStore = defineStore(
-  'app',
-  () => {
-    const settings = ref<AppSettings>(defaultSettings);
-    const desktopSettings = ref<DesktopSettings | null>(null);
-    const initializationError = ref('');
-    const isInitializing = ref(false);
-    const isInitialized = ref(false);
+export const useAppStore = defineStore('app', () => {
+  const settings = ref<AppSettings>(defaultSettings);
+  const desktopSettings = ref<DesktopSettings | null>(null);
+  const initializationError = ref('');
+  const isInitializing = ref(false);
+  const isInitialized = ref(false);
 
-    const workspacePath = computed(() => desktopSettings.value?.workspacePath ?? null);
-    const suggestedWorkspacePath = computed(
-      () => desktopSettings.value?.suggestedWorkspacePath ?? '',
-    );
-    const isWorkspaceConfigured = computed(() => Boolean(workspacePath.value));
+  const workspacePath = computed(() => desktopSettings.value?.workspacePath ?? null);
+  const suggestedWorkspacePath = computed(
+    () => desktopSettings.value?.suggestedWorkspacePath ?? '',
+  );
+  const isWorkspaceConfigured = computed(() => Boolean(workspacePath.value));
 
-    const updateSettings = (partialSettings: Partial<AppSettings>) => {
-      settings.value = { ...settings.value, ...partialSettings };
-    };
+  const updateSettings = (partialSettings: Partial<AppSettings>) => {
+    settings.value = { ...settings.value, ...partialSettings };
+    void window.desktop.settings.setAppSettings(settings.value).catch((error: unknown) => {
+      initializationError.value = error instanceof Error ? error.message : String(error);
+    });
+  };
 
-    const initializeDesktop = async () => {
-      if (isInitialized.value || isInitializing.value) {
-        return;
-      }
+  const initializeDesktop = async () => {
+    if (isInitialized.value || isInitializing.value) {
+      return;
+    }
 
-      isInitializing.value = true;
-      initializationError.value = '';
-      try {
-        desktopSettings.value = await window.desktop.settings.getSettings();
+    isInitializing.value = true;
+    initializationError.value = '';
+    try {
+      desktopSettings.value = await window.desktop.settings.getSettings();
+      settings.value = desktopSettings.value.appSettings;
 
-        const storedDeepSeekModel = isDeepSeekModel(settings.value.deepseekModel)
-          ? settings.value.deepseekModel
-          : DEFAULT_DEEPSEEK_MODEL;
+      const storedDeepSeekModel = isDeepSeekModel(settings.value.deepseekModel)
+        ? settings.value.deepseekModel
+        : DEFAULT_DEEPSEEK_MODEL;
 
-        settings.value = {
-          deepseekModel: storedDeepSeekModel,
-          fastModel: isChatModel(settings.value.fastModel)
-            ? settings.value.fastModel
-            : 'deepseek-v4-flash',
-          generalModel: isChatModel(settings.value.generalModel)
-            ? settings.value.generalModel
-            : storedDeepSeekModel,
-          imageModel: isImageModel(settings.value.imageModel)
-            ? settings.value.imageModel
-            : DEFAULT_IMAGE_MODEL,
-          theme: settings.value.theme ?? defaultSettings.theme,
-        };
-      } catch (error: unknown) {
-        initializationError.value = error instanceof Error ? error.message : String(error);
-      } finally {
-        isInitialized.value = true;
-        isInitializing.value = false;
-      }
-    };
+      settings.value = {
+        deepseekModel: storedDeepSeekModel,
+        fastModel: isChatModel(settings.value.fastModel)
+          ? settings.value.fastModel
+          : 'deepseek-v4-flash',
+        generalModel: isChatModel(settings.value.generalModel)
+          ? settings.value.generalModel
+          : storedDeepSeekModel,
+        imageModel: isImageModel(settings.value.imageModel)
+          ? settings.value.imageModel
+          : DEFAULT_IMAGE_MODEL,
+        theme: settings.value.theme ?? defaultSettings.theme,
+      };
+    } catch (error: unknown) {
+      initializationError.value = error instanceof Error ? error.message : String(error);
+    } finally {
+      isInitialized.value = true;
+      isInitializing.value = false;
+    }
+  };
 
-    const setWorkspaceDirectory = async (workspaceDirectory: string) => {
-      desktopSettings.value =
-        await window.desktop.settings.setWorkspaceDirectory(workspaceDirectory);
-    };
+  const setWorkspaceDirectory = async (workspaceDirectory: string) => {
+    desktopSettings.value = await window.desktop.settings.setWorkspaceDirectory(workspaceDirectory);
+  };
 
-    const useSuggestedWorkspace = async () => {
-      desktopSettings.value = await window.desktop.settings.useSuggestedWorkspace();
-    };
+  const useSuggestedWorkspace = async () => {
+    desktopSettings.value = await window.desktop.settings.useSuggestedWorkspace();
+  };
 
-    return {
-      initializationError,
-      initializeDesktop,
-      isWorkspaceConfigured,
-      settings,
-      setWorkspaceDirectory,
-      suggestedWorkspacePath,
-      useSuggestedWorkspace,
-      workspacePath,
-      updateSettings,
-    };
-  },
-  {
-    persist: {
-      key: 'app-setting',
-      storage: localStorage,
-      pick: ['settings'],
-    },
-  },
-);
+  return {
+    initializationError,
+    initializeDesktop,
+    isWorkspaceConfigured,
+    settings,
+    setWorkspaceDirectory,
+    suggestedWorkspacePath,
+    useSuggestedWorkspace,
+    workspacePath,
+    updateSettings,
+  };
+});

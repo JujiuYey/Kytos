@@ -21,7 +21,7 @@ import {
   validateVisualAssetSelection,
 } from './store';
 import { deleteAssetFile, saveUploadedImage } from './assets';
-import { isNodeError } from '../../storage/json-store';
+import { isNodeError } from '../../utils/node-error';
 import type {
   LegacyActionRecord,
   LegacyReferenceBoardRecord,

@@ -7,7 +7,6 @@ import {
   MAX_STORED_PROMPT_LENGTH,
 } from '../../constants';
 
-export const LEGACY_VISUAL_STORE_FILE_NAME = 'character-portraits.json';
 export const LEGACY_ACTION_ASSET_DIRECTORY = 'character-portraits';
 export const LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY = 'character-sheets';
 

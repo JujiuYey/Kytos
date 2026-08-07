@@ -4,7 +4,7 @@ import { copyFile, mkdir, mkdtemp, readdir, rename, rm, stat } from 'node:fs/pro
 import path from 'node:path';
 import type { ExportWorkspaceImagesResult } from '../../../shared/file';
 import { WORKSPACE_ASSETS_SUBDIRECTORY } from '../../constants';
-import { isNodeError } from '../../storage/json-store';
+import { isNodeError } from '../../utils/node-error';
 import { getWorkspaceDirectory } from './settings';
 
 const IMAGE_EXTENSIONS = new Set([

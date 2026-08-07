@@ -1,12 +1,25 @@
 // 桌面凭据、主题与工作区设置类型
+import type { ChatModel, DeepSeekModel } from './chat-model';
+import type { ImageModel } from './image-model';
 
 // 凭据服务类型
 export type CredentialService = 'apimart' | 'deepseek' | 'minimax';
 // 桌面主题
 export type DesktopTheme = 'dark' | 'light' | 'system';
 
+// 应用模型与界面设置
+export interface AppSettings {
+  deepseekModel: DeepSeekModel;
+  fastModel: ChatModel;
+  generalModel: ChatModel;
+  imageModel: ImageModel;
+  theme: DesktopTheme;
+}
+
 // 桌面端设置
 export interface DesktopSettings {
+  // 应用模型与界面设置
+  appSettings: AppSettings;
   // 建议工作区路径
   suggestedWorkspacePath: string;
   // 工作区路径
@@ -45,6 +58,8 @@ export interface SettingsApi {
   selectDirectory: () => Promise<string | null>;
   // 设置凭据
   setCredential: (request: SetCredentialRequest) => Promise<CredentialStatus>;
+  // 保存应用模型与界面设置
+  setAppSettings: (settings: AppSettings) => Promise<AppSettings>;
   // 设置主题
   setTheme: (theme: DesktopTheme) => Promise<void>;
   // 设置工作区目录

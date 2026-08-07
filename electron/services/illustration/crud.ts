@@ -16,7 +16,7 @@ import type {
 } from '../../../shared/illustration';
 import { createEmptyIllustrationBrief } from '../../../shared/illustration';
 import { ID_PATTERN, MAX_TEXT_LENGTH, MAX_TITLE_LENGTH } from '../../constants';
-import { isNodeError } from '../../storage/json-store';
+import { isNodeError } from '../../utils/node-error';
 import { saveUploadedIllustrationFile, safeUnlinkAssetFile } from './assets';
 import { BRIEF_FIELDS } from './constants';
 import { getAssetUrl, parseMessages } from './parsers';

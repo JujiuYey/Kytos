@@ -1,24 +1,28 @@
-// 角色视觉资产元数据读取 + CharacterLibraryState 装配
-import path from 'node:path';
+// 从角色视觉仓储装配 CharacterLibraryState
 import type {
   CharacterLibraryVisualAsset,
   CharacterLibraryState,
 } from '../../../shared/character-library';
-import { readJsonFile } from '../../storage/json-store';
-import { getWorkspaceDirectory } from '../workspace';
-import { LEGACY_VISUAL_STORE_FILE_NAME } from './constants';
-import { parseCharacterVisualAsset } from './parsers';
 import type { StoredCharacterLibrary } from './types';
 
 export async function getCharacterVisualAsset(
-  workspacePath: string,
   characterId: string,
 ): Promise<CharacterLibraryVisualAsset | null> {
   try {
-    const value = await readJsonFile(
-      path.join(workspacePath, 'characters', characterId, LEGACY_VISUAL_STORE_FILE_NAME),
+    const { getCharacterVisualWorkspace } = await import('../character-visual');
+    const workspace = await getCharacterVisualWorkspace(characterId);
+    const officialKeys = new Set(
+      workspace.officialAssets.map(asset => `${asset.taskId}:${asset.fileName}`),
     );
-    return parseCharacterVisualAsset(value);
+    for (const record of workspace.records) {
+      const image = record.images.find(candidate =>
+        officialKeys.has(`${record.id}:${candidate.fileName}`),
+      );
+      if (image) {
+        return { name: image.name ?? record.name, size: record.size, url: image.url };
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -27,11 +31,10 @@ export async function getCharacterVisualAsset(
 export async function toCharacterLibraryState(
   store: StoredCharacterLibrary,
 ): Promise<CharacterLibraryState> {
-  const workspacePath = await getWorkspaceDirectory();
   const characters = await Promise.all(
     store.characters.map(async character => ({
       ...character,
-      visualAsset: await getCharacterVisualAsset(workspacePath, character.id),
+      visualAsset: await getCharacterVisualAsset(character.id),
     })),
   );
   return { activeCharacterId: store.activeCharacterId, characters };

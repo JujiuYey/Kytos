@@ -159,6 +159,8 @@ const settingsApi: SettingsApi = {
   selectDirectory: () => ipcRenderer.invoke('dialog:select-directory'),
   // 设置凭据
   setCredential: request => ipcRenderer.invoke('credential:set', request),
+  // 保存应用模型与界面设置
+  setAppSettings: settings => ipcRenderer.invoke('settings:set-app', settings),
   // 设置主题
   setTheme: theme => ipcRenderer.invoke('settings:set-theme', theme),
   // 设置工作区目录

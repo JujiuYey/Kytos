@@ -1,44 +1,28 @@
-// 角色表情的 SQLite 仓储与旧 JSON 一次性导入
-import path from 'node:path';
+// 角色表情的 SQLite 仓储
 import type { DatabaseSync, SQLOutputValue } from 'node:sqlite';
-import { isPlainObject } from 'es-toolkit';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceSelection,
   CharacterExpressionTask,
   CharacterExpressionWorkspaceState,
 } from '../../../shared/character-expression';
-import { readJsonFile } from '../../storage/json-store';
 import {
   getWorkspaceDatabase,
   runDatabaseMigrations,
   runInTransaction,
 } from '../../storage/database';
-import { getCharacterDirectory } from '../character-library';
-import {
-  EXPRESSION_STORE_FILE_NAME,
-  EXPRESSION_STORE_VERSION,
-  EXPRESSION_TASK_STORE_FILE_NAME,
-  EXPRESSION_TASK_STORE_VERSION,
-} from './constants';
 import { getExpressionAssetUrl, parseExpressionRecord, parseExpressionTask } from './parsers';
 import { CHARACTER_EXPRESSION_MIGRATIONS } from './schema';
 
 const initializedDatabases = new WeakSet<DatabaseSync>();
-const legacyImports = new WeakMap<DatabaseSync, Map<string, Promise<void>>>();
 
 type DatabaseRow = Record<string, SQLOutputValue>;
-
-interface LegacyExpressionData {
-  records: CharacterExpressionRecord[];
-  tasks: CharacterExpressionTask[];
-}
 
 /** 列出指定角色的正式表情和未完成任务。 */
 export async function getExpressionWorkspace(
   characterId: string,
 ): Promise<CharacterExpressionWorkspaceState> {
-  const database = await getExpressionDatabase(characterId);
+  const database = await getExpressionDatabase();
   return {
     records: readRecords(database, characterId),
     tasks: readTasks(database, characterId),
@@ -50,7 +34,7 @@ export async function findExpressionRecord(
   characterId: string,
   recordId: string,
 ): Promise<CharacterExpressionRecord | null> {
-  const database = await getExpressionDatabase(characterId);
+  const database = await getExpressionDatabase();
   return readRecord(database, characterId, recordId);
 }
 
@@ -59,7 +43,7 @@ export async function saveExpressionRecord(
   characterId: string,
   record: CharacterExpressionRecord,
 ): Promise<void> {
-  const database = await getExpressionDatabase(characterId);
+  const database = await getExpressionDatabase();
   runInTransaction(database, () => saveRecord(database, characterId, record));
 }
 
@@ -70,7 +54,7 @@ export async function renameExpressionRecord(
   name: string,
   updatedAt: string,
 ): Promise<boolean> {
-  const database = await getExpressionDatabase(characterId);
+  const database = await getExpressionDatabase();
   const result = database
     .prepare(
       `UPDATE character_expression_records
@@ -88,7 +72,7 @@ export async function removeExpressionImage(
   fileName: string,
   updatedAt: string,
 ): Promise<CharacterExpressionRecord | null> {
-  const database = await getExpressionDatabase(characterId);
+  const database = await getExpressionDatabase();
   const record = readRecord(database, characterId, recordId);
   if (!record?.images.some(image => image.fileName === fileName)) return null;
 
@@ -121,7 +105,7 @@ export async function findExpressionTask(
   characterId: string,
   taskId: string,
 ): Promise<CharacterExpressionTask | null> {
-  const database = await getExpressionDatabase(characterId);
+  const database = await getExpressionDatabase();
   return readTask(database, characterId, taskId);
 }
 
@@ -130,13 +114,13 @@ export async function saveExpressionTask(
   characterId: string,
   task: CharacterExpressionTask,
 ): Promise<void> {
-  const database = await getExpressionDatabase(characterId);
+  const database = await getExpressionDatabase();
   runInTransaction(database, () => saveTask(database, characterId, task));
 }
 
 /** 删除一条表情生成任务。 */
 export async function deleteExpressionTask(characterId: string, taskId: string): Promise<void> {
-  const database = await getExpressionDatabase(characterId);
+  const database = await getExpressionDatabase();
   database
     .prepare('DELETE FROM character_expression_tasks WHERE character_id = ? AND id = ?')
     .run(characterId, taskId);
@@ -147,7 +131,7 @@ export async function completeExpressionTask(
   characterId: string,
   record: CharacterExpressionRecord,
 ): Promise<void> {
-  const database = await getExpressionDatabase(characterId);
+  const database = await getExpressionDatabase();
   runInTransaction(database, () => {
     saveRecord(database, characterId, record);
     database
@@ -156,99 +140,13 @@ export async function completeExpressionTask(
   });
 }
 
-async function getExpressionDatabase(characterId: string): Promise<DatabaseSync> {
+async function getExpressionDatabase(): Promise<DatabaseSync> {
   const database = await getWorkspaceDatabase();
   if (!initializedDatabases.has(database)) {
     runDatabaseMigrations(database, CHARACTER_EXPRESSION_MIGRATIONS);
     initializedDatabases.add(database);
   }
-  await ensureLegacyDataImported(database, characterId);
   return database;
-}
-
-/** 合并同一角色的并发首次访问，避免重复执行旧数据导入。 */
-async function ensureLegacyDataImported(
-  database: DatabaseSync,
-  characterId: string,
-): Promise<void> {
-  let importsByCharacter = legacyImports.get(database);
-  if (!importsByCharacter) {
-    importsByCharacter = new Map();
-    legacyImports.set(database, importsByCharacter);
-  }
-  let pendingImport = importsByCharacter.get(characterId);
-  if (!pendingImport) {
-    pendingImport = importLegacyData(database, characterId).catch((error: unknown) => {
-      importsByCharacter.delete(characterId);
-      throw error;
-    });
-    importsByCharacter.set(characterId, pendingImport);
-  }
-  await pendingImport;
-}
-
-/** 每个角色只导入一次旧 JSON；导入标记与数据写入位于同一事务。 */
-async function importLegacyData(database: DatabaseSync, characterId: string): Promise<void> {
-  const imported = database
-    .prepare('SELECT 1 FROM character_expression_legacy_imports WHERE character_id = ?')
-    .get(characterId);
-  if (imported) return;
-
-  const legacyData = await readLegacyData(characterId);
-  runInTransaction(database, () => {
-    for (const record of legacyData.records) {
-      saveRecord(database, characterId, record);
-    }
-    const completedIds = new Set(legacyData.records.map(record => record.id));
-    for (const task of legacyData.tasks) {
-      if (!completedIds.has(task.id)) saveTask(database, characterId, task);
-    }
-    database
-      .prepare(
-        `INSERT INTO character_expression_legacy_imports (character_id, imported_at)
-         VALUES (?, ?)`,
-      )
-      .run(characterId, new Date().toISOString());
-  });
-}
-
-async function readLegacyData(characterId: string): Promise<LegacyExpressionData> {
-  const characterDirectory = await getCharacterDirectory(characterId);
-  const [recordValue, taskValue] = await Promise.all([
-    readJsonFile(path.join(characterDirectory, EXPRESSION_STORE_FILE_NAME)),
-    readJsonFile(path.join(characterDirectory, EXPRESSION_TASK_STORE_FILE_NAME)),
-  ]);
-
-  const records: CharacterExpressionRecord[] = [];
-  const tasks = new Map<string, CharacterExpressionTask>();
-  if (isPlainObject(recordValue)) {
-    if (recordValue.version !== EXPRESSION_STORE_VERSION) {
-      throw new Error('表情数据版本无效');
-    }
-    if (Array.isArray(recordValue.records)) {
-      for (const value of recordValue.records as unknown[]) {
-        const record = parseExpressionRecord(value);
-        if (record) {
-          records.push(record);
-          continue;
-        }
-        const task = parseExpressionTask(value);
-        if (task) tasks.set(task.id, task);
-      }
-    }
-  }
-  if (isPlainObject(taskValue)) {
-    if (taskValue.version !== EXPRESSION_TASK_STORE_VERSION) {
-      throw new Error('表情任务数据版本无效');
-    }
-    if (isPlainObject(taskValue.tasks)) {
-      for (const [taskId, value] of Object.entries(taskValue.tasks)) {
-        const task = parseExpressionTask(value);
-        if (task?.id === taskId) tasks.set(task.id, task);
-      }
-    }
-  }
-  return { records, tasks: [...tasks.values()] };
 }
 
 function saveRecord(

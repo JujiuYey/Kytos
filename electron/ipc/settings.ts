@@ -1,11 +1,12 @@
 // 桌面设置、主题、目录选择、工作区 IPC 通道注册
 import { BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron';
 import type { OpenDialogOptions } from 'electron';
-import type { DesktopTheme } from '../../shared/desktop';
+import type { AppSettings, DesktopTheme } from '../../shared/desktop';
 import {
   getDesktopSettings,
   getSuggestedWorkspacePath,
   openWorkspaceDirectory,
+  saveAppSettings,
   setWorkspaceDirectory,
 } from '../services/workspace';
 import type { TrustedSenderGuard } from './trusted-sender';
@@ -25,6 +26,12 @@ export function registerSettingsIpc(assertTrustedSender: TrustedSenderGuard): vo
       throw new TypeError('界面主题无效');
     }
     nativeTheme.themeSource = theme;
+  });
+
+  // 保存模型与界面设置
+  ipcMain.handle('settings:set-app', async (event, settings: AppSettings) => {
+    assertTrustedSender(event);
+    return saveAppSettings(settings);
   });
 
   // 弹出系统目录选择对话框，返回所选路径

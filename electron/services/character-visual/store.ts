@@ -1,23 +1,17 @@
-// 角色视觉工作区的持久化与 legacy ↔ public 模型转换
+// 角色视觉工作区的 SQLite 持久化与 legacy/public 模型转换
 import path from 'node:path';
+import type { DatabaseSync, SQLOutputValue } from 'node:sqlite';
 import { isPlainObject } from 'es-toolkit';
-import { getActiveCharacterDirectory, getCharacterDirectory } from '../character-library';
-import { readJsonFile, writeJsonFile } from '../../storage/json-store';
+import { loadStore as loadCharacterStore } from '../character-library/store';
 import {
-  LEGACY_ACTION_ASSET_DIRECTORY,
-  LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY,
-  LEGACY_VISUAL_STORE_FILE_NAME,
-} from './constants';
+  getWorkspaceDatabase,
+  runDatabaseMigrations,
+  runInTransaction,
+} from '../../storage/database';
+import { LEGACY_ACTION_ASSET_DIRECTORY, LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY } from './constants';
 import { ID_PATTERN } from '../../constants';
-import {
-  getCharacterAssetUrl,
-  legacySelectionKey,
-  parseLegacyActionRecord,
-  parseLegacyReferenceBoardRecord,
-  parseLegacyVisualAssetSelection,
-  parseSelection,
-  selectionKey,
-} from './parsers';
+import { getCharacterAssetUrl, selectionKey } from './parsers';
+import { CHARACTER_VISUAL_MIGRATIONS } from './schema';
 import type {
   CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
@@ -32,57 +26,35 @@ import type {
 } from './types';
 
 const STORE_VERSION = 3;
-
-async function getLegacyVisualStorePath(characterId?: string): Promise<string> {
-  const characterDirectory = characterId
-    ? await getCharacterDirectory(characterId)
-    : await getActiveCharacterDirectory();
-  return path.join(characterDirectory, LEGACY_VISUAL_STORE_FILE_NAME);
-}
+const initializedDatabases = new WeakSet<DatabaseSync>();
+type DatabaseRow = Record<string, SQLOutputValue>;
 
 export async function loadVisualStore(characterId?: string): Promise<StoredVisualWorkspace> {
-  const storePath = await getLegacyVisualStorePath(characterId);
-  const value = await readJsonFile(storePath);
-  if (!isPlainObject(value)) {
-    return {
-      officialAssets: [],
-      records: [],
-      selectedImage: null,
-      selectedSheet: null,
-      sheetRecords: [],
-      version: STORE_VERSION,
-    };
+  const resolvedCharacterId = await getCharacterId(characterId);
+  const database = await getVisualDatabase();
+  const rows = database
+    .prepare(
+      `SELECT * FROM character_visual_records
+       WHERE character_id = ?
+       ORDER BY created_at DESC`,
+    )
+    .all(resolvedCharacterId) as DatabaseRow[];
+  const records: LegacyActionRecord[] = [];
+  const sheetRecords: LegacyReferenceBoardRecord[] = [];
+  for (const row of rows) {
+    const record = readVisualRecord(database, resolvedCharacterId, row);
+    if (readText(row.kind) === 'sheet') sheetRecords.push(record as LegacyReferenceBoardRecord);
+    else records.push(record as LegacyActionRecord);
   }
-
-  const records = Array.isArray(value.records)
-    ? (value.records as unknown[])
-        .map(parseLegacyActionRecord)
-        .filter((record): record is LegacyActionRecord => Boolean(record))
-    : [];
-  const sheetRecords = Array.isArray(value.sheetRecords)
-    ? (value.sheetRecords as unknown[])
-        .map(parseLegacyReferenceBoardRecord)
-        .filter((record): record is LegacyReferenceBoardRecord => Boolean(record))
-    : [];
-
   const store: StoredVisualWorkspace = {
-    officialAssets: getOfficialAssets(value),
-    records: records.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
-    selectedImage: parseSelection(value.selectedImage),
-    selectedSheet: parseSelection(value.selectedSheet),
-    sheetRecords: sheetRecords.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    officialAssets: readOfficialAssets(database, resolvedCharacterId),
+    records,
+    selectedImage: null,
+    selectedSheet: null,
+    sheetRecords,
     version: STORE_VERSION,
   };
-  store.officialAssets = store.officialAssets.filter(asset => {
-    const recordList = asset.kind === 'portrait' ? store.records : store.sheetRecords;
-    return recordList
-      .find(record => record.id === asset.taskId)
-      ?.images.some(image => image.fileName === asset.fileName);
-  });
   syncLegacySelections(store);
-  if (value.version !== STORE_VERSION) {
-    await writeJsonFile(storePath, store);
-  }
   return store;
 }
 
@@ -90,23 +62,41 @@ export async function saveVisualStore(
   store: StoredVisualWorkspace,
   characterId?: string,
 ): Promise<void> {
-  await writeJsonFile(await getLegacyVisualStorePath(characterId), store);
-}
-
-function getOfficialAssets(value: Record<string, unknown>): LegacyVisualAssetSelection[] {
-  if (Array.isArray(value.officialAssets)) {
-    const assets = (value.officialAssets as unknown[])
-      .map(parseLegacyVisualAssetSelection)
-      .filter((asset): asset is LegacyVisualAssetSelection => Boolean(asset));
-    return [...new Map(assets.map(asset => [legacySelectionKey(asset), asset])).values()];
-  }
-
-  const selectedImage = parseSelection(value.selectedImage);
-  const selectedSheet = parseSelection(value.selectedSheet);
-  return [
-    selectedImage ? { ...selectedImage, kind: 'portrait' as const } : null,
-    selectedSheet ? { ...selectedSheet, kind: 'sheet' as const } : null,
-  ].filter((asset): asset is LegacyVisualAssetSelection => Boolean(asset));
+  const resolvedCharacterId = await getCharacterId(characterId);
+  const database = await getVisualDatabase();
+  runInTransaction(database, () => {
+    database
+      .prepare('DELETE FROM character_official_visuals WHERE character_id = ?')
+      .run(resolvedCharacterId);
+    const recordIds = new Set<string>();
+    for (const record of store.records) {
+      recordIds.add(record.id);
+      saveVisualRecord(database, resolvedCharacterId, 'portrait', record);
+    }
+    for (const record of store.sheetRecords) {
+      recordIds.add(record.id);
+      saveVisualRecord(database, resolvedCharacterId, 'sheet', record);
+    }
+    const existingRows = database
+      .prepare('SELECT id FROM character_visual_records WHERE character_id = ?')
+      .all(resolvedCharacterId) as DatabaseRow[];
+    for (const row of existingRows) {
+      const id = readText(row.id);
+      if (!recordIds.has(id)) {
+        database
+          .prepare('DELETE FROM character_visual_records WHERE character_id = ? AND id = ?')
+          .run(resolvedCharacterId, id);
+      }
+    }
+    const insertOfficial = database.prepare(
+      `INSERT INTO character_official_visuals (
+         character_id, position, kind, record_id, file_name
+       ) VALUES (?, ?, ?, ?, ?)`,
+    );
+    store.officialAssets.forEach((asset, position) => {
+      insertOfficial.run(resolvedCharacterId, position, asset.kind, asset.taskId, asset.fileName);
+    });
+  });
 }
 
 function syncLegacySelectionsInternal(store: StoredVisualWorkspace): void {
@@ -247,6 +237,202 @@ export function validateVisualAssetSelection(
     fileName: request.fileName,
     taskId: request.taskId,
   };
+}
+
+async function getCharacterId(characterId?: string): Promise<string> {
+  if (characterId) return characterId;
+  return (await loadCharacterStore()).activeCharacterId;
+}
+
+async function getVisualDatabase(): Promise<DatabaseSync> {
+  const database = await getWorkspaceDatabase();
+  if (!initializedDatabases.has(database)) {
+    runDatabaseMigrations(database, CHARACTER_VISUAL_MIGRATIONS);
+    initializedDatabases.add(database);
+  }
+  return database;
+}
+
+function readVisualRecord(
+  database: DatabaseSync,
+  characterId: string,
+  row: DatabaseRow,
+): LegacyActionRecord | LegacyReferenceBoardRecord {
+  const id = readText(row.id);
+  const kind = readText(row.kind) as LegacyVisualAssetSelection['kind'];
+  const directoryName =
+    kind === 'sheet' ? LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY : LEGACY_ACTION_ASSET_DIRECTORY;
+  const images = (
+    database
+      .prepare(
+        `SELECT file_name, mime_type, name
+         FROM character_visual_images
+         WHERE character_id = ? AND record_id = ?
+         ORDER BY position`,
+      )
+      .all(characterId, id) as DatabaseRow[]
+  ).map(image => ({
+    fileName: readText(image.file_name),
+    mimeType: readText(image.mime_type),
+    ...(typeof image.name === 'string' ? { name: image.name } : {}),
+    url: getCharacterAssetUrl(directoryName, readText(image.file_name)),
+  }));
+  const references = (
+    database
+      .prepare(
+        `SELECT kind, reference_record_id, file_name
+         FROM character_visual_references
+         WHERE character_id = ? AND record_id = ?
+         ORDER BY position`,
+      )
+      .all(characterId, id) as DatabaseRow[]
+  ).map(reference => ({
+    fileName: readText(reference.file_name),
+    kind: readText(reference.kind) as LegacyVisualAssetSelection['kind'],
+    taskId: readText(reference.reference_record_id),
+  }));
+  const base = {
+    count: readNumber(row.count),
+    createdAt: readText(row.created_at),
+    errorMessage: typeof row.error_message === 'string' ? row.error_message : null,
+    id,
+    images,
+    name: readText(row.name),
+    originalName: typeof row.original_name === 'string' ? row.original_name : null,
+    progress: readNumber(row.progress),
+    prompt: readText(row.prompt),
+    resolution: readText(row.resolution) as LegacyActionRecord['resolution'],
+    size: readText(row.size) as LegacyActionRecord['size'],
+    source: readText(row.source) as LegacyActionRecord['source'],
+    status: readText(row.status) as LegacyActionRecord['status'],
+    updatedAt: readText(row.updated_at),
+  };
+  if (kind === 'sheet') {
+    return {
+      ...base,
+      count: 1,
+      referenceAssets: references,
+      referenceImage: references[0]
+        ? { fileName: references[0].fileName, taskId: references[0].taskId }
+        : null,
+      size: '16:9',
+    };
+  }
+  return { ...base, referenceAsset: references[0] ?? null };
+}
+
+function readOfficialAssets(
+  database: DatabaseSync,
+  characterId: string,
+): LegacyVisualAssetSelection[] {
+  const rows = database
+    .prepare(
+      `SELECT kind, record_id, file_name
+       FROM character_official_visuals
+       WHERE character_id = ?
+       ORDER BY position`,
+    )
+    .all(characterId) as DatabaseRow[];
+  return rows.map(row => ({
+    fileName: readText(row.file_name),
+    kind: readText(row.kind) as LegacyVisualAssetSelection['kind'],
+    taskId: readText(row.record_id),
+  }));
+}
+
+function saveVisualRecord(
+  database: DatabaseSync,
+  characterId: string,
+  kind: LegacyVisualAssetSelection['kind'],
+  record: LegacyActionRecord | LegacyReferenceBoardRecord,
+): void {
+  database
+    .prepare(
+      `INSERT INTO character_visual_records (
+         character_id, id, kind, name, count, prompt, resolution, size, source, status,
+         progress, original_name, error_message, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (character_id, id) DO UPDATE SET
+         kind = excluded.kind,
+         name = excluded.name,
+         count = excluded.count,
+         prompt = excluded.prompt,
+         resolution = excluded.resolution,
+         size = excluded.size,
+         source = excluded.source,
+         status = excluded.status,
+         progress = excluded.progress,
+         original_name = excluded.original_name,
+         error_message = excluded.error_message,
+         updated_at = excluded.updated_at`,
+    )
+    .run(
+      characterId,
+      record.id,
+      kind,
+      record.name,
+      record.count,
+      record.prompt,
+      record.resolution,
+      record.size,
+      record.source,
+      record.status,
+      record.progress,
+      record.originalName,
+      record.errorMessage,
+      record.createdAt,
+      record.updatedAt,
+    );
+  database
+    .prepare('DELETE FROM character_visual_images WHERE character_id = ? AND record_id = ?')
+    .run(characterId, record.id);
+  database
+    .prepare('DELETE FROM character_visual_references WHERE character_id = ? AND record_id = ?')
+    .run(characterId, record.id);
+  const insertImage = database.prepare(
+    `INSERT INTO character_visual_images (
+       character_id, record_id, position, file_name, mime_type, name
+     ) VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  record.images.forEach((image, position) => {
+    insertImage.run(
+      characterId,
+      record.id,
+      position,
+      image.fileName,
+      image.mimeType,
+      image.name ?? null,
+    );
+  });
+  const references =
+    'referenceAssets' in record
+      ? record.referenceAssets
+      : record.referenceAsset
+        ? [record.referenceAsset]
+        : [];
+  const insertReference = database.prepare(
+    `INSERT INTO character_visual_references (
+       character_id, record_id, position, kind, reference_record_id, file_name
+     ) VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  references.forEach((reference, position) => {
+    insertReference.run(
+      characterId,
+      record.id,
+      position,
+      reference.kind,
+      reference.taskId,
+      reference.fileName,
+    );
+  });
+}
+
+function readText(value: SQLOutputValue | undefined): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function readNumber(value: SQLOutputValue | undefined): number {
+  return typeof value === 'number' ? value : 0;
 }
 
 // 重新导出，避免外部服务为了引用 url helper 多导一份

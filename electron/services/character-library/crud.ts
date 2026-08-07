@@ -1,6 +1,5 @@
 // character-library 公共 API：workspace 查询 / CRUD / active directory
 import path from 'node:path';
-import { mkdir } from 'node:fs/promises';
 import { isPlainObject } from 'es-toolkit';
 import type {
   CharacterLibraryState,
@@ -10,12 +9,10 @@ import type {
   SelectCharacterRequest,
   UpdateCharacterRequest,
 } from '../../../shared/character-library';
-import { writeJsonFile } from '../../storage/json-store';
 import { getWorkspaceDirectory } from '../workspace';
 import { getCharacterVisualAsset, toCharacterLibraryState } from './assets';
 import { CHARACTER_DIRECTORY, MAX_NAME_LENGTH } from './constants';
-import { updateCharacterDraftName } from './legacy';
-import { buildNewCharacter, loadStore, mutateStore } from './store';
+import { buildNewCharacter, loadStore, mutateStore, updateCharacterDraftName } from './store';
 
 export async function getCharacterLibrary(): Promise<CharacterLibraryState> {
   return toCharacterLibraryState(await loadStore());
@@ -39,12 +36,8 @@ export async function createCharacter(
     throw new Error('角色概要无效');
   }
   const name = normalizeCharacterName(request.name);
-  const workspacePath = await getWorkspaceDirectory();
-  const store = await mutateStore(async existing => {
+  const store = await mutateStore(existing => {
     const character = buildNewCharacter(name);
-    const characterDir = path.join(workspacePath, CHARACTER_DIRECTORY, character.id);
-    await mkdir(characterDir, { recursive: true });
-    await writeJsonFile(path.join(characterDir, 'character-draft.json'), { name });
     return {
       ...existing,
       activeCharacterId: character.id,
@@ -55,10 +48,9 @@ export async function createCharacter(
 }
 
 export async function prepareCharacterVisualSave(characterId: string): Promise<string> {
-  const workspacePath = await getWorkspaceDirectory();
   const currentStore = await loadStore();
   const character = findCharacter(currentStore, characterId);
-  if (await getCharacterVisualAsset(workspacePath, character.id)) {
+  if (await getCharacterVisualAsset(character.id)) {
     throw new Error('这个角色已经有正式视觉，请前往角色视觉继续管理');
   }
   const store = await mutateStore(existing => {
@@ -105,10 +97,9 @@ export async function updateCharacter(
     throw new Error('角色概要无效');
   }
   const name = normalizeCharacterName(request.name);
-  const workspacePath = await getWorkspaceDirectory();
   const store = await mutateStore(async existing => {
     const target = findCharacter(existing, request.characterId);
-    await updateCharacterDraftName(workspacePath, target.id, name);
+    await updateCharacterDraftName(target.id, name);
     return {
       ...existing,
       characters: existing.characters.map(character =>

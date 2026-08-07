@@ -1,9 +1,6 @@
 // character-create 模块本地常量
 import { WORKSPACE_ASSETS_SUBDIRECTORY } from '../../constants';
 
-// 角色视觉候选生成结果 JSON 文件名
-export const STORE_FILE_NAME = 'character-create-generations.json';
-
 // 角色视觉候选图片在工作区下的子目录名（与 character-visual / story / illustration 等独立）
 export const ASSET_DIRECTORY = 'character-candidates';
 

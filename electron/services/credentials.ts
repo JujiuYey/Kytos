@@ -1,17 +1,12 @@
-import path from 'node:path';
-import { app, safeStorage } from 'electron';
+// API Key 使用系统安全存储加密后持久化到应用级 SQLite
+import { safeStorage } from 'electron';
+import { isPlainObject } from 'es-toolkit';
 import type {
   CredentialService,
   CredentialStatus,
   SetCredentialRequest,
 } from '../../shared/desktop';
-import { readJsonFile, writeJsonFile } from '../storage/json-store';
-import { isPlainObject } from 'es-toolkit';
-
-interface StoredSecrets {
-  credentials: Partial<Record<CredentialService, string>>;
-  version: 1;
-}
+import { getApplicationDatabase } from '../storage/app-database';
 
 const credentialServices: CredentialService[] = ['apimart', 'deepseek', 'minimax'];
 
@@ -21,46 +16,37 @@ const credentialServiceLabels: Record<CredentialService, string> = {
   minimax: 'MiniMax',
 };
 
-function getSecretsFilePath(): string {
-  return path.join(app.getPath('userData'), 'secrets.json');
+function getEncryptedCredential(service: CredentialService): string | null {
+  const row = getApplicationDatabase()
+    .prepare('SELECT encrypted_value FROM credentials WHERE service = ?')
+    .get(service) as { encrypted_value?: unknown } | undefined;
+  return typeof row?.encrypted_value === 'string' ? row.encrypted_value : null;
 }
 
-async function loadStoredSecrets(): Promise<StoredSecrets> {
-  const value = await readJsonFile(getSecretsFilePath());
-  const credentials: Partial<Record<CredentialService, string>> = {};
-
-  if (isPlainObject(value) && 'credentials' in value) {
-    const storedCredentials = value.credentials;
-    if (isPlainObject(storedCredentials)) {
-      for (const service of credentialServices) {
-        if (service in storedCredentials) {
-          const encryptedValue = (storedCredentials as Record<string, unknown>)[service];
-          if (typeof encryptedValue === 'string') {
-            credentials[service] = encryptedValue;
-          }
-        }
-      }
-    }
-  }
-
-  return { credentials, version: 1 };
+function saveEncryptedCredential(service: CredentialService, encryptedValue: string): void {
+  getApplicationDatabase()
+    .prepare(
+      `INSERT INTO credentials (service, encrypted_value, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT (service) DO UPDATE SET
+         encrypted_value = excluded.encrypted_value,
+         updated_at = excluded.updated_at`,
+    )
+    .run(service, encryptedValue, new Date().toISOString());
 }
 
 export async function getCredentialValue(service: CredentialService): Promise<string> {
-  const secrets = await loadStoredSecrets();
-  const encryptedValue = secrets.credentials[service];
+  const encryptedValue = getEncryptedCredential(service);
   if (!encryptedValue) {
     throw new Error(`尚未配置 ${credentialServiceLabels[service]} API Key`);
   }
   if (!(await safeStorage.isAsyncEncryptionAvailable())) {
     throw new Error('系统安全存储不可用，无法读取 API Key');
   }
-
   const decrypted = await safeStorage.decryptStringAsync(Buffer.from(encryptedValue, 'base64'));
   if (decrypted.shouldReEncrypt) {
     const refreshedValue = await safeStorage.encryptStringAsync(decrypted.result);
-    secrets.credentials[service] = refreshedValue.toString('base64');
-    await writeJsonFile(getSecretsFilePath(), secrets);
+    saveEncryptedCredential(service, refreshedValue.toString('base64'));
   }
   return decrypted.result;
 }
@@ -70,9 +56,8 @@ export function isCredentialService(value: unknown): value is CredentialService 
 }
 
 export async function getCredentialStatus(service: CredentialService): Promise<CredentialStatus> {
-  const secrets = await loadStoredSecrets();
   return {
-    configured: Boolean(secrets.credentials[service]),
+    configured: Boolean(getEncryptedCredential(service)),
     secureStorageAvailable: safeStorage.isEncryptionAvailable(),
     service,
   };
@@ -85,23 +70,16 @@ export async function setCredential(request: SetCredentialRequest): Promise<Cred
   if (typeof request.value !== 'string' || !request.value.trim()) {
     throw new Error('API Key 不能为空');
   }
-  if (request.value.length > 16_384) {
-    throw new Error('API Key 长度无效');
-  }
+  if (request.value.length > 16_384) throw new Error('API Key 长度无效');
   if (!(await safeStorage.isAsyncEncryptionAvailable())) {
     throw new Error('系统安全存储不可用，无法安全保存 API Key');
   }
-
   const encryptedValue = await safeStorage.encryptStringAsync(request.value.trim());
-  const secrets = await loadStoredSecrets();
-  secrets.credentials[request.service] = encryptedValue.toString('base64');
-  await writeJsonFile(getSecretsFilePath(), secrets);
+  saveEncryptedCredential(request.service, encryptedValue.toString('base64'));
   return getCredentialStatus(request.service);
 }
 
 export async function deleteCredential(service: CredentialService): Promise<CredentialStatus> {
-  const secrets = await loadStoredSecrets();
-  delete secrets.credentials[service];
-  await writeJsonFile(getSecretsFilePath(), secrets);
+  getApplicationDatabase().prepare('DELETE FROM credentials WHERE service = ?').run(service);
   return getCredentialStatus(service);
 }

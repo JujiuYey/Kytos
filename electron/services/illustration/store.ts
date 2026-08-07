@@ -1,45 +1,45 @@
-// illustration 工作区的 JSON 持久化与轻量不可变更新
-import path from 'node:path';
-import { isPlainObject } from 'es-toolkit';
-import type { IllustrationTopic } from '../../../shared/illustration';
-import { readJsonFile, writeJsonFile } from '../../storage/json-store';
-import { getWorkspaceDirectory } from '../workspace';
+// 插画工作区的 SQLite 持久化与轻量不可变更新
+import type { DatabaseSync, SQLOutputValue } from 'node:sqlite';
+import type {
+  IllustrationTopic,
+  IllustrationVersion,
+  UploadedIllustration,
+} from '../../../shared/illustration';
 import { ID_PATTERN } from '../../constants';
-import { STORE_FILE_NAME, STORE_VERSION } from './constants';
-import { parseTopic, parseUpload } from './parsers';
+import {
+  getWorkspaceDatabase,
+  runDatabaseMigrations,
+  runInTransaction,
+} from '../../storage/database';
+import { getAssetUrl, parseMessages } from './parsers';
+import { ILLUSTRATION_MIGRATIONS } from './schema';
 import type { StoredIllustrationWorkspace } from './types';
 
-async function getStorePath(): Promise<string> {
-  return path.join(await getWorkspaceDirectory(), STORE_FILE_NAME);
-}
+const initializedDatabases = new WeakSet<DatabaseSync>();
+type DatabaseRow = Record<string, SQLOutputValue>;
 
 export async function loadStore(): Promise<StoredIllustrationWorkspace> {
-  const storePath = await getStorePath();
-  const value = await readJsonFile(storePath);
-  if (!isPlainObject(value)) {
-    return { topics: [], uploads: [], version: STORE_VERSION };
-  }
-  const topics = Array.isArray(value.topics)
-    ? (value.topics as unknown[])
-        .map(parseTopic)
-        .filter((topic): topic is IllustrationTopic => Boolean(topic))
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-    : [];
-  const uploads = Array.isArray(value.uploads)
-    ? (value.uploads as unknown[])
-        .map(parseUpload)
-        .filter((upload): upload is NonNullable<ReturnType<typeof parseUpload>> => Boolean(upload))
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-    : [];
-  const store: StoredIllustrationWorkspace = { topics, uploads, version: STORE_VERSION };
-  if (value.version !== STORE_VERSION || 'selectedStyleReference' in value) {
-    await writeJsonFile(storePath, store);
-  }
-  return store;
+  const database = await getIllustrationDatabase();
+  const topicRows = database
+    .prepare('SELECT * FROM illustration_topics ORDER BY updated_at DESC')
+    .all() as DatabaseRow[];
+  const uploadRows = database
+    .prepare('SELECT * FROM illustration_uploads ORDER BY created_at DESC')
+    .all() as DatabaseRow[];
+  return {
+    topics: topicRows.map(row => readTopic(database, row)),
+    uploads: uploadRows.map(readUpload),
+    version: 4,
+  };
 }
 
 export async function saveStore(store: StoredIllustrationWorkspace): Promise<void> {
-  await writeJsonFile(await getStorePath(), store);
+  const database = await getIllustrationDatabase();
+  runInTransaction(database, () => {
+    database.exec('DELETE FROM illustration_topics; DELETE FROM illustration_uploads;');
+    for (const topic of store.topics) saveTopic(database, topic);
+    for (const upload of store.uploads) saveUpload(database, upload);
+  });
 }
 
 export function replaceTopic(
@@ -58,32 +58,254 @@ export function removeTopic(
   store: StoredIllustrationWorkspace,
   topicId: string,
 ): StoredIllustrationWorkspace {
-  return {
-    ...store,
-    topics: store.topics.filter(item => item.id !== topicId),
-  };
+  return { ...store, topics: store.topics.filter(item => item.id !== topicId) };
 }
 
 export function removeUpload(
   store: StoredIllustrationWorkspace,
   uploadId: string,
 ): StoredIllustrationWorkspace {
-  return {
-    ...store,
-    uploads: store.uploads.filter(item => item.id !== uploadId),
-  };
+  return { ...store, uploads: store.uploads.filter(item => item.id !== uploadId) };
 }
 
 export function requireTopic(
   store: StoredIllustrationWorkspace,
   topicId: string,
 ): IllustrationTopic {
-  if (!ID_PATTERN.test(topicId)) {
-    throw new Error('插画主题编号无效');
-  }
+  if (!ID_PATTERN.test(topicId)) throw new Error('插画主题编号无效');
   const topic = store.topics.find(item => item.id === topicId);
-  if (!topic) {
-    throw new Error('未找到插画主题');
-  }
+  if (!topic) throw new Error('未找到插画主题');
   return topic;
+}
+
+async function getIllustrationDatabase(): Promise<DatabaseSync> {
+  const database = await getWorkspaceDatabase();
+  if (!initializedDatabases.has(database)) {
+    runDatabaseMigrations(database, ILLUSTRATION_MIGRATIONS);
+    initializedDatabases.add(database);
+  }
+  return database;
+}
+
+function readTopic(database: DatabaseSync, row: DatabaseRow): IllustrationTopic {
+  const id = readText(row.id);
+  const versionRows = database
+    .prepare(
+      `SELECT * FROM illustration_versions
+       WHERE topic_id = ?
+       ORDER BY version_number DESC`,
+    )
+    .all(id) as DatabaseRow[];
+  return {
+    brief: {
+      action: readText(row.brief_action),
+      composition: readText(row.brief_composition),
+      details: readText(row.brief_details),
+      environment: readText(row.brief_environment),
+      finalPrompt: readText(row.brief_final_prompt),
+      mood: readText(row.brief_mood),
+      style: readText(row.brief_style),
+      subject: readText(row.brief_subject),
+    },
+    createdAt: readText(row.created_at),
+    id,
+    messages: parseMessages(parseJson(row.messages_json)),
+    ready: readBoolean(row.ready),
+    title: readText(row.title),
+    updatedAt: readText(row.updated_at),
+    useCharacter: readBoolean(row.use_character),
+    versions: versionRows.map(version => readVersion(database, id, version)),
+  };
+}
+
+function readVersion(
+  database: DatabaseSync,
+  topicId: string,
+  row: DatabaseRow,
+): IllustrationVersion {
+  const id = readText(row.id);
+  const imageRows = database
+    .prepare(
+      `SELECT file_name, mime_type, name
+       FROM illustration_version_images
+       WHERE topic_id = ? AND version_id = ?
+       ORDER BY position`,
+    )
+    .all(topicId, id) as DatabaseRow[];
+  const referenceRows = database
+    .prepare(
+      `SELECT kind, task_id, file_name
+       FROM illustration_version_character_references
+       WHERE topic_id = ? AND version_id = ?
+       ORDER BY position`,
+    )
+    .all(topicId, id) as DatabaseRow[];
+  const baseVersionId = nullableText(row.base_version_id);
+  const baseFileName = nullableText(row.base_file_name);
+  return {
+    baseVersion:
+      baseVersionId && baseFileName ? { fileName: baseFileName, versionId: baseVersionId } : null,
+    characterReferences: referenceRows.map(reference => ({
+      fileName: readText(reference.file_name),
+      kind: readText(reference.kind) as IllustrationVersion['characterReferences'][number]['kind'],
+      taskId: readText(reference.task_id),
+    })),
+    createdAt: readText(row.created_at),
+    errorMessage: nullableText(row.error_message),
+    id,
+    images: imageRows.map(image => ({
+      fileName: readText(image.file_name),
+      mimeType: readText(image.mime_type),
+      ...(typeof image.name === 'string' ? { name: image.name } : {}),
+      url: getAssetUrl(readText(image.file_name)),
+    })),
+    progress: readNumber(row.progress),
+    prompt: readText(row.prompt),
+    resolution: readText(row.resolution) as IllustrationVersion['resolution'],
+    size: readText(row.size) as IllustrationVersion['size'],
+    status: readText(row.status) as IllustrationVersion['status'],
+    updatedAt: readText(row.updated_at),
+    useCharacter: readBoolean(row.use_character),
+    versionNumber: readNumber(row.version_number),
+  };
+}
+
+function readUpload(row: DatabaseRow): UploadedIllustration {
+  const fileName = readText(row.file_name);
+  return {
+    createdAt: readText(row.created_at),
+    fileName,
+    id: readText(row.id),
+    mimeType: readText(row.mime_type),
+    originalName: readText(row.original_name),
+    size: readNumber(row.size),
+    url: getAssetUrl(fileName),
+  };
+}
+
+function saveTopic(database: DatabaseSync, topic: IllustrationTopic): void {
+  database
+    .prepare(
+      `INSERT INTO illustration_topics (
+         id, title, ready, use_character, messages_json,
+         brief_action, brief_composition, brief_details, brief_environment,
+         brief_final_prompt, brief_mood, brief_style, brief_subject, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      topic.id,
+      topic.title,
+      Number(topic.ready),
+      Number(topic.useCharacter),
+      JSON.stringify(topic.messages),
+      topic.brief.action,
+      topic.brief.composition,
+      topic.brief.details,
+      topic.brief.environment,
+      topic.brief.finalPrompt,
+      topic.brief.mood,
+      topic.brief.style,
+      topic.brief.subject,
+      topic.createdAt,
+      topic.updatedAt,
+    );
+  for (const version of topic.versions) saveVersion(database, topic.id, version);
+}
+
+function saveVersion(database: DatabaseSync, topicId: string, version: IllustrationVersion): void {
+  database
+    .prepare(
+      `INSERT INTO illustration_versions (
+         topic_id, id, version_number, base_version_id, base_file_name, prompt, resolution,
+         size, status, progress, error_message, use_character, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      topicId,
+      version.id,
+      version.versionNumber,
+      version.baseVersion?.versionId ?? null,
+      version.baseVersion?.fileName ?? null,
+      version.prompt,
+      version.resolution,
+      version.size,
+      version.status,
+      version.progress,
+      version.errorMessage,
+      Number(version.useCharacter),
+      version.createdAt,
+      version.updatedAt,
+    );
+  const insertImage = database.prepare(
+    `INSERT INTO illustration_version_images (
+       topic_id, version_id, position, file_name, mime_type, name
+     ) VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  version.images.forEach((image, position) => {
+    insertImage.run(
+      topicId,
+      version.id,
+      position,
+      image.fileName,
+      image.mimeType,
+      image.name ?? null,
+    );
+  });
+  const insertReference = database.prepare(
+    `INSERT INTO illustration_version_character_references (
+       topic_id, version_id, position, kind, task_id, file_name
+     ) VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  version.characterReferences.forEach((reference, position) => {
+    insertReference.run(
+      topicId,
+      version.id,
+      position,
+      reference.kind,
+      reference.taskId,
+      reference.fileName,
+    );
+  });
+}
+
+function saveUpload(database: DatabaseSync, upload: UploadedIllustration): void {
+  database
+    .prepare(
+      `INSERT INTO illustration_uploads (
+         id, file_name, original_name, mime_type, size, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      upload.id,
+      upload.fileName,
+      upload.originalName,
+      upload.mimeType,
+      upload.size,
+      upload.createdAt,
+    );
+}
+
+function parseJson(value: SQLOutputValue | undefined): unknown {
+  if (typeof value !== 'string') return [];
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return [];
+  }
+}
+
+function readText(value: SQLOutputValue | undefined): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function nullableText(value: SQLOutputValue | undefined): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function readNumber(value: SQLOutputValue | undefined): number {
+  return typeof value === 'number' ? value : 0;
+}
+
+function readBoolean(value: SQLOutputValue | undefined): boolean {
+  return value === 1;
 }

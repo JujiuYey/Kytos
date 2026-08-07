@@ -29,7 +29,7 @@ import {
   MAX_TITLE_LENGTH,
 } from '../../constants';
 import { isTaskStatus } from '../../utils';
-import { BRIEF_FIELDS, STORE_VERSION } from './constants';
+import { BRIEF_FIELDS } from './constants';
 
 export function isSize(value: unknown): value is IllustrationSize {
   return ILLUSTRATION_SIZES.includes(value as IllustrationSize);
@@ -247,5 +247,3 @@ export function parseTopic(value: unknown): IllustrationTopic | null {
     versions,
   };
 }
-
-export { STORE_VERSION };

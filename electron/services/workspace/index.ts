@@ -4,6 +4,7 @@ export {
   getSuggestedWorkspacePath,
   getWorkspaceDirectory,
   openWorkspaceDirectory,
+  saveAppSettings,
   setWorkspaceDirectory,
 } from './settings';
 export { saveWorkspaceFile } from './files';

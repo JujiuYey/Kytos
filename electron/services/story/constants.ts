@@ -4,8 +4,6 @@ import type { StoryDraft, StoryShotContent } from '../../../shared/story';
 import { MAX_TEXT_LENGTH, MAX_TITLE_LENGTH } from '../../constants';
 import { isActiveTaskStatus } from '../../utils';
 
-// 故事 JSON 文件名
-export const STORE_FILE_NAME = 'stories.json';
 // 故事分镜图片在工作区下的子目录名（与 shared/workspace 资产目录约定不同，专属故事）
 export const ASSET_DIRECTORY = 'story-frames';
 
