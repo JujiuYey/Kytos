@@ -1,6 +1,6 @@
 # 插画共创 · Prompt Craft 原则
 
-本文件是 wuyoscar/GPT-Image2-Skill `references/craft.md` 的蒸馏版，专为本项目插画共创 Agent 场景裁剪。Agent 是多轮对话 + 工具调用模式，但 prompt 工程原则同源。
+插画 brief 与 finalPrompt 的设计原则与反例清单，按重要性排序。
 
 ## 1. 场景驱动 · 不堆砌空形容词
 

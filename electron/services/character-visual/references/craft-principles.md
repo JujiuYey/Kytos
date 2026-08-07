@@ -1,6 +1,6 @@
 # 角色动作生成 · Prompt Craft 原则
 
-本文件是 wuyoscar/GPT-Image2-Skill `references/craft.md` 的蒸馏版，专为本项目角色全身动作生成场景裁剪。
+动作生图 prompt 的设计原则与反例清单，按重要性排序。
 
 ## 1. 8 槽结构先行
 
