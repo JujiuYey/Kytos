@@ -24,6 +24,7 @@ import { downloadTaskImages, getReferenceData } from './assets';
 import { EXPRESSION_ASSET_DIRECTORY } from './constants';
 import { parseReferenceSelection, selectionKey } from './parsers';
 import { buildExpressionPrompt, resolveChatModel } from './prompts';
+import { buildExpressionInstructions } from './instructions';
 import {
   completeExpressionTask,
   deleteExpressionTask,
@@ -229,13 +230,7 @@ export async function generateCharacterExpressionPrompt(
     model: createChatLanguageModel(apiKey, model),
     prompt: `表情名称：${name.trim()}`,
     ...(providerOptions ? { providerOptions } : {}),
-    system: `你负责为角色表情图生图编写中文提示词。根据用户给出的表情名称，输出一段可直接编辑和用于生图的表情描述。
-
-要求：
-1. 具体描述眉毛、眼睛、视线、嘴部、面部肌肉、情绪强度以及自然的头部或上半身姿态。
-2. 不重新设计角色外形、服装和画风，这些由参考图决定。
-3. 不写尺寸、分辨率、模型名称、解释、标题、Markdown 或引号。
-4. 控制在 80 至 180 个中文字符，只输出提示词正文。`,
+    system: buildExpressionInstructions(),
   });
   const prompt = text.trim();
   if (!prompt) {

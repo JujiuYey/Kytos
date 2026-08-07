@@ -5,11 +5,18 @@ import { MAX_CHARACTER_ACTION_LENGTH } from '../../../shared/character-visual';
 
 export function buildCharacterActionPrompt(action: string): string {
   return [
-    '以参考图中的角色为唯一身份与视觉依据，生成同一个角色的全身动作视觉资产。',
-    `本次唯一允许改变的是角色姿势与肢体动作：${action.trim()}`,
-    '必须严格保持参考图中的脸部特征、面部表情、发型、身材比例、服装、鞋子、配色、配饰、绘制风格、线条、材质和细节密度完全一致。',
-    '保持单一角色、全身完整入镜和干净背景。根据动作调整身体朝向与四肢位置，但不要重新设计角色。',
-    '禁止改变外貌、表情、服装或画风；禁止新增道具、场景、其他人物、文字、Logo、水印或拼贴排版。',
+    '[TASK] 单帧静态全身动作图，与参考图同一角色、同一画风、同一身份。',
+    `[TARGET ACTION] ${action.trim()}`,
+    '',
+    '[CANVAS] 全身完整入镜，单一角色，主体居中，背景干净简单，轮廓完整。',
+    '[SUBJECT IDENTITY] 脸部特征、面部表情、发型、身材比例、服装、鞋子、配色、配饰、画风、线条、材质、细节密度严格保持与参考图一致。',
+    '[PRESERVE LIST] 修改仅限 body orientation、center of mass、torso angle、head tilt、arm position、hand gesture、leg stance、foot placement；其他一切保持。',
+    '[LIGHTING] 与参考图一致。',
+    '',
+    '[CONSTRAINTS]',
+    '- 单帧静态图，非漫画分格、非对话框、非剧情插画。',
+    '- 不重新设计角色外形、表情、服装、画风。',
+    '- 不新增道具、场景、其他人物、文字、Logo、水印、边框或拼贴排版。',
   ].join('\n');
 }
 

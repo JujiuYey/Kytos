@@ -39,6 +39,7 @@ import {
   validateVisualAssetSelection,
 } from './store';
 import { buildCharacterActionPrompt, resolveChatModel } from './prompts';
+import { buildCharacterActionInstructions } from './instructions';
 import { downloadTaskImages, readOfficialReferenceImage } from './assets';
 import type { LegacyActionRecord, LegacyReferenceBoardRecord } from './types';
 
@@ -265,13 +266,7 @@ export async function generateCharacterActionPrompt(
     model: createChatLanguageModel(apiKey, model),
     prompt: `动作名称：${request.name.trim()}`,
     ...(providerOptions ? { providerOptions } : {}),
-    system: `你负责为角色动作图生图编写中文提示词。根据用户给出的动作名称，输出一段可直接编辑和用于生图的姿势描述。
-
-要求：
-1. 只描述身体朝向、重心、躯干角度、头部角度、手臂、手势、腿部和脚步的位置关系，让姿势清晰且符合人体结构。
-2. 不描述或改变角色的外貌、面部表情、视线、发型、身材、服装、配色、配饰和绘画风格，这些全部由参考图决定。
-3. 不添加道具、场景、其他人物、文字、尺寸、分辨率或模型名称。
-4. 不写解释、标题、Markdown 或引号，控制在 80 至 180 个中文字符，只输出提示词正文。`,
+    system: buildCharacterActionInstructions(),
   });
   const prompt = text.trim();
   if (!prompt) {

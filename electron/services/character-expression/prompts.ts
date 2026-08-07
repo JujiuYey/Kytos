@@ -12,11 +12,18 @@ export function resolveChatModel(value: unknown): ChatModel {
 
 export function buildExpressionPrompt(request: GenerateCharacterExpressionRequest): string {
   return [
-    '参考图中的角色是唯一要画的人，综合所有已选参考确认角色身份、造型、表情语言和整体画风。',
-    `目标表情：${request.name.trim()}`,
-    `表情描述：${request.description.trim()}`,
-    '保持角色身份、脸型、五官、发型、服装、配饰、颜色和绘画风格与参考图一致，只改变面部表情和与情绪相符的轻微姿态。',
-    '构图以清楚展示表情为主，使用头肩像或半身像，主体居中，轮廓完整，背景干净简单。',
-    '不要添加文字、对话框、边框、Logo、水印、额外人物、重复五官或多格排版。',
+    '[TASK] 单帧静态表情图，与参考图同一角色、同一画风、同一身份。',
+    `[TARGET EMOTION] ${request.name.trim()}`,
+    `[EXPRESSION DETAILS] ${request.description.trim()}`,
+    '',
+    '[CANVAS] 头肩像或半身像，主体居中，构图以清楚展示表情为主，背景干净简单，轮廓完整。',
+    '[SUBJECT IDENTITY] 脸型、五官、发型、肤色、年龄感、服装、配饰、配色、画风与参考图严格保持一致。',
+    '[PRESERVE LIST] 修改仅限 eyebrows、eyelids、gaze direction、mouth shape、cheek tension、head tilt 与少量支撑表情的上半身姿态；其他一切保持。',
+    '[LIGHTING] 柔和正面光。',
+    '',
+    '[CONSTRAINTS]',
+    '- 单帧静态图，非漫画分格、非对话框、非剧情插画。',
+    '- 不重新设计角色外形、服装、画风、色调。',
+    '- 不输出文字、Logo、水印、边框、重复五官、额外人物或多格排版。',
   ].join('\n');
 }
