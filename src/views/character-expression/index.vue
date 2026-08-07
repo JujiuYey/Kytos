@@ -13,13 +13,13 @@ import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagMissingPrerequisiteAlert } from '@/components/sag/missing-prerequisite-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
+import { useCharacterLibraryStore } from '@/stores/character-library';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionSize,
   CharacterExpressionTask,
   CharacterExpressionTaskResult,
   CharacterExpressionWorkspaceState,
-  CharacterLibraryState,
   CharacterVisualImage,
   CharacterVisualResolution,
   CharacterVisualWorkspaceState,
@@ -43,6 +43,7 @@ import { toErrorMessage } from '@/utils/helpers';
 import { ACTIVE_STATUSES, REFERENCE_FILTERS } from './constants/index';
 
 const appStore = useAppStore();
+const characterLibraryStore = useCharacterLibraryStore();
 const router = useRouter();
 
 const { uploadDialogOpen, openUploadDialog } = useUpload();
@@ -55,12 +56,31 @@ const {
   refresh: refreshCredentialStatus,
 } = useCredentialStatus();
 
-const library = ref<CharacterLibraryState | null>(null);
+const errorMessage = ref('');
+const isInitializing = ref(true);
+
+// 角色选择
+const characters = computed(() => characterLibraryStore.characters);
 const selectedCharacterId = ref('');
+
+function selectCharacter(characterId: string): void {
+  if (
+    characterSelectionDisabled.value ||
+    characterId === selectedCharacterId.value ||
+    !characters.value.some(character => character.id === characterId)
+  ) {
+    return;
+  }
+  selectedCharacterId.value = characterId;
+  resetReferences();
+  void loadExpressionPageData(characterId);
+}
+
+// 角色工作区
 const records = ref<CharacterExpressionRecord[]>([]);
 const tasks = ref<CharacterExpressionTask[]>([]);
-
 const visualWorkspace = ref<CharacterVisualWorkspaceState | null>(null);
+let loadRequestId = 0;
 
 const {
   hasReferences,
@@ -72,36 +92,82 @@ const {
   selectReferenceAssets,
 } = useExpressionReferences({ records, visualWorkspace });
 
-const { deleteDialogOpen, deleteExpression, deletingFileName, requestDelete } = useExpressionDelete(
-  {
-    characterId: selectedCharacterId,
-    onDeleted(nextRecords) {
-      records.value = nextRecords;
-    },
-  },
-);
-const { searchQuery, filteredRecords, filteredTasks, cleanQuery } = useExpressionSearch({
-  records,
-  tasks,
-});
-const { renameDialogOpen, renameExpression, renameTarget, renamingTaskId, requestRename } =
-  useExpressionRename({
-    characterId: selectedCharacterId,
-    onRenamed(nextRecords) {
-      records.value = nextRecords;
-    },
-  });
+function replaceRecord(updatedRecord: CharacterExpressionRecord): void {
+  records.value = [
+    updatedRecord,
+    ...records.value.filter(record => record.id !== updatedRecord.id),
+  ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
 
-const name = ref('');
-const description = ref('');
-const size = ref<CharacterExpressionSize>('1:1');
-const resolution = ref<CharacterVisualResolution>('1k');
-const count = ref(2);
-const errorMessage = ref('');
-const isInitializing = ref(true);
-const isSubmitting = ref(false);
-const isGeneratingPrompt = ref(false);
+function replaceTask(updatedTask: CharacterExpressionTask): void {
+  tasks.value = [updatedTask, ...tasks.value.filter(task => task.id !== updatedTask.id)].sort(
+    (left, right) => right.createdAt.localeCompare(left.createdAt),
+  );
+}
 
+function removeTask(taskId: string): void {
+  tasks.value = tasks.value.filter(task => task.id !== taskId);
+}
+
+function applyExpressionPageData(
+  expressionWorkspace: CharacterExpressionWorkspaceState,
+  currentVisualWorkspace: CharacterVisualWorkspaceState,
+): void {
+  records.value = expressionWorkspace.records;
+  tasks.value = expressionWorkspace.tasks;
+  visualWorkspace.value = currentVisualWorkspace;
+  resetReferences();
+
+  const latestGeneratedRecord = expressionWorkspace.records.find(
+    record => record.source === 'generated',
+  );
+  name.value = '';
+  description.value = '';
+  size.value = latestGeneratedRecord?.size ?? '1:1';
+  resolution.value = latestGeneratedRecord?.resolution ?? '1k';
+  count.value = latestGeneratedRecord?.count ?? 2;
+
+  if (activeTask.value) {
+    openGenerator();
+    schedulePoll({
+      characterId: selectedCharacterId.value,
+      taskId: activeTask.value.id,
+    });
+  }
+}
+
+async function loadExpressionPageData(characterId: string): Promise<void> {
+  const requestId = ++loadRequestId;
+  resetPolling();
+  isInitializing.value = true;
+  errorMessage.value = '';
+  records.value = [];
+  tasks.value = [];
+  visualWorkspace.value = null;
+  resetReferences();
+
+  try {
+    const [expressionWorkspace, currentVisualWorkspace] = await Promise.all([
+      window.desktop.character.expression.getCharacterExpressionWorkspace({ characterId }),
+      window.desktop.character.assets.getCharacterVisualWorkspace({ characterId }),
+    ]);
+    if (requestId !== loadRequestId || selectedCharacterId.value !== characterId) {
+      return;
+    }
+    applyExpressionPageData(expressionWorkspace, currentVisualWorkspace);
+  } catch (initializationError: unknown) {
+    if (requestId !== loadRequestId) {
+      return;
+    }
+    errorMessage.value = toErrorMessage(initializationError);
+  } finally {
+    if (requestId === loadRequestId) {
+      isInitializing.value = false;
+    }
+  }
+}
+
+// 表情任务
 interface ExpressionPollingTarget {
   characterId: string;
   taskId: string;
@@ -148,20 +214,27 @@ const pollingState = computed<GenerationTaskPollingState>(() => {
   return entry ? { phase: entry[1].phase, taskId: entry[0] } : { phase: 'idle', taskId: '' };
 });
 const isPolling = computed(() => pollingState.value.phase === 'requesting');
-
-provideExpressionRecords({
-  deletingFileName,
-  editExpression,
-  pollingState,
-  renamingTaskId,
-  requestDelete,
-  requestRename,
-});
-
-let loadRequestId = 0;
-
-const characters = computed(() => library.value?.characters ?? []);
 const activeTask = computed(() => tasks.value.find(task => ACTIVE_STATUSES.includes(task.status)));
+
+function retryPolling(): void {
+  if (!activeTask.value || isPolling.value) {
+    return;
+  }
+  errorMessage.value = '';
+  void pollExpressionTask({
+    characterId: selectedCharacterId.value,
+    taskId: activeTask.value.id,
+  });
+}
+
+// 表情生成器
+const name = ref('');
+const description = ref('');
+const size = ref<CharacterExpressionSize>('1:1');
+const resolution = ref<CharacterVisualResolution>('1k');
+const count = ref(1);
+const isSubmitting = ref(false);
+const isGeneratingPrompt = ref(false);
 const keyConfigured = apimartConfigured;
 const fastModelProvider = computed(
   () => getChatModelDefinition(appStore.settings.fastModel).provider,
@@ -170,14 +243,6 @@ const promptGenerationAvailable = computed(() =>
   fastModelProvider.value === 'minimax' ? minimaxConfigured.value : deepseekConfigured.value,
 );
 const isBusy = computed(() => isSubmitting.value || Boolean(activeTask.value));
-const characterSelectionDisabled = computed(
-  () =>
-    isInitializing.value ||
-    isSubmitting.value ||
-    isGeneratingPrompt.value ||
-    Boolean(deletingFileName.value) ||
-    Boolean(renamingTaskId.value),
-);
 const isGenerateDisabled = computed(
   () =>
     isInitializing.value ||
@@ -193,115 +258,6 @@ const isGenerateDisabled = computed(
     description.value.length > 20_000,
 );
 
-function replaceRecord(updatedRecord: CharacterExpressionRecord): void {
-  records.value = [
-    updatedRecord,
-    ...records.value.filter(record => record.id !== updatedRecord.id),
-  ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-}
-
-function replaceTask(updatedTask: CharacterExpressionTask): void {
-  tasks.value = [updatedTask, ...tasks.value.filter(task => task.id !== updatedTask.id)].sort(
-    (left, right) => right.createdAt.localeCompare(left.createdAt),
-  );
-}
-
-function removeTask(taskId: string): void {
-  tasks.value = tasks.value.filter(task => task.id !== taskId);
-}
-
-function applyExpressionPageData(
-  expressionWorkspace: CharacterExpressionWorkspaceState,
-  currentVisualWorkspace: CharacterVisualWorkspaceState,
-): void {
-  records.value = expressionWorkspace.records;
-  tasks.value = expressionWorkspace.tasks;
-  visualWorkspace.value = currentVisualWorkspace;
-  resetReferences();
-
-  const latestGeneratedRecord = expressionWorkspace.records.find(
-    record => record.source === 'generated',
-  );
-  name.value = '';
-  description.value = '';
-  size.value = latestGeneratedRecord?.size ?? '1:1';
-  resolution.value = latestGeneratedRecord?.resolution ?? '1k';
-  count.value = latestGeneratedRecord?.count ?? 2;
-
-  if (activeTask.value) {
-    openGenerator();
-    schedulePoll({
-      characterId: selectedCharacterId.value,
-      taskId: activeTask.value.id,
-    });
-  }
-}
-
-// 加载表情数据
-async function loadExpressionPageData(characterId: string): Promise<void> {
-  const requestId = ++loadRequestId;
-  resetPolling();
-  isInitializing.value = true;
-  errorMessage.value = '';
-  records.value = [];
-  tasks.value = [];
-  visualWorkspace.value = null;
-  resetReferences();
-
-  try {
-    const [expressionWorkspace, currentVisualWorkspace] = await Promise.all([
-      window.desktop.character.expression.getCharacterExpressionWorkspace({ characterId }),
-      window.desktop.character.assets.getCharacterVisualWorkspace({ characterId }),
-    ]);
-    if (requestId !== loadRequestId || selectedCharacterId.value !== characterId) {
-      return;
-    }
-    applyExpressionPageData(expressionWorkspace, currentVisualWorkspace);
-  } catch (initializationError: unknown) {
-    if (requestId !== loadRequestId) {
-      return;
-    }
-    errorMessage.value = toErrorMessage(initializationError);
-  } finally {
-    if (requestId === loadRequestId) {
-      isInitializing.value = false;
-    }
-  }
-}
-
-// 初始化
-async function initialize(): Promise<void> {
-  isInitializing.value = true;
-  errorMessage.value = '';
-  try {
-    const [characterLibrary] = await Promise.all([
-      window.desktop.character.library.getCharacterLibrary(),
-      refreshCredentialStatus(),
-    ]);
-    library.value = characterLibrary;
-    selectedCharacterId.value = characterLibrary.activeCharacterId;
-    await loadExpressionPageData(characterLibrary.activeCharacterId);
-  } catch (initializationError: unknown) {
-    errorMessage.value = toErrorMessage(initializationError);
-    isInitializing.value = false;
-  }
-}
-
-// 选择角色
-function selectCharacter(characterId: string): void {
-  if (
-    characterSelectionDisabled.value ||
-    characterId === selectedCharacterId.value ||
-    !characters.value.some(character => character.id === characterId)
-  ) {
-    return;
-  }
-  selectedCharacterId.value = characterId;
-  resetReferences();
-  void loadExpressionPageData(characterId);
-}
-
-// 生成表情
 async function generateExpression(): Promise<void> {
   const characterId = selectedCharacterId.value;
   if (isGenerateDisabled.value || !characterId) {
@@ -332,19 +288,6 @@ async function generateExpression(): Promise<void> {
   }
 }
 
-// 重试
-function retryPolling(): void {
-  if (!activeTask.value || isPolling.value) {
-    return;
-  }
-  errorMessage.value = '';
-  void pollExpressionTask({
-    characterId: selectedCharacterId.value,
-    taskId: activeTask.value.id,
-  });
-}
-
-// 生成表情提示词
 async function generateExpressionPrompt(): Promise<void> {
   if (isGeneratingPrompt.value || !promptGenerationAvailable.value || !name.value.trim()) {
     return;
@@ -365,7 +308,36 @@ async function generateExpressionPrompt(): Promise<void> {
   }
 }
 
-// 编辑表情
+// 资产操作
+const { deleteDialogOpen, deleteExpression, deletingFileName, requestDelete } = useExpressionDelete(
+  {
+    characterId: selectedCharacterId,
+    onDeleted(nextRecords) {
+      records.value = nextRecords;
+    },
+  },
+);
+const { renameDialogOpen, renameExpression, renameTarget, renamingTaskId, requestRename } =
+  useExpressionRename({
+    characterId: selectedCharacterId,
+    onRenamed(nextRecords) {
+      records.value = nextRecords;
+    },
+  });
+const { searchQuery, filteredRecords, filteredTasks, cleanQuery } = useExpressionSearch({
+  records,
+  tasks,
+});
+
+const characterSelectionDisabled = computed(
+  () =>
+    isInitializing.value ||
+    isSubmitting.value ||
+    isGeneratingPrompt.value ||
+    Boolean(deletingFileName.value) ||
+    Boolean(renamingTaskId.value),
+);
+
 function editExpression(record: CharacterExpressionRecord, image: CharacterVisualImage): void {
   void router.push({
     name: 'image-editor',
@@ -378,7 +350,6 @@ function editExpression(record: CharacterExpressionRecord, image: CharacterVisua
   });
 }
 
-// 上传后刷新
 async function refreshExpressionsAfterUpload(): Promise<void> {
   try {
     const workspace = await window.desktop.character.expression.getCharacterExpressionWorkspace({
@@ -389,6 +360,33 @@ async function refreshExpressionsAfterUpload(): Promise<void> {
     toast.success('表情已上传并保存到工作区');
   } catch (uploadError: unknown) {
     toast.error(toErrorMessage(uploadError));
+  }
+}
+
+provideExpressionRecords({
+  deletingFileName,
+  editExpression,
+  pollingState,
+  renamingTaskId,
+  requestDelete,
+  requestRename,
+});
+
+// 页面初始化
+async function initialize(): Promise<void> {
+  isInitializing.value = true;
+  errorMessage.value = '';
+  try {
+    await Promise.all([characterLibraryStore.initialize(), refreshCredentialStatus()]);
+    const initialCharacterId = characterLibraryStore.characters[0]?.id ?? '';
+    if (!initialCharacterId) {
+      throw new Error('请先创建角色');
+    }
+    selectedCharacterId.value = initialCharacterId;
+    await loadExpressionPageData(initialCharacterId);
+  } catch (initializationError: unknown) {
+    errorMessage.value = toErrorMessage(initializationError);
+    isInitializing.value = false;
   }
 }
 

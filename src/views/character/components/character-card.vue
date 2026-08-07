@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { Camera, Check, ImagePlus, Pencil, Trash2, UserRound } from '@lucide/vue';
+import { Camera, ImagePlus, Pencil, Trash2, UserRound } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Button } from '@/components/ui/button';
-import { SagStatusBadge } from '@/components/sag/status-badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { CharacterVisualSize, CharacterLibraryCharacter } from '@/types';
 
@@ -20,7 +19,6 @@ function getVisualAssetAspectClass(size: CharacterVisualSize): string {
 
 defineProps<{
   character: CharacterLibraryCharacter;
-  isActive: boolean;
   busy: boolean;
 }>();
 
@@ -76,10 +74,6 @@ defineEmits<{
             }}
           </p>
         </div>
-        <SagStatusBadge v-if="isActive" tone="success" class="shrink-0">
-          <Check class="size-3" />
-          当前角色
-        </SagStatusBadge>
       </div>
 
       <div class="flex items-center justify-between gap-2">

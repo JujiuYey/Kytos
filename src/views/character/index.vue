@@ -9,30 +9,25 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
-import type { CharacterLibraryCharacter, CharacterLibraryState, CharacterSummary } from '@/types';
+import { useCharacterLibraryStore } from '@/stores/character-library';
+import type { CharacterLibraryCharacter, CharacterSummary } from '@/types';
 import CharacterCard from './components/character-card.vue';
 import CharacterCardSkeleton from './components/character-card-skeleton.vue';
 import CharacterRenameDialog from './components/character-rename-dialog.vue';
 
 const router = useRouter();
+const characterLibraryStore = useCharacterLibraryStore();
 
-const library = ref<CharacterLibraryState | null>(null);
-const characters = computed(() => library.value?.characters ?? []);
+const characters = computed(() => characterLibraryStore.characters);
 const busy = ref(false);
 
-const loading = ref(true);
-const errorMessage = ref('');
+const loading = computed(
+  () => characterLibraryStore.isLoading || !characterLibraryStore.isInitialized,
+);
+const errorMessage = computed(() => characterLibraryStore.errorMessage);
 
 async function loadLibrary(): Promise<void> {
-  loading.value = true;
-  errorMessage.value = '';
-  try {
-    library.value = await window.desktop.character.library.getCharacterLibrary();
-  } catch (error: unknown) {
-    errorMessage.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    loading.value = false;
-  }
+  await characterLibraryStore.refresh().catch(() => undefined);
 }
 
 onMounted(() => {
@@ -57,7 +52,7 @@ async function submitCharacterRename(name: string): Promise<void> {
   if (!target) return;
   busy.value = true;
   try {
-    library.value = await window.desktop.character.library.updateCharacter({
+    await characterLibraryStore.updateCharacter({
       characterId: target.id,
       name,
     });
@@ -76,12 +71,9 @@ async function openCharacterVisual(character: CharacterLibraryCharacter): Promis
   }
   busy.value = true;
   try {
-    library.value = await window.desktop.character.library.selectCharacter({
-      characterId: character.id,
-    });
     await router.push(
       character.visualAsset
-        ? { name: 'character-visual' }
+        ? { name: 'character-visual', query: { characterId: character.id } }
         : { name: 'character-create', query: { characterId: character.id } },
     );
   } catch (error: unknown) {
@@ -104,7 +96,7 @@ async function confirmDelete(): Promise<void> {
   }
   busy.value = true;
   try {
-    library.value = await window.desktop.character.library.deleteCharacter({
+    await characterLibraryStore.deleteCharacter({
       characterId: target.id,
     });
     deleteTarget.value = null;
@@ -151,7 +143,6 @@ async function confirmDelete(): Promise<void> {
           :key="character.id"
           :busy="busy"
           :character="character"
-          :is-active="library?.activeCharacterId === character.id"
           @open-visual="openCharacterVisual"
           @rename="renameCharacter"
           @request-delete="requestDelete"

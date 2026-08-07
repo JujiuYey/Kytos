@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { AlertCircle, Camera } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -15,8 +15,8 @@ import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagMissingPrerequisiteAlert } from '@/components/sag/missing-prerequisite-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
+import { useCharacterLibraryStore } from '@/stores/character-library';
 import type {
-  CharacterLibraryState,
   CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
   CharacterVisualImage,
@@ -40,83 +40,35 @@ interface ActionReferenceOption extends ImageReferencePickerOption {
 }
 
 const appStore = useAppStore();
+const characterLibraryStore = useCharacterLibraryStore();
+const route = useRoute();
 const router = useRouter();
-const library = ref<CharacterLibraryState | null>(null);
+
+// 角色选择
 const selectedCharacterId = ref('');
-const credentialStatus = ref<CredentialStatus | null>(null);
-const deepseekStatus = ref<CredentialStatus | null>(null);
-const minimaxStatus = ref<CredentialStatus | null>(null);
+const characters = computed(() => characterLibraryStore.characters);
+
+// 视觉工作区
 const records = ref<CharacterVisualAssetRecord[]>([]);
 const officialAssets = ref<CharacterVisualAssetSelection[]>([]);
-const action = ref('自然站立，抬起右手挥手，左手自然垂下。');
-const imageName = ref('挥手');
-const size = ref<CharacterVisualSize>('2:3');
-const resolution = ref<CharacterVisualResolution>('1k');
-const count = ref(2);
 const errorMessage = ref('');
 const isInitializing = ref(true);
-const isSubmitting = ref(false);
-const isPolling = ref(false);
-const isGeneratingPrompt = ref(false);
-const pollingState = ref<GenerationTaskPollingState>({ phase: 'idle', taskId: '' });
-const selectingFileName = ref('');
-const deletingFileName = ref('');
-const deleteDialogOpen = ref(false);
-const deleteTarget = ref<{
-  image: CharacterVisualImage;
-  record: CharacterVisualAssetRecord;
-} | null>(null);
-const { openUploadDialog, uploadDialogOpen } = useCharacterVisualUpload();
-const { renameAsset, renameDialogOpen, renamingFileName, renameTarget, requestRename } =
-  useCharacterVisualRename({
-    onRenamed(nextRecords) {
-      records.value = nextRecords;
-    },
-  });
-const referenceDialogOpen = ref(false);
-const selectedReferenceAsset = ref<CharacterVisualAssetSelection | null>(null);
-
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
-let isDisposed = false;
-let loadRequestId = 0;
 
 const activeStatuses = ['submitted', 'pending', 'processing'];
-const characters = computed(() => library.value?.characters ?? []);
 const activeRecord = computed(() =>
   records.value.find(record => activeStatuses.includes(record.status)),
-);
-const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
-const fastModelProvider = computed(
-  () => getChatModelDefinition(appStore.settings.fastModel).provider,
-);
-const promptGenerationAvailable = computed(() =>
-  fastModelProvider.value === 'minimax'
-    ? Boolean(minimaxStatus.value?.configured)
-    : Boolean(deepseekStatus.value?.configured),
-);
-const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
-const characterSelectionDisabled = computed(
-  () =>
-    isInitializing.value ||
-    isBusy.value ||
-    isGeneratingPrompt.value ||
-    Boolean(selectingFileName.value) ||
-    Boolean(renamingFileName.value) ||
-    Boolean(deletingFileName.value),
-);
-const operationDisabled = computed(
-  () =>
-    isInitializing.value ||
-    isBusy.value ||
-    isGeneratingPrompt.value ||
-    !selectedCharacterId.value ||
-    Boolean(selectingFileName.value) ||
-    Boolean(renamingFileName.value) ||
-    Boolean(deletingFileName.value),
 );
 const assetCount = computed(() =>
   records.value.reduce((total, record) => total + record.images.length, 0),
 );
+
+// 参考资产
+const selectedReferenceAsset = ref<CharacterVisualAssetSelection | null>(null);
+
+function referenceAssetKey(selection: CharacterVisualAssetSelection): string {
+  return `${selection.taskId}:${selection.fileName}`;
+}
+
 const referenceOptions = computed<ActionReferenceOption[]>(() =>
   officialAssets.value.flatMap(selection => {
     const record = records.value.find(item => item.id === selection.taskId);
@@ -142,22 +94,6 @@ const selectedReferenceOptions = computed(() => {
   return selectedKey ? referenceOptions.value.filter(option => option.key === selectedKey) : [];
 });
 const hasOfficialReference = computed(() => referenceOptions.value.length > 0);
-const isGenerateDisabled = computed(
-  () =>
-    isInitializing.value ||
-    isBusy.value ||
-    isGeneratingPrompt.value ||
-    !selectedCharacterId.value ||
-    !keyConfigured.value ||
-    !selectedReferenceAsset.value ||
-    !imageName.value.trim() ||
-    imageName.value.length > 80 ||
-    !action.value.trim() ||
-    action.value.length > MAX_CHARACTER_ACTION_LENGTH,
-);
-function referenceAssetKey(selection: CharacterVisualAssetSelection): string {
-  return `${selection.taskId}:${selection.fileName}`;
-}
 
 function syncSelectedReference(preferred?: CharacterVisualAssetSelection | null): void {
   const availableKeys = new Set(referenceOptions.value.map(option => option.key));
@@ -179,25 +115,14 @@ function selectReferenceAsset(keys: string[]): void {
     referenceOptions.value.find(option => option.key === keys[0])?.selection ?? null;
 }
 
-function replaceRecord<TRecord extends CharacterVisualAssetRecord>(
-  recordList: TRecord[],
-  updatedRecord: TRecord,
-): TRecord[] {
-  return [updatedRecord, ...recordList.filter(record => record.id !== updatedRecord.id)].sort(
-    (left, right) => right.createdAt.localeCompare(left.createdAt),
-  );
-}
+// 任务轮询
+const isPolling = ref(false);
+const pollingState = ref<GenerationTaskPollingState>({ phase: 'idle', taskId: '' });
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let isDisposed = false;
+let loadRequestId = 0;
 
-function applyWorkspace(
-  workspace: CharacterVisualWorkspaceState,
-  preferredReference?: CharacterVisualAssetSelection | null,
-) {
-  officialAssets.value = workspace.officialAssets;
-  records.value = workspace.records;
-  syncSelectedReference(preferredReference);
-}
-
-function clearPollTimer() {
+function clearPollTimer(): void {
   if (pollTimer) {
     clearTimeout(pollTimer);
     pollTimer = null;
@@ -208,7 +133,7 @@ function resetPollingState(): void {
   pollingState.value = { phase: 'idle', taskId: '' };
 }
 
-function schedulePoll(taskId: string) {
+function schedulePoll(taskId: string): void {
   clearPollTimer();
   pollingState.value = {
     phase: 'waiting',
@@ -219,7 +144,7 @@ function schedulePoll(taskId: string) {
   }, 2500);
 }
 
-async function pollVisualTask(taskId: string) {
+async function pollVisualTask(taskId: string): Promise<void> {
   if (isDisposed) {
     return;
   }
@@ -248,6 +173,156 @@ async function pollVisualTask(taskId: string) {
   } finally {
     isPolling.value = false;
   }
+}
+
+function retryPolling(): void {
+  if (!activeRecord.value || isPolling.value) {
+    return;
+  }
+  errorMessage.value = '';
+  void pollVisualTask(activeRecord.value.id);
+}
+
+// 生成器
+const action = ref('自然站立，抬起右手挥手，左手自然垂下。');
+const imageName = ref('挥手');
+const size = ref<CharacterVisualSize>('2:3');
+const resolution = ref<CharacterVisualResolution>('1k');
+const count = ref(2);
+const isSubmitting = ref(false);
+const isGeneratingPrompt = ref(false);
+
+const credentialStatus = ref<CredentialStatus | null>(null);
+const deepseekStatus = ref<CredentialStatus | null>(null);
+const minimaxStatus = ref<CredentialStatus | null>(null);
+
+const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
+const fastModelProvider = computed(
+  () => getChatModelDefinition(appStore.settings.fastModel).provider,
+);
+const promptGenerationAvailable = computed(() =>
+  fastModelProvider.value === 'minimax'
+    ? Boolean(minimaxStatus.value?.configured)
+    : Boolean(deepseekStatus.value?.configured),
+);
+
+async function generateActions(): Promise<void> {
+  const referenceAsset = selectedReferenceAsset.value;
+  if (isGenerateDisabled.value || !referenceAsset) {
+    return;
+  }
+  isSubmitting.value = true;
+  errorMessage.value = '';
+  try {
+    const record = await window.desktop.character.assets.generateCharacterAction({
+      action: action.value.trim(),
+      count: count.value,
+      name: imageName.value.trim(),
+      referenceAsset: { ...referenceAsset },
+      resolution: resolution.value,
+      size: size.value,
+    });
+    records.value = replaceRecord(records.value, record);
+    await pollVisualTask(record.id);
+  } catch (generationError: unknown) {
+    errorMessage.value =
+      generationError instanceof Error ? generationError.message : String(generationError);
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+async function generateActionPrompt(): Promise<void> {
+  if (isGeneratingPrompt.value || !promptGenerationAvailable.value || !imageName.value.trim()) {
+    return;
+  }
+  isGeneratingPrompt.value = true;
+  try {
+    action.value = await window.desktop.character.assets.generateCharacterActionPrompt({
+      model: appStore.settings.fastModel,
+      name: imageName.value.trim(),
+    });
+    toast.success('动作提示词已生成');
+  } catch (promptError: unknown) {
+    toast.error(promptError instanceof Error ? promptError.message : String(promptError));
+  } finally {
+    isGeneratingPrompt.value = false;
+  }
+}
+
+// 资产操作
+const selectingFileName = ref('');
+const deletingFileName = ref('');
+const deleteDialogOpen = ref(false);
+const deleteTarget = ref<{
+  image: CharacterVisualImage;
+  record: CharacterVisualAssetRecord;
+} | null>(null);
+const referenceDialogOpen = ref(false);
+const { openUploadDialog, uploadDialogOpen } = useCharacterVisualUpload();
+const { renameAsset, renameDialogOpen, renamingFileName, renameTarget, requestRename } =
+  useCharacterVisualRename({
+    onRenamed(nextRecords) {
+      records.value = nextRecords;
+    },
+  });
+
+const isBusy = computed(() => isSubmitting.value || Boolean(activeRecord.value));
+const characterSelectionDisabled = computed(
+  () =>
+    isInitializing.value ||
+    isBusy.value ||
+    isGeneratingPrompt.value ||
+    Boolean(selectingFileName.value) ||
+    Boolean(renamingFileName.value) ||
+    Boolean(deletingFileName.value),
+);
+const operationDisabled = computed(
+  () =>
+    isInitializing.value ||
+    isBusy.value ||
+    isGeneratingPrompt.value ||
+    !selectedCharacterId.value ||
+    Boolean(selectingFileName.value) ||
+    Boolean(renamingFileName.value) ||
+    Boolean(deletingFileName.value),
+);
+const isGenerateDisabled = computed(
+  () =>
+    isInitializing.value ||
+    isBusy.value ||
+    isGeneratingPrompt.value ||
+    !selectedCharacterId.value ||
+    !keyConfigured.value ||
+    !selectedReferenceAsset.value ||
+    !imageName.value.trim() ||
+    imageName.value.length > 80 ||
+    !action.value.trim() ||
+    action.value.length > MAX_CHARACTER_ACTION_LENGTH,
+);
+
+const { closeGenerator, generatorOpen, openGenerator } = useCharacterVisualGenerator({
+  disabled: operationDisabled,
+  onOpen: refreshVisualWorkspace,
+});
+
+// 工作区加载
+function replaceRecord<TRecord extends CharacterVisualAssetRecord>(
+  recordList: TRecord[],
+  updatedRecord: TRecord,
+): TRecord[] {
+  return [updatedRecord, ...recordList.filter(record => record.id !== updatedRecord.id)].sort(
+    (left, right) => right.createdAt.localeCompare(left.createdAt),
+  );
+}
+
+function applyWorkspace(
+  workspace: CharacterVisualWorkspaceState,
+  preferredReference?: CharacterVisualAssetSelection | null,
+): void {
+  officialAssets.value = workspace.officialAssets;
+  records.value = workspace.records;
+  syncSelectedReference(preferredReference);
 }
 
 function applyCharacterWorkspace(visualWorkspace: CharacterVisualWorkspaceState): void {
@@ -302,29 +377,16 @@ async function loadCharacterWorkspace(characterId: string): Promise<void> {
   }
 }
 
-async function initialize(): Promise<void> {
-  isInitializing.value = true;
-  errorMessage.value = '';
+async function refreshVisualWorkspace(): Promise<void> {
   try {
-    const [characterLibrary, status, deepseek, minimax] = await Promise.all([
-      window.desktop.character.library.getCharacterLibrary(),
-      window.desktop.settings.getCredentialStatus('apimart'),
-      window.desktop.settings.getCredentialStatus('deepseek'),
-      window.desktop.settings.getCredentialStatus('minimax'),
-    ]);
-    library.value = characterLibrary;
-    credentialStatus.value = status;
-    deepseekStatus.value = deepseek;
-    minimaxStatus.value = minimax;
-    selectedCharacterId.value = characterLibrary.activeCharacterId;
-    await loadCharacterWorkspace(characterLibrary.activeCharacterId);
-  } catch (initializationError: unknown) {
+    applyWorkspace(
+      await window.desktop.character.assets.getCharacterVisualWorkspace({
+        characterId: selectedCharacterId.value,
+      }),
+    );
+  } catch (refreshError: unknown) {
     errorMessage.value =
-      initializationError instanceof Error
-        ? initializationError.message
-        : String(initializationError);
-  } finally {
-    isInitializing.value = false;
+      refreshError instanceof Error ? refreshError.message : String(refreshError);
   }
 }
 
@@ -339,7 +401,7 @@ async function selectCharacter(characterId: string): Promise<void> {
   isInitializing.value = true;
   errorMessage.value = '';
   try {
-    library.value = await window.desktop.character.library.selectCharacter({ characterId });
+    await window.desktop.character.library.selectCharacter({ characterId });
     selectedCharacterId.value = characterId;
     await loadCharacterWorkspace(characterId);
   } catch (selectionError: unknown) {
@@ -349,76 +411,11 @@ async function selectCharacter(characterId: string): Promise<void> {
   }
 }
 
-async function generateActions() {
-  const referenceAsset = selectedReferenceAsset.value;
-  if (isGenerateDisabled.value || !referenceAsset) {
-    return;
-  }
-  isSubmitting.value = true;
-  errorMessage.value = '';
-  try {
-    const record = await window.desktop.character.assets.generateCharacterAction({
-      action: action.value.trim(),
-      count: count.value,
-      name: imageName.value.trim(),
-      referenceAsset: { ...referenceAsset },
-      resolution: resolution.value,
-      size: size.value,
-    });
-    records.value = replaceRecord(records.value, record);
-    await pollVisualTask(record.id);
-  } catch (generationError: unknown) {
-    errorMessage.value =
-      generationError instanceof Error ? generationError.message : String(generationError);
-  } finally {
-    isSubmitting.value = false;
-  }
-}
-
-async function generateActionPrompt(): Promise<void> {
-  if (isGeneratingPrompt.value || !promptGenerationAvailable.value || !imageName.value.trim()) {
-    return;
-  }
-  isGeneratingPrompt.value = true;
-  try {
-    action.value = await window.desktop.character.assets.generateCharacterActionPrompt({
-      model: appStore.settings.fastModel,
-      name: imageName.value.trim(),
-    });
-    toast.success('动作提示词已生成');
-  } catch (promptError: unknown) {
-    toast.error(promptError instanceof Error ? promptError.message : String(promptError));
-  } finally {
-    isGeneratingPrompt.value = false;
-  }
-}
-
-function retryPolling() {
-  if (!activeRecord.value || isPolling.value) {
-    return;
-  }
-  errorMessage.value = '';
-  void pollVisualTask(activeRecord.value.id);
-}
-
-async function refreshVisualWorkspace(): Promise<void> {
-  try {
-    applyWorkspace(
-      await window.desktop.character.assets.getCharacterVisualWorkspace({
-        characterId: selectedCharacterId.value,
-      }),
-    );
-  } catch (refreshError: unknown) {
-    errorMessage.value =
-      refreshError instanceof Error ? refreshError.message : String(refreshError);
-  }
-}
-
 async function selectAsset(
   record: CharacterVisualAssetRecord,
   image: CharacterVisualImage,
   official: boolean,
-) {
+): Promise<void> {
   if (selectingFileName.value || deletingFileName.value) {
     return;
   }
@@ -438,7 +435,7 @@ async function selectAsset(
   }
 }
 
-function requestDelete(record: CharacterVisualAssetRecord, image: CharacterVisualImage) {
+function requestDelete(record: CharacterVisualAssetRecord, image: CharacterVisualImage): void {
   if (selectingFileName.value || deletingFileName.value) {
     return;
   }
@@ -458,7 +455,7 @@ function editImage(record: CharacterVisualAssetRecord, image: CharacterVisualIma
   });
 }
 
-async function deleteAsset() {
+async function deleteAsset(): Promise<void> {
   if (!deleteTarget.value || deletingFileName.value) {
     return;
   }
@@ -480,7 +477,7 @@ async function deleteAsset() {
   }
 }
 
-function openUpload() {
+function openUpload(): void {
   if (operationDisabled.value) {
     return;
   }
@@ -488,7 +485,7 @@ function openUpload() {
   openUploadDialog();
 }
 
-async function handleUploaded() {
+async function handleUploaded(): Promise<void> {
   try {
     applyWorkspace(
       await window.desktop.character.assets.getCharacterVisualWorkspace({
@@ -501,10 +498,42 @@ async function handleUploaded() {
   }
 }
 
-const { closeGenerator, generatorOpen, openGenerator } = useCharacterVisualGenerator({
-  disabled: operationDisabled,
-  onOpen: refreshVisualWorkspace,
-});
+// 页面初始化
+async function initialize(): Promise<void> {
+  isInitializing.value = true;
+  errorMessage.value = '';
+  try {
+    await characterLibraryStore.initialize();
+    const [status, deepseek, minimax] = await Promise.all([
+      window.desktop.settings.getCredentialStatus('apimart'),
+      window.desktop.settings.getCredentialStatus('deepseek'),
+      window.desktop.settings.getCredentialStatus('minimax'),
+    ]);
+    credentialStatus.value = status;
+    deepseekStatus.value = deepseek;
+    minimaxStatus.value = minimax;
+    const requestedCharacterId =
+      typeof route.query.characterId === 'string' ? route.query.characterId : '';
+    const initialCharacterId =
+      characterLibraryStore.characters.find(character => character.id === requestedCharacterId)
+        ?.id ??
+      characterLibraryStore.characters[0]?.id ??
+      '';
+    if (!initialCharacterId) {
+      throw new Error('请先创建角色');
+    }
+    await window.desktop.character.library.selectCharacter({ characterId: initialCharacterId });
+    selectedCharacterId.value = initialCharacterId;
+    await loadCharacterWorkspace(initialCharacterId);
+  } catch (initializationError: unknown) {
+    errorMessage.value =
+      initializationError instanceof Error
+        ? initializationError.message
+        : String(initializationError);
+  } finally {
+    isInitializing.value = false;
+  }
+}
 
 onMounted(() => {
   void initialize();

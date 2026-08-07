@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SagPage } from '@/components/sag/sag-page';
 import { useAppStore } from '@/stores/app';
+import { useCharacterLibraryStore } from '@/stores/character-library';
 import type {
   CharacterCreateAgentMessage,
   CharacterVisualImage,
@@ -44,6 +45,7 @@ import {
 const route = useRoute();
 const router = useRouter();
 const appStore = useAppStore();
+const characterLibraryStore = useCharacterLibraryStore();
 const currentStep = ref<Step>(1);
 const furthestStep = ref<Step>(1);
 const selectedStyle = ref<StyleId | null>(null);
@@ -402,17 +404,12 @@ async function saveCharacterSummary(
   if (isSavingSummary.value) return;
   isSavingSummary.value = true;
   try {
-    const library = summaryTargetId.value
-      ? await window.desktop.character.library.updateCharacter({
+    const character = summaryTargetId.value
+      ? await characterLibraryStore.updateCharacter({
           characterId: summaryTargetId.value,
           name,
         })
-      : await window.desktop.character.library.createCharacter({ name });
-    const id = summaryTargetId.value || library.activeCharacterId;
-    const character = library.characters.find(item => item.id === id);
-    if (!character) {
-      throw new Error('角色概要创建失败');
-    }
+      : await characterLibraryStore.createCharacter({ name });
     summaryTargetId.value = character.id;
     summaryInitialName.value = character.name;
 
@@ -444,26 +441,25 @@ async function saveCharacterSummary(
 async function initialize(): Promise<void> {
   try {
     if (!characterId.value) {
-      const library = await window.desktop.character.library.getCharacterLibrary();
-      const activeCharacter = isNewCharacterRequested.value
+      await characterLibraryStore.initialize();
+      const existingCharacter = isNewCharacterRequested.value
         ? undefined
-        : library.characters.find(character => character.id === library.activeCharacterId);
-      if (activeCharacter && !activeCharacter.visualAsset) {
-        summaryTargetId.value = activeCharacter.id;
-        summaryInitialName.value = activeCharacter.name;
+        : characterLibraryStore.characters.find(character => !character.visualAsset);
+      if (existingCharacter) {
+        summaryTargetId.value = existingCharacter.id;
+        summaryInitialName.value = existingCharacter.name;
       }
       needsSummary.value = true;
       return;
     }
-    const library = await window.desktop.character.library.getCharacterLibrary();
-    const character = library.characters.find(item => item.id === characterId.value);
+    await characterLibraryStore.initialize();
+    const character = characterLibraryStore.characters.find(item => item.id === characterId.value);
     if (!character) {
       throw new Error('未找到这个角色');
     }
-    await window.desktop.character.library.selectCharacter({ characterId: character.id });
     if (character.visualAsset) {
       toast.info('这个角色已经有正式视觉，请在角色视觉中继续管理');
-      await router.replace({ name: 'character-visual' });
+      await router.replace({ name: 'character-visual', query: { characterId: character.id } });
       return;
     }
     characterName.value = character.name;
