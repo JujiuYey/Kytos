@@ -8,12 +8,15 @@ import type { ChatModel } from '../../../shared/chat-model';
 import {
   MAX_ILLUSTRATION_REFERENCE_IMAGES,
   type IllustrationReference,
+  type IllustrationVersionReference,
 } from '../../../shared/illustration';
 import { getCredentialValue } from '../../services/credentials';
 import {
   getIllustrationTopic,
   illustrationReferenceKey,
+  parseVersionReference,
   parseIllustrationReferences,
+  resolveIllustrationVersionReference,
   resolveTopicIllustrationReferences,
 } from '../../services/illustration';
 import { createIllustrationAgent } from './agent';
@@ -23,6 +26,7 @@ interface IllustrationAgentRequestBody {
   messages: unknown[];
   model?: ChatModel;
   references: IllustrationReference[];
+  revisionBase: IllustrationVersionReference | null;
   topicId: string;
 }
 
@@ -57,7 +61,12 @@ function parseRequestBody(value: unknown): IllustrationAgentRequestBody {
   if (!Array.isArray(rawReferences) || references.length !== rawReferences.length) {
     throw new Error('插画参考图无效');
   }
-  return { messages, model: model || undefined, references, topicId };
+  const rawRevisionBase = 'revisionBase' in value ? value.revisionBase : null;
+  const revisionBase = rawRevisionBase === null ? null : parseVersionReference(rawRevisionBase);
+  if (rawRevisionBase !== null && !revisionBase) {
+    throw new Error('插画调整版本无效');
+  }
+  return { messages, model: model || undefined, references, revisionBase, topicId };
 }
 
 function errorResponse(error: unknown): Response {
@@ -71,6 +80,7 @@ function errorResponse(error: unknown): Response {
 function attachTopicReferences(
   messages: unknown[],
   references: Awaited<ReturnType<typeof resolveTopicIllustrationReferences>>,
+  revisionBase: Awaited<ReturnType<typeof resolveIllustrationVersionReference>> | null,
 ): unknown[] {
   const nextMessages = messages.map(message => {
     if (!isPlainObject(message) || !Array.isArray(message.parts)) return message;
@@ -79,7 +89,7 @@ function attachTopicReferences(
       parts: message.parts.filter(part => !isPlainObject(part) || part.type !== 'file'),
     };
   });
-  if (!references.length) return nextMessages;
+  if (!references.length && !revisionBase) return nextMessages;
   const lastUserMessage = [...nextMessages]
     .reverse()
     .find(
@@ -90,6 +100,16 @@ function attachTopicReferences(
   }
   lastUserMessage.parts = [
     ...lastUserMessage.parts,
+    ...(revisionBase
+      ? [
+          {
+            filename: `正在讨论 V${revisionBase.versionNumber}`,
+            mediaType: revisionBase.mimeType,
+            type: 'file',
+            url: revisionBase.dataUrl,
+          },
+        ]
+      : []),
     ...references.map((reference, index) => ({
       filename: `topic-reference-${index + 1}-${reference.fileName}`,
       mediaType: reference.mimeType,
@@ -119,6 +139,13 @@ export async function handleIllustrationAgentRequest(request: Request): Promise<
       getCredentialValue(modelDefinition.provider),
       getIllustrationTopic(body.topicId),
     ]);
+    const revisionBase = body.revisionBase
+      ? await resolveIllustrationVersionReference(topic, body.revisionBase)
+      : null;
+    const maxReferences = Math.max(
+      0,
+      MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(Boolean(revisionBase)),
+    );
     const references = [
       ...new Map(
         [...topic.references, ...body.references].map(reference => [
@@ -126,8 +153,8 @@ export async function handleIllustrationAgentRequest(request: Request): Promise<
           reference,
         ]),
       ).values(),
-    ].slice(0, MAX_ILLUSTRATION_REFERENCE_IMAGES);
-    if (references.length && !modelDefinition.supportsImageInput) {
+    ].slice(0, maxReferences);
+    if ((references.length || revisionBase) && !modelDefinition.supportsImageInput) {
       throw new Error('当前聊天模型不支持图片输入，请在模型设置中选择支持图片的模型');
     }
     const effectiveTopic = { ...topic, references };
@@ -139,10 +166,13 @@ export async function handleIllustrationAgentRequest(request: Request): Promise<
       referenceSummary: resolvedReferences
         .map((reference, index) => `参考图 ${index + 1}：${reference.purpose}`)
         .join('；'),
+      revisionContext: revisionBase
+        ? { prompt: revisionBase.prompt, versionNumber: revisionBase.versionNumber }
+        : null,
     });
     return await createAgentUIStreamResponse({
       agent,
-      uiMessages: attachTopicReferences(body.messages, resolvedReferences),
+      uiMessages: attachTopicReferences(body.messages, resolvedReferences, revisionBase),
       abortSignal: request.signal,
       headers: corsHeaders,
     });

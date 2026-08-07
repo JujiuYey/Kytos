@@ -39,6 +39,10 @@ export function createIllustrationAgent(options: {
   model: ChatModel;
   topic: IllustrationTopic;
   referenceSummary: string;
+  revisionContext: {
+    prompt: string;
+    versionNumber: number;
+  } | null;
 }) {
   let currentBrief = options.topic.brief;
   const providerOptions = getChatProviderOptions(options.model);
@@ -58,6 +62,7 @@ export function createIllustrationAgent(options: {
         reference.kind.startsWith('character-'),
       ),
       referenceSummary: options.referenceSummary,
+      revisionContext: options.revisionContext,
     }),
     stopWhen: isStepCount(4),
     tools: {

@@ -6,6 +6,10 @@ export interface IllustrationInstructionsInput {
   brief: IllustrationBrief;
   hasCharacterReferences: boolean;
   referenceSummary: string;
+  revisionContext: {
+    prompt: string;
+    versionNumber: number;
+  } | null;
 }
 
 export function buildIllustrationInstructions(input: IllustrationInstructionsInput): string {
@@ -23,9 +27,15 @@ export function buildIllustrationInstructions(input: IllustrationInstructionsInp
     '8. 不输出隐藏思维过程，使用简洁自然的中文。',
     '9. 收到风格参考图时，主动识别媒介、线条、笔触、背景、留白和色彩限制，并写入 brief.style 与 finalPrompt；不要要求用户重新口述图片中已经明确的风格。',
     '10. 内容参考图只用于理解画面事实。即使它是彩色照片，也不得覆盖风格参考图已经确定的插画语言。',
+    '11. 如果存在正在调整的版本，用户当前讨论的就是该版本。必须结合随消息附加的版本图片识别问题，不要再询问用户是哪一张图。只修改用户明确提出的内容，其余画面保持稳定。',
+    '12. 针对已有版本的调整要求也要同步更新结构化草稿和最终提示词；最终提示词描述调整后的完整目标画面，而不是只记录一句局部修改命令。',
     '',
     `是否包含角色素材：${input.hasCharacterReferences ? '是' : '否'}`,
     `当前参考图用途：${input.referenceSummary || '暂无参考图'}`,
+    input.revisionContext
+      ? `当前正在调整：V${input.revisionContext.versionNumber}。该版本图片已附加在用户消息中。`
+      : '当前正在调整：无，按全新插画方案继续对话。',
+    input.revisionContext ? `当前调整版本的生成提示词：${input.revisionContext.prompt}` : '',
     '风格参考图决定媒介、线条、背景处理、色彩克制和留白。内容参考图只提供主体、物件、空间或构图信息，不得把它的摄影质感、颜色和背景风格带入最终画面。角色参考图只用于保持角色身份和造型一致。没有用户明确要求换风格时，必须保持已有风格稳定。',
     '当前画面草稿：',
     JSON.stringify(input.brief, null, 2),

@@ -11,5 +11,12 @@ export {
   uploadIllustration,
 } from './crud';
 export { deleteIllustrationVersion, generateIllustration, getIllustrationTask } from './generation';
-export { resolveTopicIllustrationReferences } from './reference-images';
-export { illustrationReferenceKey, parseIllustrationReferences } from './parsers';
+export {
+  resolveIllustrationVersionReference,
+  resolveTopicIllustrationReferences,
+} from './reference-images';
+export {
+  illustrationReferenceKey,
+  parseIllustrationReferences,
+  parseVersionReference,
+} from './parsers';

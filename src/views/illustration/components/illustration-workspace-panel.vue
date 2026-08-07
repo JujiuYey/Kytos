@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -44,10 +44,14 @@ interface IllustrationReferencePreview {
 const props = defineProps<{
   apimartConfigured: boolean;
   busy: boolean;
+  chatBusy: boolean;
   references: IllustrationReferencePreview[];
   pollingStates: GenerationPollingStateMap;
   prompt: string;
+  revisionBase: IllustrationVersion | null;
+  revisionReady: boolean;
   resolution: CharacterVisualResolution;
+  selectedVersionId: string | null;
   size: IllustrationSize;
   topic: IllustrationTopic;
 }>();
@@ -58,6 +62,7 @@ const emit = defineEmits<{
   (event: 'open-reference-picker'): void;
   (event: 'rename', title: string): void;
   (event: 'revise', version: IllustrationVersion): void;
+  (event: 'select-version', version: IllustrationVersion): void;
   (event: 'update:prompt', value: string): void;
   (event: 'update:resolution', value: CharacterVisualResolution): void;
   (event: 'update:size', value: IllustrationSize): void;
@@ -75,21 +80,31 @@ const planFields = computed(() => [
   { label: '细节', value: props.topic.brief.details },
 ]);
 const generateDisabled = computed(
-  () => props.busy || !props.topic.ready || !props.prompt.trim() || !props.apimartConfigured,
+  () =>
+    props.busy ||
+    props.chatBusy ||
+    !props.topic.ready ||
+    !props.prompt.trim() ||
+    !props.apimartConfigured ||
+    (Boolean(props.revisionBase) && !props.revisionReady),
+);
+const selectedVersion = computed(
+  () =>
+    props.topic.versions.find(version => version.id === props.selectedVersionId) ??
+    props.topic.versions[0] ??
+    null,
 );
 
 function isActive(version: IllustrationVersion): boolean {
   return activeStatuses.includes(version.status);
 }
 
-function getAspectClass(size: IllustrationSize): string {
-  return {
-    '1:1': 'aspect-square',
-    '3:4': 'aspect-[3/4]',
-    '4:5': 'aspect-[4/5]',
-    '16:9': 'aspect-video',
-    '9:16': 'aspect-[9/16]',
-  }[size];
+function getBaseVersionNumber(version: IllustrationVersion): number | null {
+  if (!version.baseVersion) return null;
+  return (
+    props.topic.versions.find(item => item.id === version.baseVersion?.versionId)?.versionNumber ??
+    null
+  );
 }
 
 function handleTitleChange(event: Event): void {
@@ -123,6 +138,166 @@ function handleTitleChange(event: Event): void {
               maxlength="100"
               @change="handleTitleChange"
             />
+          </div>
+        </section>
+
+        <section aria-labelledby="illustration-current-version-heading">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <h3 id="illustration-current-version-heading" class="text-sm font-medium">当前成品</h3>
+            <SagStatusBadge
+              v-if="selectedVersion"
+              :tone="
+                isActive(selectedVersion)
+                  ? 'info'
+                  : selectedVersion.status === 'completed'
+                    ? 'success'
+                    : 'error'
+              "
+            >
+              {{
+                isActive(selectedVersion)
+                  ? '生成中'
+                  : selectedVersion.status === 'completed'
+                    ? '已完成'
+                    : '未完成'
+              }}
+            </SagStatusBadge>
+          </div>
+
+          <div v-if="selectedVersion" class="overflow-hidden rounded-md border">
+            <div class="flex items-center justify-between gap-3 border-b px-3 py-2 text-xs">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="font-medium">V{{ selectedVersion.versionNumber }}</span>
+                <span
+                  v-if="getBaseVersionNumber(selectedVersion)"
+                  class="truncate text-muted-foreground"
+                >
+                  基于 V{{ getBaseVersionNumber(selectedVersion) }}
+                </span>
+              </div>
+              <span class="shrink-0 text-muted-foreground">
+                {{ selectedVersion.size }} · {{ selectedVersion.resolution.toUpperCase() }}
+              </span>
+            </div>
+
+            <div v-if="isActive(selectedVersion)" class="p-4">
+              <p class="text-sm">GPT-Image-2 正在绘制</p>
+              <GenerationPollingStatus
+                class="mt-3"
+                compact
+                :phase="pollingStates[selectedVersion.id]?.phase ?? 'waiting'"
+                :progress="selectedVersion.progress"
+                :status="selectedVersion.status"
+              />
+            </div>
+
+            <div
+              v-else-if="
+                selectedVersion.status === 'failed' || selectedVersion.status === 'cancelled'
+              "
+              class="p-4"
+            >
+              <p class="text-sm text-destructive">
+                {{ selectedVersion.errorMessage || '插画生成任务未完成' }}
+              </p>
+            </div>
+
+            <template v-else-if="selectedVersion.images[0]">
+              <ImageViewer
+                :alt="`${topic.title} V${selectedVersion.versionNumber}`"
+                :src="selectedVersion.images[0].url"
+                :title="`${topic.title} V${selectedVersion.versionNumber}`"
+                description="查看插画大图，可缩放和拖拽"
+              >
+                <Button
+                  variant="ghost"
+                  class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
+                >
+                  <AiImage
+                    :alt="`${topic.title} V${selectedVersion.versionNumber}`"
+                    :src="selectedVersion.images[0].url"
+                    class="h-72 w-full rounded-none bg-muted/30 object-contain"
+                  />
+                </Button>
+              </ImageViewer>
+            </template>
+
+            <div class="flex flex-wrap items-center justify-end gap-1 border-t px-3 py-2">
+              <Button
+                v-if="selectedVersion.status === 'completed' && selectedVersion.images.length"
+                size="sm"
+                :variant="revisionBase?.id === selectedVersion.id ? 'secondary' : 'ghost'"
+                @click="emit('revise', selectedVersion)"
+              >
+                <PencilLine class="size-4" />
+                {{
+                  revisionBase?.id === selectedVersion.id
+                    ? `返回对话调整 V${selectedVersion.versionNumber}`
+                    : `继续调整 V${selectedVersion.versionNumber}`
+                }}
+              </Button>
+              <TooltipProvider v-if="!isActive(selectedVersion)" :delay-duration="300">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      class="size-8 text-muted-foreground hover:text-destructive"
+                      :aria-label="`删除 V${selectedVersion.versionNumber}`"
+                      @click="emit('delete-version', selectedVersion)"
+                    >
+                      <Trash2 class="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>删除版本</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="flex min-h-36 flex-col items-center justify-center rounded-md border border-dashed px-5 text-center"
+          >
+            <ImagePlus class="size-5 text-muted-foreground" />
+            <p class="mt-3 text-sm font-medium">还没有生成版本</p>
+            <p class="mt-1 text-xs leading-5 text-muted-foreground">
+              完成画面方案后，生成结果会直接显示在这里。
+            </p>
+          </div>
+
+          <div v-if="topic.versions.length > 1" class="mt-3">
+            <p class="mb-2 text-xs text-muted-foreground">历史版本</p>
+            <ScrollArea class="w-full pb-2">
+              <div class="flex w-max gap-2 pb-2">
+                <Button
+                  v-for="version in topic.versions"
+                  :key="version.id"
+                  :variant="selectedVersion?.id === version.id ? 'secondary' : 'outline'"
+                  class="h-auto w-24 shrink-0 flex-col items-stretch gap-0 overflow-hidden p-0"
+                  :aria-label="`查看 V${version.versionNumber}`"
+                  :aria-pressed="selectedVersion?.id === version.id"
+                  @click="emit('select-version', version)"
+                >
+                  <AiImage
+                    v-if="version.images[0]"
+                    :alt="`${topic.title} V${version.versionNumber}`"
+                    :src="version.images[0].url"
+                    class="aspect-[4/3] w-full rounded-none bg-muted/30 object-cover"
+                  />
+                  <div
+                    v-else
+                    class="flex aspect-[4/3] w-full items-center justify-center bg-muted/30"
+                  >
+                    <ImageIcon class="size-4 text-muted-foreground" />
+                  </div>
+                  <span class="w-full border-t px-2 py-1.5 text-xs"
+                    >V{{ version.versionNumber }}</span
+                  >
+                </Button>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           </div>
         </section>
 
@@ -234,146 +409,26 @@ function handleTitleChange(event: Event): void {
           @update:resolution="emit('update:resolution', $event)"
           @update:size="emit('update:size', $event as IllustrationSize)"
         />
-
-        <section aria-labelledby="illustration-versions-heading">
-          <div class="mb-3 flex items-center justify-between gap-3">
-            <h3 id="illustration-versions-heading" class="text-sm font-medium">生成版本</h3>
-            <Images class="size-4 text-muted-foreground" />
-          </div>
-
-          <div v-if="topic.versions.length" class="space-y-5">
-            <article
-              v-for="version in topic.versions"
-              :key="version.id"
-              class="overflow-hidden rounded-md border"
-            >
-              <div class="flex items-center justify-between gap-3 border-b px-3 py-2 text-xs">
-                <div class="flex min-w-0 items-center gap-2">
-                  <span class="font-medium">V{{ version.versionNumber }}</span>
-                  <span v-if="version.baseVersion" class="truncate text-muted-foreground">
-                    基于 V{{
-                      topic.versions.find(item => item.id === version.baseVersion?.versionId)
-                        ?.versionNumber
-                    }}
-                  </span>
-                </div>
-                <SagStatusBadge
-                  :tone="
-                    isActive(version)
-                      ? 'info'
-                      : version.status === 'completed'
-                        ? 'success'
-                        : 'error'
-                  "
-                >
-                  {{
-                    isActive(version)
-                      ? '生成中'
-                      : version.status === 'completed'
-                        ? '已完成'
-                        : '未完成'
-                  }}
-                </SagStatusBadge>
-              </div>
-
-              <div v-if="isActive(version)" class="p-4">
-                <p class="text-sm">GPT-Image-2 正在绘制</p>
-                <GenerationPollingStatus
-                  class="mt-3"
-                  compact
-                  :phase="pollingStates[version.id]?.phase ?? 'waiting'"
-                  :progress="version.progress"
-                  :status="version.status"
-                />
-              </div>
-
-              <div
-                v-else-if="version.status === 'failed' || version.status === 'cancelled'"
-                class="p-4"
-              >
-                <p class="text-sm text-destructive">
-                  {{ version.errorMessage || '插画生成任务未完成' }}
-                </p>
-                <div class="mt-3 flex justify-end">
-                  <Button size="sm" variant="ghost" @click="emit('delete-version', version)">
-                    <Trash2 class="size-4" />
-                    删除记录
-                  </Button>
-                </div>
-              </div>
-
-              <div v-else>
-                <div v-for="image in version.images" :key="image.fileName">
-                  <ImageViewer
-                    :alt="`${topic.title} V${version.versionNumber}`"
-                    :src="image.url"
-                    :title="`${topic.title} V${version.versionNumber}`"
-                    description="查看插画大图，可缩放和拖拽"
-                  >
-                    <Button
-                      variant="ghost"
-                      class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
-                    >
-                      <AiImage
-                        :alt="`${topic.title} V${version.versionNumber}`"
-                        :src="image.url"
-                        :class="[
-                          getAspectClass(version.size),
-                          'w-full rounded-none bg-muted/30 object-contain',
-                        ]"
-                      />
-                    </Button>
-                  </ImageViewer>
-                  <div class="flex items-center justify-between gap-2 border-t px-3 py-2">
-                    <span class="text-xs text-muted-foreground">
-                      {{ version.size }} · {{ version.resolution.toUpperCase() }}
-                    </span>
-                    <div class="flex items-center gap-1">
-                      <Button size="sm" variant="ghost" @click="emit('revise', version)">
-                        <PencilLine class="size-4" />
-                        基于此修改
-                      </Button>
-                      <TooltipProvider :delay-duration="300">
-                        <Tooltip>
-                          <TooltipTrigger as-child>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              class="size-8 text-muted-foreground hover:text-destructive"
-                              aria-label="删除这个插画版本"
-                              @click="emit('delete-version', version)"
-                            >
-                              <Trash2 class="size-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>删除版本</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </article>
-          </div>
-
-          <div v-else class="rounded-md border border-dashed px-5 py-8 text-center">
-            <ImagePlus class="mx-auto size-5 text-muted-foreground" />
-            <p class="mt-3 text-sm font-medium">还没有生成版本</p>
-            <p class="mt-1 text-xs leading-5 text-muted-foreground">
-              先通过左侧对话完成画面方案，再明确点击生成。
-            </p>
-          </div>
-        </section>
       </div>
     </ScrollArea>
 
     <footer class="shrink-0 border-t bg-background px-5 py-4">
       <Button class="w-full" :disabled="generateDisabled" @click="emit('generate')">
         <Sparkles class="size-4" />
-        {{ busy ? '正在生成插画' : '生成插画' }}
+        {{
+          busy
+            ? '正在生成插画'
+            : revisionBase
+              ? `基于 V${revisionBase.versionNumber} 生成新版本`
+              : '生成插画'
+        }}
       </Button>
       <p class="mt-2 text-center text-xs text-muted-foreground">
-        使用 GPT-Image-2，点击后将产生实际费用
+        {{
+          revisionBase && !revisionReady
+            ? '先在左侧对话中说明要调整的内容'
+            : '使用 GPT-Image-2，点击后将产生实际费用'
+        }}
       </p>
     </footer>
   </section>

@@ -1,4 +1,8 @@
-import type { IllustrationReference, IllustrationTopic } from '../../../shared/illustration';
+import type {
+  IllustrationReference,
+  IllustrationTopic,
+  IllustrationVersionReference,
+} from '../../../shared/illustration';
 import { getCharacterExpressionWorkspace } from '../character-expression';
 import { getCharacterLibrary } from '../character-library';
 import {
@@ -17,6 +21,14 @@ export interface ResolvedIllustrationReference {
   mimeType: string;
   purpose: NonNullable<IllustrationReference['purpose']>;
   reference: IllustrationReference;
+}
+
+export interface ResolvedIllustrationVersionReference {
+  dataUrl: string;
+  fileName: string;
+  mimeType: string;
+  prompt: string;
+  versionNumber: number;
 }
 
 function referencePurpose(
@@ -118,6 +130,24 @@ export async function resolveTopicIllustrationReferences(
   topic: IllustrationTopic,
 ): Promise<ResolvedIllustrationReference[]> {
   return resolveIllustrationReferences(await loadStore(), topic.references);
+}
+
+export async function resolveIllustrationVersionReference(
+  topic: IllustrationTopic,
+  reference: IllustrationVersionReference,
+): Promise<ResolvedIllustrationVersionReference> {
+  const version = topic.versions.find(item => item.id === reference.versionId);
+  const image = version?.images.find(item => item.fileName === reference.fileName);
+  if (!version || !image || version.status !== 'completed') {
+    throw new Error('选择的旧插画版本已失效');
+  }
+  return {
+    dataUrl: await readReferenceImage(ASSET_DIRECTORY, image),
+    fileName: image.fileName,
+    mimeType: image.mimeType,
+    prompt: version.prompt,
+    versionNumber: version.versionNumber,
+  };
 }
 
 export async function resolveIllustrationReferencesForStore(

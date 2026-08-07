@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChatStatus } from 'ai';
 import type { FileUIPart } from 'ai';
-import { Images } from '@lucide/vue';
+import { Images, X } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import {
   PromptInputActionAddAttachments,
@@ -12,6 +12,7 @@ import {
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
+  PromptInputHeader,
   PromptInputProvider,
   PromptInputSubmit,
   PromptInputTextarea,
@@ -19,28 +20,16 @@ import {
 } from '@/components/ai-elements/prompt-input';
 import type { CharacterVisualImage } from '@/types';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import IllustrationChatAttachments from './illustration-chat-attachments.vue';
 
-interface ChatReferencePreview {
-  detail: string;
-  editablePurpose: boolean;
-  image: CharacterVisualImage;
-  key: string;
-  label: string;
-  purpose: 'style' | 'content' | 'character';
-}
-
 const props = defineProps<{
+  adjustmentVersion: {
+    image: CharacterVisualImage;
+    versionNumber: number;
+  } | null;
   disabled: boolean;
   providerName: string;
-  references: ChatReferencePreview[];
+  references: { key: string }[];
   supportsImageInput: boolean;
   status: ChatStatus;
   uploading: boolean;
@@ -48,15 +37,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'send', payload: { files: FileUIPart[]; text: string }): void;
+  (event: 'clear-adjustment-version'): void;
   (event: 'stop'): void;
   (event: 'open-library'): void;
-  (event: 'set-reference-purpose', payload: { key: string; purpose: 'style' | 'content' }): void;
 }>();
 
 function handleSubmit(message: PromptInputMessage): void {
   const text = message.text.trim();
   if (
-    (!text && !message.files.length && !props.references.length) ||
+    (!text && !message.files.length && !props.references.length && !props.adjustmentVersion) ||
     props.disabled ||
     props.status !== 'ready'
   ) {
@@ -91,65 +80,46 @@ function handleSubmitClick(event: MouseEvent): void {
         :max-files="4"
         multiple
       >
-        <PromptInputBody>
-          <ScrollArea v-if="references.length" class="max-h-24 px-3 pt-3">
-            <div class="flex flex-wrap gap-2">
-              <div
-                v-for="reference in references"
-                :key="reference.key"
-                class="flex min-w-0 items-center gap-2 rounded-md border bg-muted/20 px-2 py-1.5"
-              >
-                <AiImage
-                  :src="reference.image.url"
-                  :alt="reference.label"
-                  class="size-8 shrink-0 rounded object-cover"
-                />
-                <div class="min-w-0">
-                  <p class="max-w-40 truncate text-xs font-medium">{{ reference.label }}</p>
-                  <p v-if="!reference.editablePurpose" class="text-[11px] text-muted-foreground">
-                    {{
-                      reference.purpose === 'style'
-                        ? '风格基准'
-                        : reference.purpose === 'character'
-                          ? '角色参考'
-                          : '内容参考'
-                    }}
-                  </p>
-                  <DropdownMenu v-else>
-                    <DropdownMenuTrigger as-child>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        class="h-5 px-1 text-[11px] font-normal text-muted-foreground"
-                      >
-                        {{ reference.purpose === 'style' ? '风格基准' : '内容参考' }}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuItem
-                        @select="
-                          emit('set-reference-purpose', { key: reference.key, purpose: 'style' })
-                        "
-                      >
-                        风格基准
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        @select="
-                          emit('set-reference-purpose', { key: reference.key, purpose: 'content' })
-                        "
-                      >
-                        内容参考
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
+        <PromptInputHeader
+          v-if="adjustmentVersion"
+          class="flex-nowrap justify-between gap-3 border-b px-3 py-2"
+        >
+          <div class="flex min-w-0 items-center gap-2">
+            <AiImage
+              :src="adjustmentVersion.image.url"
+              :alt="`正在调整 V${adjustmentVersion.versionNumber}`"
+              class="size-10 shrink-0 rounded object-cover"
+            />
+            <div class="min-w-0">
+              <p class="truncate text-xs font-medium">
+                正在基于 V{{ adjustmentVersion.versionNumber }} 调整
+              </p>
+              <p class="truncate text-[11px] text-muted-foreground">
+                该版本图片会随消息发送给 Agent
+              </p>
             </div>
-          </ScrollArea>
+          </div>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            class="size-8 shrink-0"
+            :disabled="disabled || status !== 'ready'"
+            :aria-label="`停止调整 V${adjustmentVersion.versionNumber}`"
+            @click="emit('clear-adjustment-version')"
+          >
+            <X class="size-4" />
+          </Button>
+        </PromptInputHeader>
+        <PromptInputBody>
           <IllustrationChatAttachments />
           <PromptInputTextarea
             class="scrollbar-subtle"
-            placeholder="描述想画的情境，或回答 Agent 的问题…"
+            :placeholder="
+              adjustmentVersion
+                ? `描述 V${adjustmentVersion.versionNumber} 需要调整的地方…`
+                : '描述想画的情境，或回答 Agent 的问题…'
+            "
             :disabled="disabled"
           />
         </PromptInputBody>

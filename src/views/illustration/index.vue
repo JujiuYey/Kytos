@@ -37,7 +37,6 @@ import { getChatModelDefinition } from '@/types';
 import IllustrationChatInput from './components/illustration-chat-input.vue';
 import IllustrationChatMessages from './components/illustration-chat-messages.vue';
 import IllustrationHeader from './components/illustration-header.vue';
-import IllustrationRevisionDialog from './components/illustration-revision-dialog.vue';
 import IllustrationWorkspacePanel from './components/illustration-workspace-panel.vue';
 
 interface IllustrationReferenceOption extends ImageReferencePickerOption {
@@ -50,6 +49,8 @@ interface CharacterReferenceWorkspace {
   expression: CharacterExpressionWorkspaceState;
   visual: CharacterVisualWorkspaceState;
 }
+
+const MAX_REVISION_INSTRUCTION_LENGTH = 20_000;
 
 const appStore = useAppStore();
 const route = useRoute();
@@ -72,6 +73,8 @@ const prompt = ref('');
 const size = ref<IllustrationSize>('16:9');
 const resolution = ref<CharacterVisualResolution>('1k');
 const revisionTarget = ref<IllustrationVersion | null>(null);
+const revisionInstructions = ref<string[]>([]);
+const selectedVersionId = ref<string | null>(null);
 const transientChatReferences = ref<IllustrationReference[]>([]);
 
 const {
@@ -91,7 +94,15 @@ const { pollingStates, schedulePoll } = useGenerationPolling<IllustrationVersion
   },
   onCompleted: (_id, version) => {
     toast.success(`V${version.versionNumber} 已生成并保存到工作区`);
-    mobilePane.value = 'workspace';
+    const owner = topics.value.find(topic => topic.versions.some(item => item.id === version.id));
+    if (owner?.id === activeTopicId.value) {
+      selectedVersionId.value = version.id;
+      if (version.baseVersion && version.images.length) {
+        revisionTarget.value = version;
+        revisionInstructions.value = [];
+      }
+      mobilePane.value = 'workspace';
+    }
   },
   onFailed: (_id, version) => {
     generationError.value = version.errorMessage || '插画生成任务未完成';
@@ -217,28 +228,22 @@ const referencePreviews = computed(() =>
     return [
       {
         detail: option.detail,
-        editablePurpose: reference.kind === 'illustration',
         image: option.image,
         key,
         label: option.label,
-        purpose: getReferencePurpose(reference),
       },
     ];
   }),
 );
-const maxReferenceCount = computed(() => MAX_ILLUSTRATION_REFERENCE_IMAGES);
+const maxReferenceCount = computed(
+  () => MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(Boolean(revisionTarget.value)),
+);
 
 function illustrationReferenceKey(reference: IllustrationReference): string {
   if (reference.kind === 'illustration') {
     return `illustration:${reference.source}:${reference.topicId ?? reference.uploadId}:${reference.versionId ?? reference.fileName}`;
   }
   return `${reference.kind}:${reference.characterId}:${reference.taskId}:${reference.fileName}`;
-}
-
-function getReferencePurpose(reference: IllustrationReference): 'style' | 'content' | 'character' {
-  if (reference.purpose) return reference.purpose;
-  if (reference.kind !== 'illustration') return 'character';
-  return reference.source === 'generated' ? 'style' : 'content';
 }
 
 async function selectReferenceKeys(keys: string[]): Promise<void> {
@@ -254,29 +259,6 @@ async function selectReferenceKeys(keys: string[]): Promise<void> {
       );
       return { ...(current ?? option.reference) };
     });
-  try {
-    replaceTopic(
-      await window.desktop.illustration.updateIllustrationTopic({
-        references,
-        topicId: topic.id,
-      }),
-    );
-  } catch (error: unknown) {
-    toast.error(error instanceof Error ? error.message : String(error));
-  }
-}
-
-async function setReferencePurpose(payload: {
-  key: string;
-  purpose: 'style' | 'content';
-}): Promise<void> {
-  const topic = activeTopic.value;
-  if (!topic || generationBusy.value) return;
-  const references = topic.references.map(reference =>
-    illustrationReferenceKey(reference) === payload.key
-      ? { ...reference, purpose: payload.purpose }
-      : reference,
-  );
   try {
     replaceTopic(
       await window.desktop.illustration.updateIllustrationTopic({
@@ -323,9 +305,18 @@ const inputDisabled = computed(
     !activeTopic.value ||
     !chatProviderConfigured.value ||
     (Boolean(activeTopic.value.references.length) && !supportsImageInput.value) ||
+    (Boolean(revisionTarget.value) && !supportsImageInput.value) ||
     isUploadingChatImages.value ||
     chatStatus.value === 'error',
 );
+const revisionReady = computed(
+  () => Boolean(revisionTarget.value) && revisionInstructions.value.length > 0,
+);
+const adjustmentVersionPreview = computed(() => {
+  const version = revisionTarget.value;
+  const image = version?.images[0];
+  return version && image ? { image, versionNumber: version.versionNumber } : null;
+});
 const errorMessage = computed(
   () => initializationError.value || generationError.value || error.value?.message || '',
 );
@@ -393,6 +384,9 @@ function applyToolOutputs(messageList: IllustrationAgentMessage[]): void {
 function applyTopic(topic: IllustrationTopic): void {
   activeTopicId.value = topic.id;
   transientChatReferences.value = [];
+  revisionTarget.value = null;
+  revisionInstructions.value = [];
+  selectedVersionId.value = topic.versions[0]?.id ?? null;
   messages.value = topic.messages;
   prompt.value = topic.brief.finalPrompt;
   const latestVersion = topic.versions[0];
@@ -440,7 +434,7 @@ function openRequestedRevision(topic: IllustrationTopic): void {
   if (!version) {
     return;
   }
-  revisionTarget.value = version;
+  startVersionAdjustment(version);
   const {
     revisionTopicId: _revisionTopicId,
     revisionVersionId: _revisionVersionId,
@@ -513,9 +507,11 @@ async function uploadChatFiles(
   topic: IllustrationTopic,
 ): Promise<{ files: FileUIPart[]; references: IllustrationReference[] }> {
   if (!files.length) return { files: [], references: [] };
-  if (topic.references.length + files.length > MAX_ILLUSTRATION_REFERENCE_IMAGES) {
+  if (topic.references.length + files.length > maxReferenceCount.value) {
     throw new Error(
-      `当前主题最多使用 ${MAX_ILLUSTRATION_REFERENCE_IMAGES} 张参考图，请先移除部分素材`,
+      revisionTarget.value
+        ? `调整版本会占用 1 张图片，请将其他参考图控制在 ${maxReferenceCount.value} 张以内`
+        : `当前主题最多使用 ${MAX_ILLUSTRATION_REFERENCE_IMAGES} 张参考图，请先移除部分素材`,
     );
   }
   const uploaded = await Promise.all(
@@ -560,9 +556,34 @@ async function send(input: string | { files: FileUIPart[]; text: string }): Prom
   try {
     const uploaded = await uploadChatFiles(payload.files, topic);
     transientChatReferences.value = uploaded.references;
+    const revisionImage = revisionTarget.value?.images[0];
+    const revisionFiles =
+      revisionTarget.value && revisionImage
+        ? [
+            {
+              filename: `正在讨论 V${revisionTarget.value.versionNumber}`,
+              mediaType: revisionImage.mimeType,
+              type: 'file' as const,
+              url: revisionImage.url,
+            },
+          ]
+        : [];
+    if (revisionTarget.value) {
+      revisionInstructions.value = [...revisionInstructions.value, payload.text.trim()];
+    }
     await sendMessage(
-      { files: uploaded.files, text: payload.text.trim() },
-      { body: { model: model.value, references: uploaded.references, topicId: topic.id } },
+      { files: [...revisionFiles, ...uploaded.files], text: payload.text.trim() },
+      {
+        body: {
+          model: model.value,
+          references: uploaded.references,
+          revisionBase:
+            revisionTarget.value && revisionImage
+              ? { fileName: revisionImage.fileName, versionId: revisionTarget.value.id }
+              : null,
+          topicId: topic.id,
+        },
+      },
     );
   } catch (sendError: unknown) {
     toast.error(sendError instanceof Error ? sendError.message : String(sendError));
@@ -580,6 +601,13 @@ async function retry(): Promise<void> {
     body: {
       model: model.value,
       references: transientChatReferences.value,
+      revisionBase:
+        revisionTarget.value && revisionTarget.value.images[0]
+          ? {
+              fileName: revisionTarget.value.images[0].fileName,
+              versionId: revisionTarget.value.id,
+            }
+          : null,
       topicId: topic.id,
     },
   });
@@ -620,16 +648,16 @@ async function renameTopic(title: string): Promise<void> {
   }
 }
 
-interface GenerateIllustrationOptions {
-  baseVersion: IllustrationVersionReference | null;
-  revisionPrompt: string | null;
-}
-
-async function generate(
-  options: GenerateIllustrationOptions = { baseVersion: null, revisionPrompt: null },
-): Promise<boolean> {
+async function generate(): Promise<boolean> {
   const topic = activeTopic.value;
-  if (!topic || generationBusy.value || !prompt.value.trim()) {
+  const revisionVersion = revisionTarget.value;
+  const revisionImage = revisionVersion?.images[0];
+  if (
+    !topic ||
+    generationBusy.value ||
+    !prompt.value.trim() ||
+    (revisionVersion && (!revisionImage || !revisionInstructions.value.length))
+  ) {
     return false;
   }
   isGenerating.value = true;
@@ -637,7 +665,7 @@ async function generate(
   try {
     const maxReferences = Math.max(
       0,
-      MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(Boolean(options.baseVersion)),
+      MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(Boolean(revisionVersion)),
     );
     const references = topic.references
       .slice(0, maxReferences)
@@ -645,15 +673,22 @@ async function generate(
     if (references.length < topic.references.length) {
       toast.info('修改版本会额外使用原插画，已将总参考图控制在 16 张以内');
     }
+    const baseVersion: IllustrationVersionReference | null =
+      revisionVersion && revisionImage
+        ? { fileName: revisionImage.fileName, versionId: revisionVersion.id }
+        : null;
     const version = await window.desktop.illustration.generateIllustration({
-      baseVersion: options.baseVersion,
+      baseVersion,
       prompt: prompt.value.trim(),
-      revisionPrompt: options.revisionPrompt,
+      revisionPrompt: revisionVersion
+        ? revisionInstructions.value.join('\n').slice(-MAX_REVISION_INSTRUCTION_LENGTH)
+        : null,
       references,
       resolution: resolution.value,
       size: size.value,
       topicId: topic.id,
     });
+    selectedVersionId.value = version.id;
     replaceTopic({
       ...topic,
       brief: { ...topic.brief, finalPrompt: prompt.value.trim() },
@@ -672,29 +707,31 @@ async function generate(
   }
 }
 
-function openRevisionDialog(version: IllustrationVersion): void {
-  revisionTarget.value = version;
-}
-
-function updateRevisionDialogOpen(open: boolean): void {
-  if (!open && !generationBusy.value) {
-    revisionTarget.value = null;
-  }
-}
-
-async function confirmRevision(revisionPrompt: string): Promise<void> {
-  const version = revisionTarget.value;
-  const image = version?.images[0];
-  if (!version || !image) {
+function startVersionAdjustment(version: IllustrationVersion): void {
+  if (version.status !== 'completed' || !version.images.length) {
     return;
   }
-  const generated = await generate({
-    baseVersion: { fileName: image.fileName, versionId: version.id },
-    revisionPrompt,
-  });
-  if (generated) {
-    revisionTarget.value = null;
+  if (revisionTarget.value?.id !== version.id) {
+    revisionInstructions.value = [];
   }
+  revisionTarget.value = version;
+  if ((activeTopic.value?.references.length ?? 0) > maxReferenceCount.value) {
+    toast.info(`调整版本会额外使用原插画，生图时只会使用前 ${maxReferenceCount.value} 张素材`);
+  }
+  selectedVersionId.value = version.id;
+  mobilePane.value = 'chat';
+}
+
+function clearRevisionTarget(): void {
+  if (chatBusy.value || generationBusy.value) {
+    return;
+  }
+  revisionTarget.value = null;
+  revisionInstructions.value = [];
+}
+
+function selectVersion(version: IllustrationVersion): void {
+  selectedVersionId.value = version.id;
 }
 
 async function confirmDeleteTopic(): Promise<void> {
@@ -737,6 +774,10 @@ async function confirmDeleteVersion(): Promise<void> {
     replaceTopic(updatedTopic);
     if (revisionTarget.value?.id === version.id) {
       revisionTarget.value = null;
+      revisionInstructions.value = [];
+    }
+    if (selectedVersionId.value === version.id) {
+      selectedVersionId.value = updatedTopic.versions[0]?.id ?? null;
     }
     deleteVersionTarget.value = null;
   } catch (deleteError: unknown) {
@@ -781,7 +822,7 @@ onMounted(() => {
 
     <div
       v-if="activeTopic"
-      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]"
+      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,5fr)_minmax(400px,2fr)]"
     >
       <section
         :class="[
@@ -792,6 +833,7 @@ onMounted(() => {
       >
         <IllustrationChatMessages :messages="messages" :status="chatStatus" @suggest="send" />
         <IllustrationChatInput
+          :adjustment-version="adjustmentVersionPreview"
           :disabled="inputDisabled"
           :provider-name="chatProvider === 'minimax' ? 'MiniMax' : 'DeepSeek'"
           :references="referencePreviews"
@@ -799,8 +841,8 @@ onMounted(() => {
           :status="chatStatus"
           :uploading="isUploadingChatImages"
           @open-library="referenceDialogOpen = true"
+          @clear-adjustment-version="clearRevisionTarget"
           @send="send"
-          @set-reference-purpose="setReferencePurpose"
           @stop="stop"
         />
       </section>
@@ -814,10 +856,14 @@ onMounted(() => {
         <IllustrationWorkspacePanel
           :apimart-configured="apimartConfigured"
           :busy="generationBusy"
+          :chat-busy="chatBusy"
           :prompt="prompt"
           :polling-states="pollingStates"
           :references="referencePreviews"
+          :revision-base="revisionTarget"
+          :revision-ready="revisionReady"
           :resolution="resolution"
+          :selected-version-id="selectedVersionId"
           :size="size"
           :topic="activeTopic"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
@@ -825,7 +871,8 @@ onMounted(() => {
           @generate="generate"
           @open-reference-picker="referenceDialogOpen = true"
           @rename="renameTopic"
-          @revise="openRevisionDialog"
+          @revise="startVersionAdjustment"
+          @select-version="selectVersion"
           @update:prompt="prompt = $event"
           @update:resolution="resolution = $event"
           @update:size="size = $event"
@@ -844,14 +891,6 @@ onMounted(() => {
       :selected-keys="selectedReferenceKeys"
       title="管理画面素材"
       @confirm="selectReferenceKeys"
-    />
-
-    <IllustrationRevisionDialog
-      :busy="generationBusy"
-      :open="Boolean(revisionTarget)"
-      :version="revisionTarget"
-      @confirm="confirmRevision"
-      @update:open="updateRevisionDialogOpen"
     />
 
     <SagConfirmDialog

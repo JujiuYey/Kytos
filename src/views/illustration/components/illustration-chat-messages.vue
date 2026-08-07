@@ -57,12 +57,19 @@ const startingSuggestions = [
           <template v-for="(part, index) in message.parts" :key="`${message.id}-${index}`">
             <MessageResponse v-if="part.type === 'text'" :content="part.text" />
 
-            <AiImage
+            <div
               v-else-if="part.type === 'file' && part.mediaType.startsWith('image/')"
-              :alt="part.filename || '对话参考图'"
-              :src="part.url"
-              class="max-h-64 w-auto max-w-sm bg-muted/20 object-contain"
-            />
+              class="w-fit max-w-sm overflow-hidden rounded-md border bg-muted/20"
+            >
+              <AiImage
+                :alt="part.filename || '对话参考图'"
+                :src="part.url"
+                class="max-h-64 w-auto max-w-sm rounded-none object-contain"
+              />
+              <p v-if="part.filename" class="border-t px-2 py-1.5 text-xs text-muted-foreground">
+                {{ part.filename }}
+              </p>
+            </div>
 
             <Tool v-else-if="part.type === 'tool-updateIllustrationBrief'" class="mb-0">
               <ToolHeader :type="part.type" :state="part.state" title="整理画面草稿" />
