@@ -5,6 +5,7 @@ import illustrationTemplates from './references/illustration-templates.md?raw';
 export interface IllustrationInstructionsInput {
   brief: IllustrationBrief;
   hasCharacterReferences: boolean;
+  referenceSummary: string;
 }
 
 export function buildIllustrationInstructions(input: IllustrationInstructionsInput): string {
@@ -20,8 +21,12 @@ export function buildIllustrationInstructions(input: IllustrationInstructionsInp
     '6. 如果本次画面包含角色素材，最终提示词只描述角色在本次画面中的表现，不要重新设计角色外形。角色视觉会由系统作为身份参考图附加。',
     '7. 不要声称图片已经生成。付费生图只能由用户在界面中点击确认。',
     '8. 不输出隐藏思维过程，使用简洁自然的中文。',
+    '9. 收到风格参考图时，主动识别媒介、线条、笔触、背景、留白和色彩限制，并写入 brief.style 与 finalPrompt；不要要求用户重新口述图片中已经明确的风格。',
+    '10. 内容参考图只用于理解画面事实。即使它是彩色照片，也不得覆盖风格参考图已经确定的插画语言。',
     '',
     `是否包含角色素材：${input.hasCharacterReferences ? '是' : '否'}`,
+    `当前参考图用途：${input.referenceSummary || '暂无参考图'}`,
+    '风格参考图决定媒介、线条、背景处理、色彩克制和留白。内容参考图只提供主体、物件、空间或构图信息，不得把它的摄影质感、颜色和背景风格带入最终画面。角色参考图只用于保持角色身份和造型一致。没有用户明确要求换风格时，必须保持已有风格稳定。',
     '当前画面草稿：',
     JSON.stringify(input.brief, null, 2),
     '',

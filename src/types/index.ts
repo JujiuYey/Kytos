@@ -123,6 +123,7 @@ export type {
   IllustrationBrief,
   IllustrationBriefUpdateResult,
   IllustrationReference,
+  IllustrationReferencePurpose,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,

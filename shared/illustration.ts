@@ -70,17 +70,22 @@ export interface IllustrationVersionReference {
   versionId: string;
 }
 
+// 参考图用途：同一张图在 Agent 和生图阶段不能被当成同一种证据处理。
+export type IllustrationReferencePurpose = 'style' | 'content' | 'character';
+
 // 画面素材引用：角色素材和插画素材分别保留自己的来源定位
 export type IllustrationReference =
   | {
       characterId: string;
       fileName: string;
       kind: 'character-expression' | 'character-visual';
+      purpose?: IllustrationReferencePurpose;
       taskId: string;
     }
   | {
       fileName: string;
       kind: 'illustration';
+      purpose?: IllustrationReferencePurpose;
       source: 'generated' | 'uploaded';
       topicId: string | null;
       uploadId: string | null;

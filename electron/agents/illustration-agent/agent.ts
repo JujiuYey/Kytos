@@ -38,6 +38,7 @@ export function createIllustrationAgent(options: {
   apiKey: string;
   model: ChatModel;
   topic: IllustrationTopic;
+  referenceSummary: string;
 }) {
   let currentBrief = options.topic.brief;
   const providerOptions = getChatProviderOptions(options.model);
@@ -56,6 +57,7 @@ export function createIllustrationAgent(options: {
       hasCharacterReferences: options.topic.references.some(reference =>
         reference.kind.startsWith('character-'),
       ),
+      referenceSummary: options.referenceSummary,
     }),
     stopWhen: isStepCount(4),
     tools: {

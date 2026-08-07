@@ -62,6 +62,7 @@ const initializationError = ref('');
 const generationError = ref('');
 const isInitializing = ref(true);
 const isGenerating = ref(false);
+const isUploadingChatImages = ref(false);
 const isDeleting = ref(false);
 const deleteTopicDialogOpen = ref(false);
 const deleteVersionTarget = ref<IllustrationVersion | null>(null);
@@ -71,6 +72,7 @@ const prompt = ref('');
 const size = ref<IllustrationSize>('16:9');
 const resolution = ref<CharacterVisualResolution>('1k');
 const revisionTarget = ref<IllustrationVersion | null>(null);
+const transientChatReferences = ref<IllustrationReference[]>([]);
 
 const {
   apimartConfigured,
@@ -123,6 +125,7 @@ const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() 
         characterId: workspace.characterId,
         fileName: image.fileName,
         kind: 'character-visual',
+        purpose: 'character',
         taskId: record.id,
       };
       return [
@@ -142,6 +145,7 @@ const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() 
           characterId: workspace.characterId,
           fileName: image.fileName,
           kind: 'character-expression',
+          purpose: 'character',
           taskId: record.id,
         };
         return {
@@ -160,6 +164,7 @@ const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() 
     const reference: IllustrationReference = {
       fileName: upload.fileName,
       kind: 'illustration',
+      purpose: 'content',
       source: 'uploaded',
       topicId: null,
       uploadId: upload.id,
@@ -181,6 +186,7 @@ const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() 
             const reference: IllustrationReference = {
               fileName: image.fileName,
               kind: 'illustration',
+              purpose: 'style',
               source: 'generated',
               topicId: topic.id,
               uploadId: null,
@@ -203,17 +209,22 @@ const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() 
 const selectedReferenceKeys = computed(() =>
   (activeTopic.value?.references ?? []).map(illustrationReferenceKey),
 );
-const selectedReferenceOptions = computed(() => {
-  const selectedKeySet = new Set(selectedReferenceKeys.value);
-  return illustrationReferenceOptions.value.filter(option => selectedKeySet.has(option.key));
-});
 const referencePreviews = computed(() =>
-  selectedReferenceOptions.value.map(option => ({
-    detail: option.detail,
-    image: option.image,
-    key: option.key,
-    label: option.label,
-  })),
+  (activeTopic.value?.references ?? []).flatMap(reference => {
+    const key = illustrationReferenceKey(reference);
+    const option = illustrationReferenceOptions.value.find(item => item.key === key);
+    if (!option) return [];
+    return [
+      {
+        detail: option.detail,
+        editablePurpose: reference.kind === 'illustration',
+        image: option.image,
+        key,
+        label: option.label,
+        purpose: getReferencePurpose(reference),
+      },
+    ];
+  }),
 );
 const maxReferenceCount = computed(() => MAX_ILLUSTRATION_REFERENCE_IMAGES);
 
@@ -224,6 +235,12 @@ function illustrationReferenceKey(reference: IllustrationReference): string {
   return `${reference.kind}:${reference.characterId}:${reference.taskId}:${reference.fileName}`;
 }
 
+function getReferencePurpose(reference: IllustrationReference): 'style' | 'content' | 'character' {
+  if (reference.purpose) return reference.purpose;
+  if (reference.kind !== 'illustration') return 'character';
+  return reference.source === 'generated' ? 'style' : 'content';
+}
+
 async function selectReferenceKeys(keys: string[]): Promise<void> {
   const topic = activeTopic.value;
   if (!topic || generationBusy.value) return;
@@ -231,7 +248,35 @@ async function selectReferenceKeys(keys: string[]): Promise<void> {
   const references = illustrationReferenceOptions.value
     .filter(option => selectedKeySet.has(option.key))
     .slice(0, maxReferenceCount.value)
-    .map(option => ({ ...option.reference }));
+    .map(option => {
+      const current = topic.references.find(
+        reference => illustrationReferenceKey(reference) === option.key,
+      );
+      return { ...(current ?? option.reference) };
+    });
+  try {
+    replaceTopic(
+      await window.desktop.illustration.updateIllustrationTopic({
+        references,
+        topicId: topic.id,
+      }),
+    );
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function setReferencePurpose(payload: {
+  key: string;
+  purpose: 'style' | 'content';
+}): Promise<void> {
+  const topic = activeTopic.value;
+  if (!topic || generationBusy.value) return;
+  const references = topic.references.map(reference =>
+    illustrationReferenceKey(reference) === payload.key
+      ? { ...reference, purpose: payload.purpose }
+      : reference,
+  );
   try {
     replaceTopic(
       await window.desktop.illustration.updateIllustrationTopic({
@@ -266,13 +311,19 @@ const activeGeneration = computed(() =>
   ),
 );
 const generationBusy = computed(() => isGenerating.value || Boolean(activeGeneration.value));
-const busy = computed(() => chatBusy.value || generationBusy.value || isDeleting.value);
-const navigationBusy = computed(() => chatBusy.value || isDeleting.value);
+const busy = computed(
+  () => chatBusy.value || generationBusy.value || isUploadingChatImages.value || isDeleting.value,
+);
+const navigationBusy = computed(
+  () => chatBusy.value || isUploadingChatImages.value || isDeleting.value,
+);
 const inputDisabled = computed(
   () =>
     isInitializing.value ||
     !activeTopic.value ||
     !chatProviderConfigured.value ||
+    (Boolean(activeTopic.value.references.length) && !supportsImageInput.value) ||
+    isUploadingChatImages.value ||
     chatStatus.value === 'error',
 );
 const errorMessage = computed(
@@ -341,6 +392,7 @@ function applyToolOutputs(messageList: IllustrationAgentMessage[]): void {
 
 function applyTopic(topic: IllustrationTopic): void {
   activeTopicId.value = topic.id;
+  transientChatReferences.value = [];
   messages.value = topic.messages;
   prompt.value = topic.brief.finalPrompt;
   const latestVersion = topic.versions[0];
@@ -456,16 +508,67 @@ async function persistFinishedConversation(): Promise<void> {
   }
 }
 
+async function uploadChatFiles(
+  files: FileUIPart[],
+  topic: IllustrationTopic,
+): Promise<{ files: FileUIPart[]; references: IllustrationReference[] }> {
+  if (!files.length) return { files: [], references: [] };
+  if (topic.references.length + files.length > MAX_ILLUSTRATION_REFERENCE_IMAGES) {
+    throw new Error(
+      `当前主题最多使用 ${MAX_ILLUSTRATION_REFERENCE_IMAGES} 张参考图，请先移除部分素材`,
+    );
+  }
+  const uploaded = await Promise.all(
+    files.map(async file => {
+      const response = await fetch(file.url);
+      const saved = await window.desktop.illustration.uploadIllustration({
+        fileData: new Uint8Array(await response.arrayBuffer()),
+        fileName: file.filename || 'chat-reference.png',
+        mimeType: file.mediaType,
+      });
+      return { file, saved };
+    }),
+  );
+  uploads.value = [...uploaded.map(item => item.saved), ...uploads.value];
+  const references = uploaded.map(({ saved }) => ({
+    fileName: saved.fileName,
+    kind: 'illustration' as const,
+    purpose: 'content' as const,
+    source: 'uploaded' as const,
+    topicId: null,
+    uploadId: saved.id,
+    versionId: null,
+  }));
+  return {
+    files: uploaded.map(({ file, saved }) => ({
+      filename: file.filename || saved.originalName,
+      mediaType: saved.mimeType,
+      type: 'file' as const,
+      url: saved.url,
+    })),
+    references,
+  };
+}
+
 async function send(input: string | { files: FileUIPart[]; text: string }): Promise<void> {
   const payload = typeof input === 'string' ? { files: [], text: input } : input;
   const topic = activeTopic.value;
   if (!topic || !payload.text.trim() || inputDisabled.value || chatBusy.value) {
     return;
   }
-  await sendMessage(
-    { files: payload.files, text: payload.text.trim() },
-    { body: { model: model.value, topicId: topic.id } },
-  );
+  isUploadingChatImages.value = payload.files.length > 0;
+  try {
+    const uploaded = await uploadChatFiles(payload.files, topic);
+    transientChatReferences.value = uploaded.references;
+    await sendMessage(
+      { files: uploaded.files, text: payload.text.trim() },
+      { body: { model: model.value, references: uploaded.references, topicId: topic.id } },
+    );
+  } catch (sendError: unknown) {
+    toast.error(sendError instanceof Error ? sendError.message : String(sendError));
+  } finally {
+    isUploadingChatImages.value = false;
+  }
 }
 
 async function retry(): Promise<void> {
@@ -473,7 +576,13 @@ async function retry(): Promise<void> {
   if (!topic || chatStatus.value !== 'error') {
     return;
   }
-  await regenerate({ body: { model: model.value, topicId: topic.id } });
+  await regenerate({
+    body: {
+      model: model.value,
+      references: transientChatReferences.value,
+      topicId: topic.id,
+    },
+  });
 }
 
 async function createTopic(): Promise<void> {
@@ -685,9 +794,13 @@ onMounted(() => {
         <IllustrationChatInput
           :disabled="inputDisabled"
           :provider-name="chatProvider === 'minimax' ? 'MiniMax' : 'DeepSeek'"
+          :references="referencePreviews"
           :supports-image-input="supportsImageInput"
           :status="chatStatus"
+          :uploading="isUploadingChatImages"
+          @open-library="referenceDialogOpen = true"
           @send="send"
+          @set-reference-purpose="setReferencePurpose"
           @stop="stop"
         />
       </section>

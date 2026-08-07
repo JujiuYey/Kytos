@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ChatStatus } from 'ai';
 import { Bot, Check, ListChecks, PencilLine } from '@lucide/vue';
+import { Image as AiImage } from '@/components/ai-elements/image';
 import {
   Conversation,
   ConversationContent,
@@ -55,6 +56,13 @@ const startingSuggestions = [
         <MessageContent class="w-full">
           <template v-for="(part, index) in message.parts" :key="`${message.id}-${index}`">
             <MessageResponse v-if="part.type === 'text'" :content="part.text" />
+
+            <AiImage
+              v-else-if="part.type === 'file' && part.mediaType.startsWith('image/')"
+              :alt="part.filename || '对话参考图'"
+              :src="part.url"
+              class="max-h-64 w-auto max-w-sm bg-muted/20 object-contain"
+            />
 
             <Tool v-else-if="part.type === 'tool-updateIllustrationBrief'" class="mb-0">
               <ToolHeader :type="part.type" :state="part.state" title="整理画面草稿" />

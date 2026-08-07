@@ -10,6 +10,7 @@ import type {
   IllustrationAgentMessage,
   IllustrationBrief,
   IllustrationReference,
+  IllustrationReferencePurpose,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,
@@ -96,7 +97,12 @@ export function parseIllustrationReference(value: unknown): IllustrationReferenc
   ) {
     const selection = parseSelection(value);
     if (!selection) return null;
-    return { ...selection, characterId: value.characterId, kind: value.kind };
+    return {
+      ...selection,
+      characterId: value.characterId,
+      kind: value.kind,
+      purpose: 'character',
+    };
   }
   if (
     value.kind !== 'illustration' ||
@@ -120,14 +126,21 @@ export function parseIllustrationReference(value: unknown): IllustrationReferenc
   ) {
     return null;
   }
+  const purpose =
+    parseReferencePurpose(value.purpose) ?? (value.source === 'generated' ? 'style' : 'content');
   return {
     fileName: value.fileName,
     kind: 'illustration',
+    purpose,
     source: value.source,
     topicId,
     uploadId,
     versionId,
   };
+}
+
+function parseReferencePurpose(value: unknown): IllustrationReferencePurpose | null {
+  return value === 'style' || value === 'content' || value === 'character' ? value : null;
 }
 
 export function parseIllustrationReferences(value: unknown): IllustrationReference[] {
