@@ -122,6 +122,7 @@ export type {
   IllustrationAgentMessage,
   IllustrationBrief,
   IllustrationBriefUpdateResult,
+  IllustrationReference,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,

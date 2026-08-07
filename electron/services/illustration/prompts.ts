@@ -3,20 +3,15 @@ import { isPlainObject } from 'es-toolkit';
 import { MAX_ILLUSTRATION_REFERENCE_IMAGES } from '../../../shared/illustration';
 import type { GenerateIllustrationRequest } from '../../../shared/illustration';
 import { MAX_TEXT_LENGTH } from '../../constants';
-import {
-  isResolution,
-  isSize,
-  parseCharacterReferenceSelection,
-  parseVersionReference,
-} from './parsers';
+import { isResolution, isSize, parseIllustrationReference, parseVersionReference } from './parsers';
 
 export function buildIllustrationPrompt(
   prompt: string,
-  useCharacter: boolean,
+  hasCharacterReferences: boolean,
   revisionPrompt: string,
 ): string {
   const lines: string[] = [];
-  if (useCharacter) {
+  if (hasCharacterReferences) {
     lines.push(
       '参考图中的角色是本次插画中的同一个角色。综合所有已选角色参考确认脸部、表情、服装、完整造型和结构。',
       revisionPrompt
@@ -55,9 +50,9 @@ export function validateGenerateRequest(request: GenerateIllustrationRequest): v
     (request.revisionPrompt !== null && request.baseVersion === null) ||
     !isSize(request.size) ||
     !isResolution(request.resolution) ||
-    !Array.isArray(request.characterReferences) ||
-    request.characterReferences.length > MAX_ILLUSTRATION_REFERENCE_IMAGES ||
-    request.characterReferences.some(reference => !parseCharacterReferenceSelection(reference)) ||
+    !Array.isArray(request.references) ||
+    request.references.length > MAX_ILLUSTRATION_REFERENCE_IMAGES ||
+    request.references.some(reference => !parseIllustrationReference(reference)) ||
     (request.baseVersion !== null && !parseVersionReference(request.baseVersion))
   ) {
     throw new Error('插画生成参数无效');

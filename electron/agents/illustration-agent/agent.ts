@@ -53,7 +53,9 @@ export function createIllustrationAgent(options: {
     ...(providerOptions ? { providerOptions } : {}),
     instructions: buildIllustrationInstructions({
       brief: currentBrief,
-      useCharacter: options.topic.useCharacter,
+      hasCharacterReferences: options.topic.references.some(reference =>
+        reference.kind.startsWith('character-'),
+      ),
     }),
     stopWhen: isStepCount(4),
     tools: {

@@ -4,7 +4,7 @@ import illustrationTemplates from './references/illustration-templates.md?raw';
 
 export interface IllustrationInstructionsInput {
   brief: IllustrationBrief;
-  useCharacter: boolean;
+  hasCharacterReferences: boolean;
 }
 
 export function buildIllustrationInstructions(input: IllustrationInstructionsInput): string {
@@ -17,11 +17,11 @@ export function buildIllustrationInstructions(input: IllustrationInstructionsInp
     '3. 用户提供或确认画面事实后，调用 updateIllustrationBrief 保存结构化草稿。不要把你的建议擅自当成用户已确认的要求。',
     '4. 当信息足够，或用户要求开始生图时，调用 presentIllustrationPlan，给出短标题、完整画面方案和可直接用于 GPT-Image-2 的最终提示词。',
     '5. 最终提示词必须明确主体关系、动作姿态、环境、镜头构图、色彩、视觉表现、画幅意图和禁止项。不要包含图片比例或分辨率参数，界面会单独传递。',
-    '6. 如果启用了当前角色，最终提示词只描述角色在本次画面中的表现，不要重新设计角色外形。正式角色视觉会由系统自动作为身份参考图附加。',
+    '6. 如果本次画面包含角色素材，最终提示词只描述角色在本次画面中的表现，不要重新设计角色外形。角色视觉会由系统作为身份参考图附加。',
     '7. 不要声称图片已经生成。付费生图只能由用户在界面中点击确认。',
     '8. 不输出隐藏思维过程，使用简洁自然的中文。',
     '',
-    `是否使用当前角色：${input.useCharacter ? '是' : '否'}`,
+    `是否包含角色素材：${input.hasCharacterReferences ? '是' : '否'}`,
     '当前画面草稿：',
     JSON.stringify(input.brief, null, 2),
     '',

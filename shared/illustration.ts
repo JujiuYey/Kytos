@@ -5,7 +5,6 @@ import type {
   CharacterVisualResolution,
   CharacterVisualTaskStatus,
 } from './character-visual';
-import type { CharacterExpressionReferenceSelection } from './character-expression';
 
 // 插画 Agent 端点
 export const ILLUSTRATION_AGENT_ENDPOINT = 'app://bundle/api/illustration-agent';
@@ -71,12 +70,29 @@ export interface IllustrationVersionReference {
   versionId: string;
 }
 
+// 画面素材引用：角色素材和插画素材分别保留自己的来源定位
+export type IllustrationReference =
+  | {
+      characterId: string;
+      fileName: string;
+      kind: 'character-expression' | 'character-visual';
+      taskId: string;
+    }
+  | {
+      fileName: string;
+      kind: 'illustration';
+      source: 'generated' | 'uploaded';
+      topicId: string | null;
+      uploadId: string | null;
+      versionId: string | null;
+    };
+
 // 插画版本
 export interface IllustrationVersion {
   // 基础版本
   baseVersion: IllustrationVersionReference | null;
-  // 角色引用列表
-  characterReferences: CharacterExpressionReferenceSelection[];
+  // 生成时使用的画面素材快照
+  references: IllustrationReference[];
   // 创建时间
   createdAt: string;
   // 错误信息
@@ -97,8 +113,6 @@ export interface IllustrationVersion {
   status: CharacterVisualTaskStatus;
   // 更新时间
   updatedAt: string;
-  // 是否使用角色
-  useCharacter: boolean;
   // 版本号
   versionNumber: number;
 }
@@ -115,12 +129,12 @@ export interface IllustrationTopic {
   messages: IllustrationAgentMessage[];
   // 是否就绪
   ready: boolean;
+  // 当前画面使用的素材
+  references: IllustrationReference[];
   // 标题
   title: string;
   // 更新时间
   updatedAt: string;
-  // 是否使用角色
-  useCharacter: boolean;
   // 版本列表
   versions: IllustrationVersion[];
 }
@@ -152,10 +166,7 @@ export interface IllustrationWorkspaceState {
 }
 
 // 创建插画主题请求
-export interface CreateIllustrationTopicRequest {
-  // 是否使用角色
-  useCharacter: boolean;
-}
+export interface CreateIllustrationTopicRequest {}
 
 // 更新插画主题请求
 export interface UpdateIllustrationTopicRequest {
@@ -163,8 +174,8 @@ export interface UpdateIllustrationTopicRequest {
   title?: string;
   // 主题ID
   topicId: string;
-  // 是否使用角色
-  useCharacter?: boolean;
+  // 画面素材
+  references?: IllustrationReference[];
 }
 
 // 保存插画会话请求
@@ -179,8 +190,8 @@ export interface SaveIllustrationConversationRequest {
 export interface GenerateIllustrationRequest {
   // 基础版本
   baseVersion: IllustrationVersionReference | null;
-  // 角色引用列表
-  characterReferences: CharacterExpressionReferenceSelection[];
+  // 本次生成使用的画面素材
+  references: IllustrationReference[];
   // 提示词
   prompt: string;
   // 修订提示词

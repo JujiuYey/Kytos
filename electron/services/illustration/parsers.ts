@@ -9,13 +9,13 @@ import {
 import type {
   IllustrationAgentMessage,
   IllustrationBrief,
+  IllustrationReference,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,
   IllustrationVersionReference,
   UploadedIllustration,
 } from '../../../shared/illustration';
-import type { CharacterExpressionReferenceSelection } from '../../../shared/character-expression';
 import type {
   CharacterVisualAssetSelection,
   CharacterVisualImage,
@@ -85,25 +85,68 @@ export function parseSelection(value: unknown): CharacterVisualAssetSelection | 
   return { fileName: value.fileName, taskId: value.taskId };
 }
 
-export function parseCharacterReferenceSelection(
-  value: unknown,
-): CharacterExpressionReferenceSelection | null {
-  const selection = parseSelection(value);
+export function parseIllustrationReference(value: unknown): IllustrationReference | null {
+  if (!isPlainObject(value)) {
+    return null;
+  }
   if (
-    !selection ||
-    !isPlainObject(value) ||
-    !['expression', 'visual', 'portrait', 'sheet'].includes(String(value.kind))
+    (value.kind === 'character-expression' || value.kind === 'character-visual') &&
+    typeof value.characterId === 'string' &&
+    ID_PATTERN.test(value.characterId)
+  ) {
+    const selection = parseSelection(value);
+    if (!selection) return null;
+    return { ...selection, characterId: value.characterId, kind: value.kind };
+  }
+  if (
+    value.kind !== 'illustration' ||
+    (value.source !== 'generated' && value.source !== 'uploaded')
+  ) {
+    return null;
+  }
+  const topicId =
+    typeof value.topicId === 'string' && ID_PATTERN.test(value.topicId) ? value.topicId : null;
+  const versionId =
+    typeof value.versionId === 'string' && ID_PATTERN.test(value.versionId)
+      ? value.versionId
+      : null;
+  const uploadId =
+    typeof value.uploadId === 'string' && ID_PATTERN.test(value.uploadId) ? value.uploadId : null;
+  if (
+    (value.source === 'generated' && (!topicId || !versionId || uploadId)) ||
+    (value.source === 'uploaded' && (!uploadId || topicId || versionId)) ||
+    typeof value.fileName !== 'string' ||
+    path.basename(value.fileName) !== value.fileName
   ) {
     return null;
   }
   return {
-    ...selection,
-    kind: value.kind === 'expression' ? 'expression' : 'visual',
+    fileName: value.fileName,
+    kind: 'illustration',
+    source: value.source,
+    topicId,
+    uploadId,
+    versionId,
   };
 }
 
-export function characterReferenceKey(selection: CharacterExpressionReferenceSelection): string {
-  return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
+export function parseIllustrationReferences(value: unknown): IllustrationReference[] {
+  if (!Array.isArray(value)) return [];
+  const references = value
+    .map(parseIllustrationReference)
+    .filter((reference): reference is IllustrationReference => Boolean(reference));
+  return [
+    ...new Map(
+      references.map(reference => [illustrationReferenceKey(reference), reference]),
+    ).values(),
+  ].slice(0, MAX_ILLUSTRATION_REFERENCE_IMAGES);
+}
+
+export function illustrationReferenceKey(reference: IllustrationReference): string {
+  if (reference.kind === 'illustration') {
+    return `illustration:${reference.source}:${reference.topicId ?? reference.uploadId}:${reference.versionId ?? reference.fileName}`;
+  }
+  return `${reference.kind}:${reference.characterId}:${reference.taskId}:${reference.fileName}`;
 }
 
 export function parseVersionReference(value: unknown): IllustrationVersionReference | null {
@@ -178,27 +221,8 @@ export function parseVersion(value: unknown): IllustrationVersion | null {
   ) {
     return null;
   }
-  const characterReferences = Array.isArray(value.characterReferences)
-    ? value.characterReferences
-        .map(parseCharacterReferenceSelection)
-        .filter((selection): selection is CharacterExpressionReferenceSelection =>
-          Boolean(selection),
-        )
-        .slice(0, MAX_ILLUSTRATION_REFERENCE_IMAGES)
-    : [];
-  if (!characterReferences.length) {
-    for (const legacySelection of [
-      parseSelection(value.referencePortrait),
-      parseSelection(value.referenceSheet),
-    ]) {
-      if (legacySelection) {
-        characterReferences.push({ ...legacySelection, kind: 'visual' });
-      }
-    }
-  }
   return {
     baseVersion: parseVersionReference(value.baseVersion),
-    characterReferences,
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     errorMessage: typeof value.errorMessage === 'string' ? value.errorMessage : null,
     id: value.id,
@@ -210,10 +234,10 @@ export function parseVersion(value: unknown): IllustrationVersion | null {
     progress: typeof value.progress === 'number' ? Math.min(100, Math.max(0, value.progress)) : 0,
     prompt: value.prompt,
     resolution: value.resolution,
+    references: parseIllustrationReferences(value.references),
     size: value.size,
     status: value.status,
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
-    useCharacter: value.useCharacter !== false,
     versionNumber: value.versionNumber,
   };
 }
@@ -241,9 +265,9 @@ export function parseTopic(value: unknown): IllustrationTopic | null {
     id: value.id,
     messages: parseMessages(value.messages),
     ready: value.ready === true,
+    references: parseIllustrationReferences(value.references),
     title: value.title.trim(),
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
-    useCharacter: value.useCharacter !== false,
     versions,
   };
 }

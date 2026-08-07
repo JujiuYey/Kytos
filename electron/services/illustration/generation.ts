@@ -1,9 +1,9 @@
 // illustration 模块的生成 / 轮询 / 删除版本
 import { isPlainObject } from 'es-toolkit';
 import { MAX_ILLUSTRATION_REFERENCE_IMAGES } from '../../../shared/illustration';
-import type { CharacterExpressionReferenceSelection } from '../../../shared/character-expression';
 import type {
   DeleteIllustrationVersionRequest,
+  IllustrationReference,
   GenerateIllustrationRequest,
   IllustrationTopic,
   IllustrationVersion,
@@ -26,7 +26,7 @@ import {
 } from '../character-visual';
 import { downloadTaskImages, readReferenceImage, safeUnlinkAssetFiles } from './assets';
 import { ASSET_DIRECTORY, EXPRESSION_ASSET_DIRECTORY } from './constants';
-import { characterReferenceKey, parseCharacterReferenceSelection } from './parsers';
+import { illustrationReferenceKey, parseIllustrationReference } from './parsers';
 import { buildIllustrationPrompt, validateGenerateRequest } from './prompts';
 import { loadStore, replaceTopic, requireTopic, saveStore } from './store';
 
@@ -40,68 +40,98 @@ export async function generateIllustration(
     throw new Error('请先通过对话完成并确认画面方案');
   }
 
-  // 1. 解析并去重用户提交的角色参考
-  const parsedReferences = request.characterReferences.map(parseCharacterReferenceSelection);
+  // 1. 解析并去重本次明确选择的画面素材
+  const parsedReferences = request.references.map(parseIllustrationReference);
   if (parsedReferences.some(selection => !selection)) {
-    throw new Error('选择的角色参考无效');
+    throw new Error('选择的画面素材无效');
   }
-  const requestedCharacterReferences = [
+  const requestedReferences = [
     ...new Map(
-      (parsedReferences as CharacterExpressionReferenceSelection[]).map(selection => [
-        characterReferenceKey(selection),
+      (parsedReferences as IllustrationReference[]).map(selection => [
+        illustrationReferenceKey(selection),
         selection,
       ]),
     ).values(),
   ];
-  if (requestedCharacterReferences.length === 0) {
-    throw new Error('请先选择至少一张角色参考');
-  }
 
-  // 2. 收集 referenceImages：官方角色视觉（只在 useCharacter=true）
+  // 2. 解析角色素材和插画素材，绝不回退到全局选中状态
   const referenceImages: string[] = [];
-  if (topic.useCharacter) {
+  const characterIds = [
+    ...new Set(
+      requestedReferences.flatMap(reference =>
+        reference.kind === 'illustration' ? [] : [reference.characterId],
+      ),
+    ),
+  ];
+  const characterReferenceWorkspaces = new Map<
+    string,
+    Awaited<ReturnType<typeof getCharacterVisualWorkspace>>
+  >();
+  const expressionReferenceWorkspaces = new Map<
+    string,
+    Awaited<ReturnType<typeof getCharacterExpressionWorkspace>>
+  >();
+  if (characterIds.length) {
     const characterLibrary = await getCharacterLibrary();
-    const [visualWorkspace, expressionWorkspace] = await Promise.all([
-      getCharacterVisualWorkspace(),
-      getCharacterExpressionWorkspace({ characterId: characterLibrary.activeCharacterId }),
-    ]);
-    const visualReferences = getOfficialCharacterVisualReferences(visualWorkspace).map(
-      reference => ({
-        ...reference,
-        selection: { ...reference.selection, kind: 'visual' as const },
+    if (
+      !characterIds.every(characterId =>
+        characterLibrary.characters.some(item => item.id === characterId),
+      )
+    ) {
+      throw new Error('选择的角色已不存在');
+    }
+    const workspaces = await Promise.all(
+      characterIds.map(async characterId => {
+        const [visualWorkspace, expressionWorkspace] = await Promise.all([
+          getCharacterVisualWorkspace(characterId),
+          getCharacterExpressionWorkspace({ characterId }),
+        ]);
+        return { characterId, expressionWorkspace, visualWorkspace };
       }),
     );
-    const expressionReferences = expressionWorkspace.records.flatMap(record =>
-      record.status === 'completed'
-        ? record.images.map(image => ({
-            directoryName: EXPRESSION_ASSET_DIRECTORY,
-            image,
-            selection: {
-              fileName: image.fileName,
-              kind: 'expression' as const,
-              taskId: record.id,
-            },
-          }))
-        : [],
-    );
-    const availableReferenceMap = new Map(
-      [...visualReferences, ...expressionReferences].map(reference => [
-        characterReferenceKey(reference.selection),
-        reference,
-      ]),
-    );
-    const references = requestedCharacterReferences.map(selection => {
-      const match = availableReferenceMap.get(characterReferenceKey(selection));
-      if (!match) {
-        throw new Error('选择的角色参考已失效');
-      }
-      return match;
-    });
-    referenceImages.push(
-      ...(await Promise.all(
-        references.map(reference => readReferenceImage(reference.directoryName, reference.image)),
-      )),
-    );
+    for (const workspace of workspaces) {
+      characterReferenceWorkspaces.set(workspace.characterId, workspace.visualWorkspace);
+      expressionReferenceWorkspaces.set(workspace.characterId, workspace.expressionWorkspace);
+    }
+  }
+  for (const reference of requestedReferences) {
+    if (reference.kind === 'character-visual') {
+      const workspace = characterReferenceWorkspaces.get(reference.characterId);
+      const match =
+        workspace &&
+        getOfficialCharacterVisualReferences(workspace).find(
+          item =>
+            item.selection.taskId === reference.taskId &&
+            item.selection.fileName === reference.fileName,
+        );
+      if (!match) throw new Error('选择的角色视觉已失效');
+      referenceImages.push(await readReferenceImage(match.directoryName, match.image));
+      continue;
+    }
+    if (reference.kind === 'character-expression') {
+      const workspace = expressionReferenceWorkspaces.get(reference.characterId);
+      const record = workspace?.records.find(item => item.id === reference.taskId);
+      const image = record?.images.find(item => item.fileName === reference.fileName);
+      if (!record || !image) throw new Error('选择的角色表情已失效');
+      referenceImages.push(await readReferenceImage(EXPRESSION_ASSET_DIRECTORY, image));
+      continue;
+    }
+    if (reference.kind !== 'illustration') {
+      throw new Error('选择的画面素材无效');
+    }
+    if (reference.source === 'uploaded') {
+      const upload = store.uploads.find(item => item.id === reference.uploadId);
+      if (!upload || upload.fileName !== reference.fileName) throw new Error('选择的插画已失效');
+      referenceImages.push(await readReferenceImage(ASSET_DIRECTORY, upload));
+      continue;
+    }
+    const sourceTopic = store.topics.find(item => item.id === reference.topicId);
+    const sourceVersion = sourceTopic?.versions.find(item => item.id === reference.versionId);
+    const sourceImage = sourceVersion?.images.find(item => item.fileName === reference.fileName);
+    if (!sourceImage || !sourceVersion || sourceVersion.status !== 'completed') {
+      throw new Error('选择的创作插画已失效');
+    }
+    referenceImages.push(await readReferenceImage(ASSET_DIRECTORY, sourceImage));
   }
 
   // 3. 旧版本作为修改底稿
@@ -123,7 +153,7 @@ export async function generateIllustration(
   // 4. 调用生成接口
   const prompt = buildIllustrationPrompt(
     request.prompt,
-    topic.useCharacter,
+    requestedReferences.some(reference => reference.kind.startsWith('character-')),
     request.revisionPrompt?.trim() ?? '',
   );
   const apiKey = await getCredentialValue('apimart');
@@ -140,7 +170,6 @@ export async function generateIllustration(
   const now = new Date().toISOString();
   const version: IllustrationVersion = {
     baseVersion,
-    characterReferences: requestedCharacterReferences.map(selection => ({ ...selection })),
     createdAt: now,
     errorMessage: null,
     id: taskId,
@@ -148,10 +177,10 @@ export async function generateIllustration(
     progress: 0,
     prompt,
     resolution: request.resolution,
+    references: requestedReferences.map(reference => ({ ...reference })),
     size: request.size,
     status: 'submitted',
     updatedAt: now,
-    useCharacter: topic.useCharacter,
     versionNumber: Math.max(0, ...topic.versions.map(item => item.versionNumber)) + 1,
   };
   const updatedTopic: IllustrationTopic = {

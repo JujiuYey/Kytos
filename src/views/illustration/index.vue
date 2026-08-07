@@ -18,13 +18,13 @@ import { useCredentialStatus } from '@/composables/use-credential-status';
 import { useGenerationPolling } from '@/composables/use-generation-polling';
 import { useAppStore } from '@/stores/app';
 import type {
-  CharacterVisualResolution,
-  CharacterExpressionReferenceSelection,
+  CharacterLibraryCharacter,
   CharacterExpressionWorkspaceState,
+  CharacterVisualResolution,
   CharacterVisualWorkspaceState,
-  CharacterVisualAssetSelection,
   IllustrationAgentMessage,
   IllustrationBriefUpdateResult,
+  IllustrationReference,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,
@@ -40,8 +40,15 @@ import IllustrationHeader from './components/illustration-header.vue';
 import IllustrationRevisionDialog from './components/illustration-revision-dialog.vue';
 import IllustrationWorkspacePanel from './components/illustration-workspace-panel.vue';
 
-interface IllustrationCharacterReferenceOption extends ImageReferencePickerOption {
-  selection: CharacterExpressionReferenceSelection;
+interface IllustrationReferenceOption extends ImageReferencePickerOption {
+  reference: IllustrationReference;
+}
+
+interface CharacterReferenceWorkspace {
+  characterId: string;
+  characterName: string;
+  expression: CharacterExpressionWorkspaceState;
+  visual: CharacterVisualWorkspaceState;
 }
 
 const appStore = useAppStore();
@@ -50,8 +57,7 @@ const router = useRouter();
 const topics = ref<IllustrationTopic[]>([]);
 const uploads = ref<UploadedIllustration[]>([]);
 const activeTopicId = ref('');
-const visualWorkspace = ref<CharacterVisualWorkspaceState | null>(null);
-const expressionWorkspace = ref<CharacterExpressionWorkspaceState | null>(null);
+const characterReferenceWorkspaces = ref<CharacterReferenceWorkspace[]>([]);
 const initializationError = ref('');
 const generationError = ref('');
 const isInitializing = ref(true);
@@ -64,7 +70,6 @@ const mobilePane = ref<'chat' | 'workspace'>('chat');
 const prompt = ref('');
 const size = ref<IllustrationSize>('16:9');
 const resolution = ref<CharacterVisualResolution>('1k');
-const selectedCharacterReferences = ref<CharacterExpressionReferenceSelection[]>([]);
 const revisionTarget = ref<IllustrationVersion | null>(null);
 
 const {
@@ -104,83 +109,139 @@ const activeTopic = computed(
   () => topics.value.find(topic => topic.id === activeTopicId.value) ?? null,
 );
 const referenceFilters: ImageReferencePickerFilter[] = [
-  { label: '视觉资产', value: 'visual' },
-  { label: '已有表情', value: 'expression' },
+  { label: '角色视觉', value: 'character-visual' },
+  { label: '角色表情', value: 'character-expression' },
+  { label: '已有插画', value: 'illustration' },
 ];
-const characterReferenceOptions = computed<IllustrationCharacterReferenceOption[]>(() => {
-  const visualOptions = (visualWorkspace.value?.officialAssets ?? []).flatMap(selection => {
-    const match = findOfficialVisual(selection);
-    if (!match) {
-      return [];
-    }
-    return [
-      {
-        detail: `角色视觉 · ${match.record.size}`,
-        image: match.image,
-        key: characterReferenceKey({ ...selection, kind: 'visual' }),
-        label: match.image.name || match.record.name || '正式角色视觉',
-        selection: { ...selection, kind: 'visual' as const },
-        source: 'visual',
-      },
-    ];
+const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() => {
+  const characterOptions = characterReferenceWorkspaces.value.flatMap(workspace => {
+    const visualOptions = workspace.visual.officialAssets.flatMap(selection => {
+      const record = workspace.visual.records.find(item => item.id === selection.taskId);
+      const image = record?.images.find(item => item.fileName === selection.fileName);
+      if (!record || !image) return [];
+      const reference: IllustrationReference = {
+        characterId: workspace.characterId,
+        fileName: image.fileName,
+        kind: 'character-visual',
+        taskId: record.id,
+      };
+      return [
+        {
+          detail: `${workspace.characterName} · 正式视觉 · ${record.size}`,
+          image,
+          key: illustrationReferenceKey(reference),
+          label: image.name || record.name || '正式角色视觉',
+          reference,
+          source: 'character-visual',
+        },
+      ];
+    });
+    const expressionOptions = workspace.expression.records.flatMap(record =>
+      record.images.map((image, index) => {
+        const reference: IllustrationReference = {
+          characterId: workspace.characterId,
+          fileName: image.fileName,
+          kind: 'character-expression',
+          taskId: record.id,
+        };
+        return {
+          detail: `${workspace.characterName} · ${record.source === 'uploaded' ? '表情上传' : '生成表情'}`,
+          image,
+          key: illustrationReferenceKey(reference),
+          label: record.images.length > 1 ? `${record.name} ${index + 1}` : record.name,
+          reference,
+          source: 'character-expression',
+        };
+      }),
+    );
+    return [...visualOptions, ...expressionOptions];
   });
-  const expressionOptions = (expressionWorkspace.value?.records ?? []).flatMap(record =>
-    record.status === 'completed'
-      ? record.images.map((image, index) => {
-          const selection = {
-            fileName: image.fileName,
-            kind: 'expression' as const,
-            taskId: record.id,
-          };
-          return {
-            detail: record.source === 'uploaded' ? '已有表情 · 上传' : '已有表情 · 生成',
-            image,
-            key: characterReferenceKey(selection),
-            label: record.images.length > 1 ? `${record.name} ${index + 1}` : record.name,
-            selection,
-            source: 'expression',
-          };
-        })
-      : [],
+  const uploadedOptions = uploads.value.map(upload => {
+    const reference: IllustrationReference = {
+      fileName: upload.fileName,
+      kind: 'illustration',
+      source: 'uploaded',
+      topicId: null,
+      uploadId: upload.id,
+      versionId: null,
+    };
+    return {
+      detail: `上传 · ${upload.originalName}`,
+      image: { fileName: upload.fileName, mimeType: upload.mimeType, url: upload.url },
+      key: illustrationReferenceKey(reference),
+      label: upload.originalName,
+      reference,
+      source: 'illustration',
+    };
+  });
+  const generatedOptions = topics.value.flatMap(topic =>
+    topic.versions.flatMap(version =>
+      version.status === 'completed'
+        ? version.images.map(image => {
+            const reference: IllustrationReference = {
+              fileName: image.fileName,
+              kind: 'illustration',
+              source: 'generated',
+              topicId: topic.id,
+              uploadId: null,
+              versionId: version.id,
+            };
+            return {
+              detail: `创作 · ${topic.title} V${version.versionNumber}`,
+              image,
+              key: illustrationReferenceKey(reference),
+              label: `${topic.title} V${version.versionNumber}`,
+              reference,
+              source: 'illustration',
+            };
+          })
+        : [],
+    ),
   );
-  return [...visualOptions, ...expressionOptions];
+  return [...characterOptions, ...uploadedOptions, ...generatedOptions];
 });
-const selectedCharacterReferenceKeys = computed(() =>
-  selectedCharacterReferences.value.map(characterReferenceKey),
+const selectedReferenceKeys = computed(() =>
+  (activeTopic.value?.references ?? []).map(illustrationReferenceKey),
 );
-const selectedCharacterReferenceOptions = computed(() => {
-  const selectedKeySet = new Set(selectedCharacterReferenceKeys.value);
-  return characterReferenceOptions.value.filter(option => selectedKeySet.has(option.key));
+const selectedReferenceOptions = computed(() => {
+  const selectedKeySet = new Set(selectedReferenceKeys.value);
+  return illustrationReferenceOptions.value.filter(option => selectedKeySet.has(option.key));
 });
-const characterReferencePreviews = computed(() =>
-  selectedCharacterReferenceOptions.value.map(option => ({
+const referencePreviews = computed(() =>
+  selectedReferenceOptions.value.map(option => ({
+    detail: option.detail,
     image: option.image,
+    key: option.key,
     label: option.label,
   })),
 );
-const referencesReady = computed(() => selectedCharacterReferenceOptions.value.length > 0);
-const maxCharacterReferenceCount = computed(() => MAX_ILLUSTRATION_REFERENCE_IMAGES);
+const maxReferenceCount = computed(() => MAX_ILLUSTRATION_REFERENCE_IMAGES);
 
-function characterReferenceKey(selection: CharacterExpressionReferenceSelection): string {
-  return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
-}
-
-function findOfficialVisual(selection: CharacterVisualAssetSelection) {
-  const workspace = visualWorkspace.value;
-  if (!workspace) {
-    return null;
+function illustrationReferenceKey(reference: IllustrationReference): string {
+  if (reference.kind === 'illustration') {
+    return `illustration:${reference.source}:${reference.topicId ?? reference.uploadId}:${reference.versionId ?? reference.fileName}`;
   }
-  const record = workspace.records.find(record => record.id === selection.taskId);
-  const image = record?.images.find(image => image.fileName === selection.fileName);
-  return record && image ? { image, record } : null;
+  return `${reference.kind}:${reference.characterId}:${reference.taskId}:${reference.fileName}`;
 }
 
-function selectCharacterReferenceKeys(keys: string[]): void {
+async function selectReferenceKeys(keys: string[]): Promise<void> {
+  const topic = activeTopic.value;
+  if (!topic || generationBusy.value) return;
   const selectedKeySet = new Set(keys);
-  selectedCharacterReferences.value = characterReferenceOptions.value
+  const references = illustrationReferenceOptions.value
     .filter(option => selectedKeySet.has(option.key))
-    .slice(0, maxCharacterReferenceCount.value)
-    .map(option => ({ ...option.selection }));
+    .slice(0, maxReferenceCount.value)
+    .map(option => ({ ...option.reference }));
+  try {
+    replaceTopic(
+      await window.desktop.illustration.updateIllustrationTopic({
+        references,
+        topicId: topic.id,
+      }),
+    );
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  }
 }
 
 const transport = new DefaultChatTransport<IllustrationAgentMessage>({
@@ -285,14 +346,30 @@ function applyTopic(topic: IllustrationTopic): void {
   const latestVersion = topic.versions[0];
   size.value = latestVersion?.size ?? '16:9';
   resolution.value = latestVersion?.resolution ?? '1k';
-  const availableReferenceKeys = new Set(characterReferenceOptions.value.map(option => option.key));
-  selectedCharacterReferences.value = (latestVersion?.characterReferences ?? [])
-    .filter(reference => availableReferenceKeys.has(characterReferenceKey(reference)))
-    .slice(0, maxCharacterReferenceCount.value)
-    .map(reference => ({ ...reference }));
   clearError();
   generationError.value = '';
   mobilePane.value = 'chat';
+}
+
+async function loadCharacterReferenceWorkspaces(
+  characters: CharacterLibraryCharacter[],
+): Promise<void> {
+  characterReferenceWorkspaces.value = await Promise.all(
+    characters.map(async character => {
+      const [visual, expression] = await Promise.all([
+        window.desktop.character.assets.getCharacterVisualWorkspace({ characterId: character.id }),
+        window.desktop.character.expression.getCharacterExpressionWorkspace({
+          characterId: character.id,
+        }),
+      ]);
+      return {
+        characterId: character.id,
+        characterName: character.name,
+        expression,
+        visual,
+      };
+    }),
+  );
 }
 
 function openRequestedRevision(topic: IllustrationTopic): void {
@@ -324,19 +401,14 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   initializationError.value = '';
   try {
-    const [workspace, visuals, library] = await Promise.all([
+    const [workspace, library] = await Promise.all([
       window.desktop.illustration.getIllustrationWorkspace(),
-      window.desktop.character.assets.getCharacterVisualWorkspace(),
       window.desktop.character.library.getCharacterLibrary(),
       refreshCredentialStatus(),
     ]);
-    const expressions = await window.desktop.character.expression.getCharacterExpressionWorkspace({
-      characterId: library.activeCharacterId,
-    });
+    await loadCharacterReferenceWorkspaces(library.characters);
     topics.value = workspace.topics;
     uploads.value = workspace.uploads;
-    visualWorkspace.value = visuals;
-    expressionWorkspace.value = expressions;
 
     const requestedTopicId = route.query.revisionTopicId;
     let topic =
@@ -345,7 +417,7 @@ async function initialize(): Promise<void> {
         : undefined;
     topic ??= topics.value[0];
     if (!topic) {
-      topic = await window.desktop.illustration.createIllustrationTopic({ useCharacter: true });
+      topic = await window.desktop.illustration.createIllustrationTopic({});
       topics.value = [topic];
     }
     applyTopic(topic);
@@ -409,7 +481,7 @@ async function createTopic(): Promise<void> {
     return;
   }
   try {
-    const topic = await window.desktop.illustration.createIllustrationTopic({ useCharacter: true });
+    const topic = await window.desktop.illustration.createIllustrationTopic({});
     replaceTopic(topic);
     applyTopic(topic);
   } catch (createError: unknown) {
@@ -423,23 +495,6 @@ function selectTopic(topicId: string): void {
     return;
   }
   applyTopic(topic);
-}
-
-async function updateUseCharacter(value: boolean): Promise<void> {
-  const topic = activeTopic.value;
-  if (!topic || busy.value) {
-    return;
-  }
-  try {
-    replaceTopic(
-      await window.desktop.illustration.updateIllustrationTopic({
-        topicId: topic.id,
-        useCharacter: value,
-      }),
-    );
-  } catch (updateError: unknown) {
-    toast.error(updateError instanceof Error ? updateError.message : String(updateError));
-  }
 }
 
 async function renameTopic(title: string): Promise<void> {
@@ -475,19 +530,17 @@ async function generate(
       0,
       MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(Boolean(options.baseVersion)),
     );
-    const characterReferences = topic.useCharacter
-      ? selectedCharacterReferences.value
-          .slice(0, maxReferences)
-          .map(reference => ({ ...reference }))
-      : [];
-    if (characterReferences.length < selectedCharacterReferences.value.length) {
+    const references = topic.references
+      .slice(0, maxReferences)
+      .map(reference => ({ ...reference }));
+    if (references.length < topic.references.length) {
       toast.info('修改版本会额外使用原插画，已将总参考图控制在 16 张以内');
     }
     const version = await window.desktop.illustration.generateIllustration({
       baseVersion: options.baseVersion,
-      characterReferences,
       prompt: prompt.value.trim(),
       revisionPrompt: options.revisionPrompt,
+      references,
       resolution: resolution.value,
       size: size.value,
       topicId: topic.id,
@@ -549,7 +602,7 @@ async function confirmDeleteTopic(): Promise<void> {
     deleteTopicDialogOpen.value = false;
     let nextTopic = topics.value[0];
     if (!nextTopic) {
-      nextTopic = await window.desktop.illustration.createIllustrationTopic({ useCharacter: true });
+      nextTopic = await window.desktop.illustration.createIllustrationTopic({});
       topics.value = [nextTopic];
     }
     applyTopic(nextTopic);
@@ -599,14 +652,11 @@ onMounted(() => {
         v-model:mobile-pane="mobilePane"
         :active-topic-id="activeTopic.id"
         :busy="navigationBusy"
-        :references-ready="referencesReady"
         :topics="topics"
         :topic-locked="busy"
-        :use-character="activeTopic.useCharacter"
         @create="createTopic"
         @delete="deleteTopicDialogOpen = true"
         @select="selectTopic"
-        @update:use-character="updateUseCharacter"
       />
     </template>
 
@@ -653,8 +703,7 @@ onMounted(() => {
           :busy="generationBusy"
           :prompt="prompt"
           :polling-states="pollingStates"
-          :character-references="characterReferencePreviews"
-          :references-ready="referencesReady"
+          :references="referencePreviews"
           :resolution="resolution"
           :size="size"
           :topic="activeTopic"
@@ -667,7 +716,6 @@ onMounted(() => {
           @update:prompt="prompt = $event"
           @update:resolution="resolution = $event"
           @update:size="size = $event"
-          @update:use-character="updateUseCharacter"
         />
       </aside>
     </div>
@@ -675,14 +723,14 @@ onMounted(() => {
     <ImageReferencePickerDialog
       v-model:open="referenceDialogOpen"
       :busy="generationBusy"
-      description="可以混选当前角色的正式视觉资产和已有表情，生成时只使用这里确认的图片。"
-      empty-description="当前角色还没有可选择的正式视觉资产或已有表情。"
+      description="可加入多个角色的正式视觉或表情，也可以加入已有插画和上传图作为本次画面的参考。"
+      empty-description="还没有可加入的角色或插画素材。"
       :filters="referenceFilters"
-      :max-selection="maxCharacterReferenceCount"
-      :options="characterReferenceOptions"
-      :selected-keys="selectedCharacterReferenceKeys"
-      title="选择角色参考"
-      @confirm="selectCharacterReferenceKeys"
+      :max-selection="maxReferenceCount"
+      :options="illustrationReferenceOptions"
+      :selected-keys="selectedReferenceKeys"
+      title="管理画面素材"
+      @confirm="selectReferenceKeys"
     />
 
     <IllustrationRevisionDialog

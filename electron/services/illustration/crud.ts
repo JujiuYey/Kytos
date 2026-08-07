@@ -19,7 +19,7 @@ import { ID_PATTERN, MAX_TEXT_LENGTH, MAX_TITLE_LENGTH } from '../../constants';
 import { isNodeError } from '../../utils/node-error';
 import { saveUploadedIllustrationFile, safeUnlinkAssetFile } from './assets';
 import { BRIEF_FIELDS } from './constants';
-import { getAssetUrl, parseMessages } from './parsers';
+import { getAssetUrl, parseIllustrationReferences, parseMessages } from './parsers';
 import {
   loadStore,
   removeTopic,
@@ -44,7 +44,7 @@ export async function getIllustrationTopic(topicId: string): Promise<Illustratio
 export async function createIllustrationTopic(
   request: CreateIllustrationTopicRequest,
 ): Promise<IllustrationTopic> {
-  if (!isPlainObject(request) || typeof request.useCharacter !== 'boolean') {
+  if (!isPlainObject(request)) {
     throw new Error('新建插画主题参数无效');
   }
   const now = new Date().toISOString();
@@ -54,9 +54,9 @@ export async function createIllustrationTopic(
     id: `illustration_${randomUUID()}`,
     messages: [],
     ready: false,
+    references: [],
     title: '未命名插画',
     updatedAt: now,
-    useCharacter: request.useCharacter,
     versions: [],
   };
   await saveStore(replaceTopic(await loadStore(), topic));
@@ -77,16 +77,23 @@ export async function updateIllustrationTopic(
   ) {
     throw new Error('插画主题名称无效');
   }
-  if (request.useCharacter !== undefined && typeof request.useCharacter !== 'boolean') {
-    throw new Error('角色参考设置无效');
+  if (request.references !== undefined && !Array.isArray(request.references)) {
+    throw new Error('画面素材无效');
   }
   const store = await loadStore();
   const topic = requireTopic(store, request.topicId);
+  const references =
+    request.references === undefined
+      ? topic.references
+      : parseIllustrationReferences(request.references);
+  if (request.references !== undefined && references.length !== request.references.length) {
+    throw new Error('画面素材无效');
+  }
   const updatedTopic: IllustrationTopic = {
     ...topic,
     title: request.title?.trim() ?? topic.title,
     updatedAt: new Date().toISOString(),
-    useCharacter: request.useCharacter ?? topic.useCharacter,
+    references,
   };
   await saveStore(replaceTopic(store, updatedTopic));
   return updatedTopic;

@@ -86,4 +86,13 @@ export const ILLUSTRATION_MIGRATIONS: readonly DatabaseMigration[] = [
     migrate: createIllustrationTables,
     name: '005_illustration_tables',
   },
+  {
+    migrate(database) {
+      database.exec(`
+        ALTER TABLE illustration_topics ADD COLUMN references_json TEXT NOT NULL DEFAULT '[]';
+        ALTER TABLE illustration_versions ADD COLUMN references_json TEXT NOT NULL DEFAULT '[]';
+      `);
+    },
+    name: '008_illustration_reference_materials',
+  },
 ];

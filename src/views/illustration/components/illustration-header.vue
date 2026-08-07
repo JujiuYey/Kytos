@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Images, MessageSquare, Plus, Trash2 } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -9,9 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { IllustrationTopic } from '@/types';
 
 defineProps<{
@@ -19,9 +16,7 @@ defineProps<{
   busy: boolean;
   topicLocked: boolean;
   mobilePane: 'chat' | 'workspace';
-  referencesReady: boolean;
   topics: IllustrationTopic[];
-  useCharacter: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -29,7 +24,6 @@ const emit = defineEmits<{
   (event: 'delete'): void;
   (event: 'select', topicId: string): void;
   (event: 'update:mobilePane', value: 'chat' | 'workspace'): void;
-  (event: 'update:useCharacter', value: boolean): void;
 }>();
 </script>
 
@@ -63,19 +57,6 @@ const emit = defineEmits<{
       </TabsTrigger>
     </TabsList>
   </Tabs>
-
-  <div class="hidden items-center gap-2 md:flex">
-    <Switch
-      id="illustration-use-character"
-      :model-value="useCharacter"
-      :disabled="topicLocked"
-      @update:model-value="emit('update:useCharacter', Boolean($event))"
-    />
-    <Label for="illustration-use-character" class="whitespace-nowrap text-xs">使用当前角色</Label>
-    <SagStatusBadge v-if="useCharacter" :tone="referencesReady ? 'success' : 'error'">
-      {{ referencesReady ? '角色参考就绪' : '缺少角色参考' }}
-    </SagStatusBadge>
-  </div>
 
   <Button
     size="icon"

@@ -16,7 +16,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -35,18 +34,19 @@ import type {
 } from '@/types';
 import { ILLUSTRATION_SIZES } from '@/types';
 
-interface IllustrationCharacterReferencePreview {
+interface IllustrationReferencePreview {
+  detail: string;
   image: CharacterVisualImage;
+  key: string;
   label: string;
 }
 
 const props = defineProps<{
   apimartConfigured: boolean;
   busy: boolean;
-  characterReferences: IllustrationCharacterReferencePreview[];
+  references: IllustrationReferencePreview[];
   pollingStates: GenerationPollingStateMap;
   prompt: string;
-  referencesReady: boolean;
   resolution: CharacterVisualResolution;
   size: IllustrationSize;
   topic: IllustrationTopic;
@@ -61,11 +61,9 @@ const emit = defineEmits<{
   (event: 'update:prompt', value: string): void;
   (event: 'update:resolution', value: CharacterVisualResolution): void;
   (event: 'update:size', value: IllustrationSize): void;
-  (event: 'update:useCharacter', value: boolean): void;
 }>();
 
 const promptOpen = ref(false);
-const referenceAssets = computed(() => (props.topic.useCharacter ? props.characterReferences : []));
 const activeStatuses = ['submitted', 'pending', 'processing'];
 const planFields = computed(() => [
   { label: '主体', value: props.topic.brief.subject },
@@ -77,12 +75,7 @@ const planFields = computed(() => [
   { label: '细节', value: props.topic.brief.details },
 ]);
 const generateDisabled = computed(
-  () =>
-    props.busy ||
-    !props.topic.ready ||
-    !props.prompt.trim() ||
-    !props.apimartConfigured ||
-    (props.topic.useCharacter && !props.referencesReady),
+  () => props.busy || !props.topic.ready || !props.prompt.trim() || !props.apimartConfigured,
 );
 
 function isActive(version: IllustrationVersion): boolean {
@@ -131,36 +124,19 @@ function handleTitleChange(event: Event): void {
               @change="handleTitleChange"
             />
           </div>
-
-          <div
-            class="flex items-center justify-between gap-4 rounded-md border px-3 py-3 md:hidden"
-          >
-            <div>
-              <Label for="illustration-mobile-use-character">使用当前角色</Label>
-              <p class="mt-1 text-xs text-muted-foreground">
-                {{ referencesReady ? '正式角色视觉已就绪' : '需要先准备正式角色视觉' }}
-              </p>
-            </div>
-            <Switch
-              id="illustration-mobile-use-character"
-              :model-value="topic.useCharacter"
-              :disabled="busy"
-              @update:model-value="emit('update:useCharacter', Boolean($event))"
-            />
-          </div>
         </section>
 
         <section aria-labelledby="illustration-references-heading">
           <div class="mb-3 flex items-center justify-between gap-3">
-            <h3 id="illustration-references-heading" class="text-sm font-medium">正式参考</h3>
-            <SagStatusBadge :tone="topic.useCharacter && referencesReady ? 'success' : 'info'">
-              {{ topic.useCharacter ? `${characterReferences.length} 张角色参考` : '不使用角色' }}
+            <h3 id="illustration-references-heading" class="text-sm font-medium">画面素材</h3>
+            <SagStatusBadge :tone="references.length ? 'success' : 'info'">
+              {{ references.length ? `${references.length} 项素材` : '未添加素材' }}
             </SagStatusBadge>
           </div>
-          <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div v-if="references.length" class="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <div
-              v-for="asset in referenceAssets"
-              :key="asset.label"
+              v-for="asset in references"
+              :key="asset.key"
               class="min-w-0 overflow-hidden rounded-md border bg-muted/20"
             >
               <ImageViewer
@@ -189,25 +165,23 @@ function handleTitleChange(event: Event): void {
                 <ImageIcon class="size-4" />
               </div>
               <p class="truncate border-t px-2 py-1.5 text-center text-xs">{{ asset.label }}</p>
+              <p class="truncate border-t px-2 py-1 text-center text-[11px] text-muted-foreground">
+                {{ asset.detail }}
+              </p>
             </div>
           </div>
-          <div v-if="topic.useCharacter" class="mt-3">
-            <Button
-              v-if="topic.useCharacter"
-              variant="outline"
-              size="sm"
-              @click="emit('open-reference-picker')"
-            >
-              <Images class="size-4" />
-              {{ characterReferences.length ? '更换角色参考' : '选择角色参考' }}
-            </Button>
+          <div
+            v-else
+            class="flex min-h-24 items-center justify-center border border-dashed px-3 text-center text-xs leading-5 text-muted-foreground"
+          >
+            可以直接创作，也可以加入角色、已有插画或上传图作为画面素材。
           </div>
+          <Button class="mt-3" variant="outline" size="sm" @click="emit('open-reference-picker')">
+            <Images class="size-4" />
+            {{ references.length ? '管理画面素材' : '添加画面素材' }}
+          </Button>
           <p class="mt-2 text-xs leading-5 text-muted-foreground">
-            {{
-              topic.useCharacter
-                ? '生成时使用已选角色参考；已有版本可单独继续修改。'
-                : '生成时不附加角色参考；已有版本可单独继续修改。'
-            }}
+            角色、已有插画和上传图会在本次生成中作为参考；生成版本会保存这次选择的素材。
           </p>
         </section>
 

@@ -11,7 +11,7 @@ import {
   runDatabaseMigrations,
   runInTransaction,
 } from '../../storage/database';
-import { getAssetUrl, parseMessages } from './parsers';
+import { getAssetUrl, parseIllustrationReferences, parseMessages } from './parsers';
 import { ILLUSTRATION_MIGRATIONS } from './schema';
 import type { StoredIllustrationWorkspace } from './types';
 
@@ -111,9 +111,9 @@ function readTopic(database: DatabaseSync, row: DatabaseRow): IllustrationTopic 
     id,
     messages: parseMessages(parseJson(row.messages_json)),
     ready: readBoolean(row.ready),
+    references: parseIllustrationReferences(parseJson(row.references_json)),
     title: readText(row.title),
     updatedAt: readText(row.updated_at),
-    useCharacter: readBoolean(row.use_character),
     versions: versionRows.map(version => readVersion(database, id, version)),
   };
 }
@@ -132,24 +132,11 @@ function readVersion(
        ORDER BY position`,
     )
     .all(topicId, id) as DatabaseRow[];
-  const referenceRows = database
-    .prepare(
-      `SELECT kind, task_id, file_name
-       FROM illustration_version_character_references
-       WHERE topic_id = ? AND version_id = ?
-       ORDER BY position`,
-    )
-    .all(topicId, id) as DatabaseRow[];
   const baseVersionId = nullableText(row.base_version_id);
   const baseFileName = nullableText(row.base_file_name);
   return {
     baseVersion:
       baseVersionId && baseFileName ? { fileName: baseFileName, versionId: baseVersionId } : null,
-    characterReferences: referenceRows.map(reference => ({
-      fileName: readText(reference.file_name),
-      kind: readText(reference.kind) as IllustrationVersion['characterReferences'][number]['kind'],
-      taskId: readText(reference.task_id),
-    })),
     createdAt: readText(row.created_at),
     errorMessage: nullableText(row.error_message),
     id,
@@ -162,10 +149,10 @@ function readVersion(
     progress: readNumber(row.progress),
     prompt: readText(row.prompt),
     resolution: readText(row.resolution) as IllustrationVersion['resolution'],
+    references: parseIllustrationReferences(parseJson(row.references_json)),
     size: readText(row.size) as IllustrationVersion['size'],
     status: readText(row.status) as IllustrationVersion['status'],
     updatedAt: readText(row.updated_at),
-    useCharacter: readBoolean(row.use_character),
     versionNumber: readNumber(row.version_number),
   };
 }
@@ -187,16 +174,17 @@ function saveTopic(database: DatabaseSync, topic: IllustrationTopic): void {
   database
     .prepare(
       `INSERT INTO illustration_topics (
-         id, title, ready, use_character, messages_json,
+         id, title, ready, use_character, references_json, messages_json,
          brief_action, brief_composition, brief_details, brief_environment,
          brief_final_prompt, brief_mood, brief_style, brief_subject, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       topic.id,
       topic.title,
       Number(topic.ready),
-      Number(topic.useCharacter),
+      Number(topic.references.some(reference => reference.kind.startsWith('character-'))),
+      JSON.stringify(topic.references),
       JSON.stringify(topic.messages),
       topic.brief.action,
       topic.brief.composition,
@@ -217,8 +205,8 @@ function saveVersion(database: DatabaseSync, topicId: string, version: Illustrat
     .prepare(
       `INSERT INTO illustration_versions (
          topic_id, id, version_number, base_version_id, base_file_name, prompt, resolution,
-         size, status, progress, error_message, use_character, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         size, status, progress, error_message, use_character, references_json, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       topicId,
@@ -232,7 +220,8 @@ function saveVersion(database: DatabaseSync, topicId: string, version: Illustrat
       version.status,
       version.progress,
       version.errorMessage,
-      Number(version.useCharacter),
+      Number(version.references.some(reference => reference.kind.startsWith('character-'))),
+      JSON.stringify(version.references),
       version.createdAt,
       version.updatedAt,
     );
@@ -249,21 +238,6 @@ function saveVersion(database: DatabaseSync, topicId: string, version: Illustrat
       image.fileName,
       image.mimeType,
       image.name ?? null,
-    );
-  });
-  const insertReference = database.prepare(
-    `INSERT INTO illustration_version_character_references (
-       topic_id, version_id, position, kind, task_id, file_name
-     ) VALUES (?, ?, ?, ?, ?, ?)`,
-  );
-  version.characterReferences.forEach((reference, position) => {
-    insertReference.run(
-      topicId,
-      version.id,
-      position,
-      reference.kind,
-      reference.taskId,
-      reference.fileName,
     );
   });
 }
