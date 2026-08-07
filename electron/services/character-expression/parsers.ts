@@ -19,7 +19,6 @@ import type {
 import { ID_PATTERN, MAX_NAME_LENGTH, MAX_PROMPT_LENGTH } from '../../constants';
 import { isTaskStatus } from '../../utils';
 import { EXPRESSION_ASSET_DIRECTORY } from './constants';
-import type { StoredExpressionWorkspace } from './types';
 
 export function isExpressionSize(value: unknown): value is CharacterExpressionSize {
   return CHARACTER_EXPRESSION_SIZES.includes(value as CharacterExpressionSize);
@@ -184,5 +183,3 @@ export function parseExpressionTask(value: unknown): CharacterExpressionTask | n
     status: value.status === 'completed' ? 'processing' : value.status,
   };
 }
-
-export type { StoredExpressionWorkspace };

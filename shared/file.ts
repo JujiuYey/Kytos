@@ -37,10 +37,24 @@ export interface ExportFileResult {
   filePath: string | null;
 }
 
+// 批量导出工作区图片结果
+export interface ExportWorkspaceImagesResult {
+  // 用户是否取消了目录选择
+  canceled: boolean;
+  // 实际创建的导出目录
+  directoryPath: string | null;
+  // 导出的图片分类数量
+  categoryCount: number;
+  // 导出的图片总数
+  fileCount: number;
+}
+
 // 文件 API
 export interface FileApi {
   // 导出文件到用户选择的位置
   exportFile: (request: ExportFileRequest) => Promise<ExportFileResult>;
+  // 按资源分类批量导出工作区图片
+  exportWorkspaceImages: () => Promise<ExportWorkspaceImagesResult>;
   // 保存文件
   saveFile: (request: SaveFileRequest) => Promise<SavedFileResult>;
 }

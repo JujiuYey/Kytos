@@ -24,13 +24,14 @@ import { downloadTaskImages, getReferenceData } from './assets';
 import { EXPRESSION_ASSET_DIRECTORY } from './constants';
 import { parseReferenceSelection, selectionKey } from './parsers';
 import { buildExpressionPrompt, resolveChatModel } from './prompts';
-import { loadExpressionStore, replaceRecord, saveExpressionStore } from './store';
 import {
-  loadExpressionTaskStore,
-  removeExpressionTask,
-  saveExpressionTaskStore,
-  upsertExpressionTask,
-} from './task-store';
+  completeExpressionTask,
+  deleteExpressionTask,
+  findExpressionRecord,
+  findExpressionTask,
+  getExpressionWorkspace,
+  saveExpressionTask,
+} from './repository';
 import {
   buildGptImage2RequestBody,
   idSchema,
@@ -42,7 +43,6 @@ import {
 } from '../../utils';
 import type { GptImage2Resolution } from '../../utils';
 import type { ExpressionReferenceData } from './types';
-import type { StoredExpressionWorkspace } from './types';
 
 const generateRequestSchema = z.object({
   characterId: z.string(),
@@ -66,13 +66,13 @@ const generatePromptRequestSchema = z.object({
 // 获取可用的参考图
 export function getAvailableReferences(
   visualReferences: ReturnType<typeof getCharacterVisualReferences>,
-  expressionStore: StoredExpressionWorkspace,
+  expressionRecords: CharacterExpressionRecord[],
 ): ExpressionReferenceData[] {
   const characterVisualReferences = visualReferences.map(reference => ({
     ...reference,
     selection: { ...reference.selection, kind: 'visual' as const },
   }));
-  const expressionReferences = expressionStore.records.flatMap(record =>
+  const expressionReferences = expressionRecords.flatMap(record =>
     record.images.map(image => ({
       directoryName: EXPRESSION_ASSET_DIRECTORY,
       image,
@@ -107,13 +107,13 @@ export async function generateCharacterExpression(
   request: GenerateCharacterExpressionRequest,
 ): Promise<CharacterExpressionTask> {
   const requestedAssets = validateGenerateRequest(request);
-  const [visualWorkspace, expressionStore] = await Promise.all([
+  const [visualWorkspace, expressionWorkspace] = await Promise.all([
     getCharacterVisualWorkspace(request.characterId),
-    loadExpressionStore(request.characterId),
+    getExpressionWorkspace(request.characterId),
   ]);
   const availableReferences = getAvailableReferences(
     getCharacterVisualReferences(visualWorkspace),
-    expressionStore,
+    expressionWorkspace.records,
   );
   const referencesByKey = new Map(
     availableReferences.map(reference => [selectionKey(reference.selection), reference]),
@@ -158,8 +158,7 @@ export async function generateCharacterExpression(
     status: 'submitted',
     updatedAt: now,
   };
-  const taskStore = await loadExpressionTaskStore(request.characterId);
-  await saveExpressionTaskStore(request.characterId, upsertExpressionTask(taskStore, task));
+  await saveExpressionTask(request.characterId, task);
   return task;
 }
 
@@ -168,11 +167,9 @@ export async function getCharacterExpressionTask(
   request: GetCharacterExpressionTaskRequest,
 ): Promise<CharacterExpressionTaskResult> {
   const { characterId, taskId } = parseRequest(request, getTaskRequestSchema);
-  const taskStore = await loadExpressionTaskStore(characterId);
-  const existingTask = taskStore.tasks[taskId];
+  const existingTask = await findExpressionTask(characterId, taskId);
   if (!existingTask) {
-    const expressionStore = await loadExpressionStore(characterId);
-    const completedRecord = expressionStore.records.find(record => record.id === taskId);
+    const completedRecord = await findExpressionRecord(characterId, taskId);
     if (completedRecord) {
       return { record: completedRecord, task: null };
     }
@@ -185,10 +182,9 @@ export async function getCharacterExpressionTask(
     throw new Error('图片生成服务返回了未知任务状态');
   }
   if (taskData.status === 'completed') {
-    const expressionStore = await loadExpressionStore(characterId);
-    const completedRecord = expressionStore.records.find(record => record.id === taskId);
+    const completedRecord = await findExpressionRecord(characterId, taskId);
     if (completedRecord) {
-      await saveExpressionTaskStore(characterId, removeExpressionTask(taskStore, taskId));
+      await deleteExpressionTask(characterId, taskId);
       return { record: completedRecord, task: null };
     }
     const images = await downloadTaskImages(taskId, taskData);
@@ -202,8 +198,7 @@ export async function getCharacterExpressionTask(
       status: 'completed',
       updatedAt: now,
     };
-    await saveExpressionStore(characterId, replaceRecord(expressionStore, record));
-    await saveExpressionTaskStore(characterId, removeExpressionTask(taskStore, taskId));
+    await completeExpressionTask(characterId, record);
     return { record, task: null };
   }
 
@@ -217,9 +212,7 @@ export async function getCharacterExpressionTask(
     status: taskData.status,
     updatedAt: new Date().toISOString(),
   };
-  if (updatedTask.status === 'failed' || updatedTask.status === 'cancelled') {
-    await saveExpressionTaskStore(characterId, upsertExpressionTask(taskStore, updatedTask));
-  }
+  await saveExpressionTask(characterId, updatedTask);
   return { record: null, task: updatedTask };
 }
 

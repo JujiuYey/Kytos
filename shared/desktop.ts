@@ -11,6 +11,7 @@ import type {
   SavedFileResult,
   ExportFileRequest,
   ExportFileResult,
+  ExportWorkspaceImagesResult,
 } from './file';
 import type {
   CredentialService,
@@ -33,6 +34,7 @@ export type {
   SavedFileResult,
   ExportFileRequest,
   ExportFileResult,
+  ExportWorkspaceImagesResult,
   CredentialService,
   CredentialStatus,
   SetCredentialRequest,

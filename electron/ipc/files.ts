@@ -1,14 +1,16 @@
 // 文件保存 IPC 通道注册
 import { writeFile } from 'node:fs/promises';
-import { dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import type { OpenDialogOptions } from 'electron';
 import type {
   ExportFileRequest,
   ExportFileResult,
+  ExportWorkspaceImagesResult,
   SaveFileRequest,
   SavedFileResult,
 } from '../../shared/desktop';
 import { getMimeTypeExtensions } from '../../shared/image-formats';
-import { saveWorkspaceFile } from '../services/workspace';
+import { exportWorkspaceImages, saveWorkspaceFile } from '../services/workspace';
 import type { TrustedSenderGuard } from './trusted-sender';
 
 // 每个 handler 都先调 assertTrustedSender 验证发送方
@@ -27,6 +29,29 @@ export function registerFilesIpc(assertTrustedSender: TrustedSenderGuard): void 
       }
       await writeFile(result.filePath, request.fileData);
       return { canceled: false, filePath: result.filePath };
+    },
+  );
+
+  // 选择目标目录并按资源分类批量导出工作区图片
+  ipcMain.handle(
+    'file:export-workspace-images',
+    async (event): Promise<ExportWorkspaceImagesResult> => {
+      assertTrustedSender(event);
+      const owner = BrowserWindow.fromWebContents(event.sender);
+      const options: OpenDialogOptions = {
+        buttonLabel: '导出到这里',
+        defaultPath: app.getPath('downloads'),
+        properties: ['openDirectory', 'createDirectory'],
+        title: '选择图片导出位置',
+      };
+      const selection = owner
+        ? await dialog.showOpenDialog(owner, options)
+        : await dialog.showOpenDialog(options);
+      const destinationRoot = selection.filePaths[0];
+      if (selection.canceled || !destinationRoot) {
+        return { canceled: true, categoryCount: 0, directoryPath: null, fileCount: 0 };
+      }
+      return { canceled: false, ...(await exportWorkspaceImages(destinationRoot)) };
     },
   );
 

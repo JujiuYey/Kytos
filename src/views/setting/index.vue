@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Settings } from '@lucide/vue';
 import ProjectDir from './components/project-dir/index.vue';
+import ResourceExport from './components/resource-export/index.vue';
 import ModelSettings from './components/model-settings/index.vue';
 import Providers from './components/providers/index.vue';
 import ThemeToggle from './components/theme/index.vue';
@@ -29,6 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
           <TabsContent value="basic" class="space-y-8">
             <ThemeToggle />
             <ProjectDir />
+            <ResourceExport />
           </TabsContent>
 
           <TabsContent value="defaults">

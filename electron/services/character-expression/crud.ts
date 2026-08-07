@@ -13,14 +13,12 @@ import { isNodeError } from '../../storage/json-store';
 import { idSchema, nameSchema, parseRequest, safeFileNameSchema } from '../../utils';
 import { deleteExpressionAssetFile, saveUploadedExpressionFile } from './assets';
 import {
-  loadExpressionStore,
-  patchRecordName,
-  removeImageFromRecord,
-  replaceRecord,
-  saveExpressionStore,
-} from './store';
-import { loadExpressionTaskStore } from './task-store';
-import type { StoredExpressionWorkspace } from './types';
+  findExpressionRecord,
+  getExpressionWorkspace,
+  removeExpressionImage,
+  renameExpressionRecord,
+  saveExpressionRecord,
+} from './repository';
 
 const getWorkspaceRequestSchema = z.object({ characterId: z.string() });
 const renameRequestSchema = z.object({
@@ -38,19 +36,7 @@ export async function getCharacterExpressionWorkspace(
   request: GetCharacterExpressionWorkspaceRequest,
 ): Promise<CharacterExpressionWorkspaceState> {
   const { characterId } = parseRequest(request, getWorkspaceRequestSchema);
-  const store = await loadExpressionStore(characterId);
-  return toWorkspaceState(characterId, store.records);
-}
-
-async function toWorkspaceState(
-  characterId: string,
-  records: CharacterExpressionRecord[],
-): Promise<CharacterExpressionWorkspaceState> {
-  const taskStore = await loadExpressionTaskStore(characterId);
-  const tasks = Object.values(taskStore.tasks).sort((left, right) =>
-    right.createdAt.localeCompare(left.createdAt),
-  );
-  return { records, tasks };
+  return getExpressionWorkspace(characterId);
 }
 
 export async function uploadCharacterExpression(
@@ -77,8 +63,7 @@ export async function uploadCharacterExpression(
     updatedAt: now,
   };
   try {
-    const existing = await loadExpressionStore(request.characterId);
-    await saveExpressionStore(request.characterId, replaceRecord(existing, record));
+    await saveExpressionRecord(request.characterId, record);
   } catch (error: unknown) {
     await deleteExpressionAssetFile(fileName).catch(() => undefined);
     throw error;
@@ -91,8 +76,7 @@ export async function renameCharacterExpression(
 ): Promise<CharacterExpressionWorkspaceState> {
   const { characterId, name, taskId } = parseRequest(request, renameRequestSchema);
 
-  const store = await loadExpressionStore(characterId);
-  const record = store.records.find(item => item.id === taskId);
+  const record = await findExpressionRecord(characterId, taskId);
   if (!record) {
     throw new Error('未找到要重命名的表情');
   }
@@ -100,38 +84,39 @@ export async function renameCharacterExpression(
     throw new Error('表情完成后才能重命名');
   }
 
-  const nextStore = patchRecordName(store, record.id, name, new Date().toISOString());
-  await saveExpressionStore(characterId, nextStore);
-  return toWorkspaceState(characterId, nextStore.records);
+  const renamed = await renameExpressionRecord(
+    characterId,
+    record.id,
+    name,
+    new Date().toISOString(),
+  );
+  if (!renamed) throw new Error('未找到要重命名的表情');
+  return getExpressionWorkspace(characterId);
 }
 
 export async function deleteCharacterExpression(
   request: DeleteCharacterExpressionRequest,
 ): Promise<CharacterExpressionWorkspaceState> {
   const { characterId, fileName, taskId } = parseRequest(request, deleteRequestSchema);
-  const store = await loadExpressionStore(characterId);
-  const record = store.records.find(item => item.id === taskId);
-  const image = record?.images.find(item => item.fileName === fileName);
-  if (!record || !image) {
-    throw new Error('未找到这张表情图片');
-  }
-
-  const nextStore: StoredExpressionWorkspace = removeImageFromRecord(
-    store,
-    record.id,
+  const originalRecord = await removeExpressionImage(
+    characterId,
+    taskId,
     fileName,
     new Date().toISOString(),
   );
-  await saveExpressionStore(characterId, nextStore);
+  if (!originalRecord) {
+    throw new Error('未找到这张表情图片');
+  }
+
   try {
     await deleteExpressionAssetFile(fileName);
   } catch (error: unknown) {
     if (!isNodeError(error) || error.code !== 'ENOENT') {
-      await saveExpressionStore(characterId, store);
+      await saveExpressionRecord(characterId, originalRecord);
       throw new Error(
         error instanceof Error ? `表情图片删除失败：${error.message}` : '表情图片删除失败',
       );
     }
   }
-  return toWorkspaceState(characterId, nextStore.records);
+  return getExpressionWorkspace(characterId);
 }

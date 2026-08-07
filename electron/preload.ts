@@ -172,6 +172,8 @@ const settingsApi: SettingsApi = {
 const fileApi: FileApi = {
   // 导出文件到用户选择的位置
   exportFile: request => ipcRenderer.invoke('file:export', request),
+  // 按资源分类批量导出工作区图片
+  exportWorkspaceImages: () => ipcRenderer.invoke('file:export-workspace-images'),
   // 保存文件
   saveFile: request => ipcRenderer.invoke('file:save', request),
 };

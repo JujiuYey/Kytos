@@ -7,3 +7,4 @@ export {
   setWorkspaceDirectory,
 } from './settings';
 export { saveWorkspaceFile } from './files';
+export { exportWorkspaceImages } from './image-export';
