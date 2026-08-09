@@ -5,6 +5,8 @@ Kytos 是一个本地优先的 AI 角色与视觉内容创作工作台。
 它把角色创建、角色视觉、表情、插画和故事创作放在同一个桌面应用中。
 作品文件保存在你选择的本地工作区，模型凭据由操作系统安全存储保护。
 
+[完整文档](https://jujiuyey.github.io/Kytos/) · [快速开始](https://jujiuyey.github.io/Kytos/getting-started/) · [开发架构](https://jujiuyey.github.io/Kytos/developer/architecture)
+
 > 项目状态：持续开发中。界面和 AI 工作流可能继续调整。
 
 ## 功能
@@ -13,14 +15,8 @@ Kytos 是一个本地优先的 AI 角色与视觉内容创作工作台。
 
 - 创建角色：选择视觉风格，提供可选参考图，生成多张候选形象。
 - 角色管理：创建、选择、重命名和删除角色。
-- 角色视觉：管理头像、角色表和正式角色视觉素材。
+- 角色视觉：管理正式角色视觉、动作图片和角色参考板。
 - 表情管理：基于角色参考生成、上传、重命名和整理表情素材。
-
-![创建角色页面](docs/screenshots/02-character-create.png)
-
-![角色管理页面](docs/screenshots/03-character-library.png)
-
-![角色视觉与表情页面](docs/screenshots/04-character-assets.png)
 
 ### 内容创作
 
@@ -29,12 +25,6 @@ Kytos 是一个本地优先的 AI 角色与视觉内容创作工作台。
 - 插画管理：集中查看、上传、删除和整理插画资产。
 - 故事管理：创建、打开和删除故事项目。
 - 故事创作：通过 AI 共创对话编辑故事、分镜和画面版本。
-
-![插画创作页面](docs/screenshots/05-illustration-create.png)
-
-![插画管理页面](docs/screenshots/06-illustration-library.png)
-
-![故事创作页面](docs/screenshots/07-story-create.png)
 
 ## 安装
 
@@ -53,25 +43,23 @@ pnpm dev
 ```
 
 首次启动时，选择作品工作区。
-默认推荐目录是文档目录下的 `Kytos` 文件夹。
+默认推荐目录是系统文档目录下的 `Kytos` 文件夹。
 
 然后打开“系统设置”，配置需要使用的模型服务凭据。
 
 ## 配置外部服务
 
 Kytos 不读取项目根目录中的 `.env` 来保存用户凭据。
-请在应用的“系统设置 → 模型与凭据”中完成配置。
+请在应用的“系统设置 → 模型厂商”中完成配置。
 
-| 配置          | 用途                                          |
-| ------------- | --------------------------------------------- |
-| DeepSeek Key  | 角色对话、故事对话、插画对话和内容整理        |
-| DeepSeek 模型 | 选择 `DeepSeek V4 Flash` 或 `DeepSeek V4 Pro` |
-| APIMart Key   | 角色视觉、表情、插画和故事画面生成            |
+| 配置     | 用途                                           |
+| -------- | ---------------------------------------------- |
+| DeepSeek | DeepSeek V4 Flash / Pro 对话和内容整理         |
+| MiniMax  | MiniMax M3 文本与多模态共创                    |
+| APIMart  | GPT-Image-2 角色视觉、表情、插画和故事画面生成 |
 
 应用只在主进程调用外部服务时读取 API Key。
 已保存的 API Key 不会回传到渲染界面。
-
-![系统设置页面](docs/screenshots/08-settings.png)
 
 ## 使用流程
 
@@ -134,6 +122,18 @@ pnpm lint
 pnpm exec oxfmt --check README.md
 ```
 
+启动文档站：
+
+```bash
+pnpm docs:dev
+```
+
+构建文档站：
+
+```bash
+pnpm docs:build
+```
+
 创建 macOS 打包产物：
 
 ```bash
@@ -153,7 +153,8 @@ src/stores/               Pinia 状态管理
 src/router/               Vue Router 路由
 src/assets/               内置图片和风格素材
 scripts/                  本地辅助脚本
-docs/                     设计文档和 README 截图
+website/                  VitePress 文档站源码
+.github/workflows/        GitHub Pages 自动发布流程
 ```
 
 ## 贡献

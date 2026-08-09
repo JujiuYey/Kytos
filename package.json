@@ -8,6 +8,9 @@
     "dev": "electron-forge start",
     "build": "vue-tsc -b && electron-forge package",
     "build:web": "vue-tsc -b && vite build",
+    "docs:dev": "vitepress dev website",
+    "docs:build": "vitepress build website",
+    "docs:preview": "vitepress preview website",
     "package": "vue-tsc -b && electron-forge package",
     "make": "vue-tsc -b && electron-forge make",
     "preview": "vite preview",
@@ -77,6 +80,7 @@
     "tailwindcss": "^4.1.11",
     "typescript": "~5.8.3",
     "vite": "^7.0.0",
+    "vitepress": "2.0.0-alpha.19",
     "vue-tsc": "^2.2.10"
   },
   "lint-staged": {
