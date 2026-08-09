@@ -15,6 +15,8 @@ Kytos 不从项目根目录的 `.env` 读取用户 API Key。所有模型凭据�
 | DeepSeek | 角色创建、插画共创、故事共创和提示词整理     | DeepSeek V4 Flash、DeepSeek V4 Pro |
 | MiniMax  | 文本与多模态共创任务                         | MiniMax M3                         |
 
+![系统设置页面](../../docs/screenshots/08-settings.png)
+
 ## 三类默认模型
 
 ### 通用模型

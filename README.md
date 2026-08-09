@@ -18,6 +18,12 @@ Kytos 是一个本地优先的 AI 角色与视觉内容创作工作台。
 - 角色视觉：管理正式角色视觉、动作图片和角色参考板。
 - 表情管理：基于角色参考生成、上传、重命名和整理表情素材。
 
+![创建角色页面](docs/screenshots/02-character-create.png)
+
+![角色管理页面](docs/screenshots/03-character-library.png)
+
+![角色视觉与表情页面](docs/screenshots/04-character-assets.png)
+
 ### 内容创作
 
 - 插画创作：通过 AI 共创对话整理主题，生成并管理插画版本。
@@ -25,6 +31,12 @@ Kytos 是一个本地优先的 AI 角色与视觉内容创作工作台。
 - 插画管理：集中查看、上传、删除和整理插画资产。
 - 故事管理：创建、打开和删除故事项目。
 - 故事创作：通过 AI 共创对话编辑故事、分镜和画面版本。
+
+![插画创作页面](docs/screenshots/05-illustration-create.png)
+
+![插画管理页面](docs/screenshots/06-illustration-library.png)
+
+![故事创作页面](docs/screenshots/07-story-create.png)
 
 ## 安装
 
@@ -60,6 +72,8 @@ Kytos 不读取项目根目录中的 `.env` 来保存用户凭据。
 
 应用只在主进程调用外部服务时读取 API Key。
 已保存的 API Key 不会回传到渲染界面。
+
+![系统设置页面](docs/screenshots/08-settings.png)
 
 ## 使用流程
 
