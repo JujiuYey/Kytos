@@ -48,8 +48,10 @@ const props = defineProps<{
   references: IllustrationReferencePreview[];
   pollingStates: GenerationPollingStateMap;
   prompt: string;
-  revisionBase: IllustrationVersion | null;
+  revisionActive: boolean;
+  revisionLabel: string | null;
   revisionReady: boolean;
+  revisionVersionId: string | null;
   resolution: CharacterVisualResolution;
   selectedVersionId: string | null;
   size: IllustrationSize;
@@ -86,7 +88,7 @@ const generateDisabled = computed(
     !props.topic.ready ||
     !props.prompt.trim() ||
     !props.apimartConfigured ||
-    (Boolean(props.revisionBase) && !props.revisionReady),
+    (props.revisionActive && !props.revisionReady),
 );
 const selectedVersion = computed(
   () =>
@@ -226,12 +228,12 @@ function handleTitleChange(event: Event): void {
               <Button
                 v-if="selectedVersion.status === 'completed' && selectedVersion.images.length"
                 size="sm"
-                :variant="revisionBase?.id === selectedVersion.id ? 'secondary' : 'ghost'"
+                :variant="revisionVersionId === selectedVersion.id ? 'secondary' : 'ghost'"
                 @click="emit('revise', selectedVersion)"
               >
                 <PencilLine class="size-4" />
                 {{
-                  revisionBase?.id === selectedVersion.id
+                  revisionVersionId === selectedVersion.id
                     ? `返回对话调整 V${selectedVersion.versionNumber}`
                     : `继续调整 V${selectedVersion.versionNumber}`
                 }}
@@ -416,16 +418,12 @@ function handleTitleChange(event: Event): void {
       <Button class="w-full" :disabled="generateDisabled" @click="emit('generate')">
         <Sparkles class="size-4" />
         {{
-          busy
-            ? '正在生成插画'
-            : revisionBase
-              ? `基于 V${revisionBase.versionNumber} 生成新版本`
-              : '生成插画'
+          busy ? '正在生成插画' : revisionLabel ? `基于 ${revisionLabel} 生成新版本` : '生成插画'
         }}
       </Button>
       <p class="mt-2 text-center text-xs text-muted-foreground">
         {{
-          revisionBase && !revisionReady
+          revisionActive && !revisionReady
             ? '先在左侧对话中说明要调整的内容'
             : '使用 GPT-Image-2，点击后将产生实际费用'
         }}

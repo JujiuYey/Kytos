@@ -196,7 +196,14 @@ async function handleUploaded(): Promise<void> {
 }
 
 function reviseIllustration(item: IllustrationLibraryItem): void {
-  if (item.source !== 'generated' || !item.topicId || !item.versionId) {
+  if (item.source === 'uploaded' && item.uploadId) {
+    void router.push({
+      path: '/illustration',
+      query: { revisionUploadId: item.uploadId },
+    });
+    return;
+  }
+  if (!item.topicId || !item.versionId) {
     return;
   }
   void router.push({
@@ -387,12 +394,7 @@ onMounted(() => {
                     <TooltipContent>编辑图片</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                <Button
-                  v-if="item.source === 'generated'"
-                  size="sm"
-                  variant="outline"
-                  @click="reviseIllustration(item)"
-                >
+                <Button size="sm" variant="outline" @click="reviseIllustration(item)">
                   <PencilLine class="size-4" />
                   继续修改
                 </Button>

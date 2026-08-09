@@ -10,6 +10,7 @@ import type {
   IllustrationAgentMessage,
   IllustrationBrief,
   IllustrationReference,
+  IllustrationRevisionReference,
   IllustrationReferencePurpose,
   IllustrationSize,
   IllustrationTopic,
@@ -173,6 +174,33 @@ export function parseVersionReference(value: unknown): IllustrationVersionRefere
     return null;
   }
   return { fileName: value.fileName, versionId: value.versionId };
+}
+
+export function parseIllustrationRevisionReference(
+  value: unknown,
+): IllustrationRevisionReference | null {
+  if (
+    !isPlainObject(value) ||
+    typeof value.fileName !== 'string' ||
+    path.basename(value.fileName) !== value.fileName
+  ) {
+    return null;
+  }
+  if (
+    value.source === 'generated' &&
+    typeof value.versionId === 'string' &&
+    ID_PATTERN.test(value.versionId)
+  ) {
+    return { fileName: value.fileName, source: 'generated', versionId: value.versionId };
+  }
+  if (
+    value.source === 'uploaded' &&
+    typeof value.uploadId === 'string' &&
+    ID_PATTERN.test(value.uploadId)
+  ) {
+    return { fileName: value.fileName, source: 'uploaded', uploadId: value.uploadId };
+  }
+  return null;
 }
 
 export function parseImage(value: unknown): CharacterVisualImage | null {

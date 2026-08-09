@@ -40,8 +40,8 @@ export function createIllustrationAgent(options: {
   topic: IllustrationTopic;
   referenceSummary: string;
   revisionContext: {
+    label: string;
     prompt: string;
-    versionNumber: number;
   } | null;
 }) {
   let currentBrief = options.topic.brief;

@@ -18,11 +18,13 @@ import {
 } from '../../utils';
 import type { GptImage2Resolution } from '../../utils';
 import { getCredentialValue } from '../credentials';
-import { downloadTaskImages, readReferenceImage, safeUnlinkAssetFiles } from './assets';
-import { ASSET_DIRECTORY } from './constants';
+import { downloadTaskImages, safeUnlinkAssetFiles } from './assets';
 import { illustrationReferenceKey, parseIllustrationReference } from './parsers';
 import { buildIllustrationPrompt, validateGenerateRequest } from './prompts';
-import { resolveIllustrationReferencesForStore } from './reference-images';
+import {
+  resolveIllustrationReferencesForStore,
+  resolveIllustrationRevisionReferenceForStore,
+} from './reference-images';
 import { loadStore, replaceTopic, requireTopic, saveStore } from './store';
 
 export async function generateIllustration(
@@ -56,16 +58,21 @@ export async function generateIllustration(
   );
   const referenceImages = resolvedReferences.map(reference => reference.dataUrl);
 
-  // 3. 旧版本作为修改底稿
+  // 3. 生成版本或上传插画作为修改底稿；仅生成版本记录版本血缘。
   let baseVersion: IllustrationVersionReference | null = null;
-  if (request.baseVersion) {
-    const version = topic.versions.find(item => item.id === request.baseVersion?.versionId);
-    const image = version?.images.find(item => item.fileName === request.baseVersion?.fileName);
-    if (!version || !image || version.status !== 'completed') {
-      throw new Error('选择的旧插画版本已失效');
+  if (request.revisionBase) {
+    const resolvedBase = await resolveIllustrationRevisionReferenceForStore(
+      store,
+      topic,
+      request.revisionBase,
+    );
+    if (request.revisionBase.source === 'generated') {
+      baseVersion = {
+        fileName: request.revisionBase.fileName,
+        versionId: request.revisionBase.versionId,
+      };
     }
-    baseVersion = { ...request.baseVersion };
-    referenceImages.push(await readReferenceImage(ASSET_DIRECTORY, image));
+    referenceImages.push(resolvedBase.dataUrl);
   }
 
   if (referenceImages.length > MAX_ILLUSTRATION_REFERENCE_IMAGES) {

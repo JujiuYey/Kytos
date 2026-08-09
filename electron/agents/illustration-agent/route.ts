@@ -8,15 +8,15 @@ import type { ChatModel } from '../../../shared/chat-model';
 import {
   MAX_ILLUSTRATION_REFERENCE_IMAGES,
   type IllustrationReference,
-  type IllustrationVersionReference,
+  type IllustrationRevisionReference,
 } from '../../../shared/illustration';
 import { getCredentialValue } from '../../services/credentials';
 import {
   getIllustrationTopic,
   illustrationReferenceKey,
-  parseVersionReference,
+  parseIllustrationRevisionReference,
   parseIllustrationReferences,
-  resolveIllustrationVersionReference,
+  resolveIllustrationRevisionReference,
   resolveTopicIllustrationReferences,
 } from '../../services/illustration';
 import { createIllustrationAgent } from './agent';
@@ -26,7 +26,7 @@ interface IllustrationAgentRequestBody {
   messages: unknown[];
   model?: ChatModel;
   references: IllustrationReference[];
-  revisionBase: IllustrationVersionReference | null;
+  revisionBase: IllustrationRevisionReference | null;
   topicId: string;
 }
 
@@ -62,7 +62,8 @@ function parseRequestBody(value: unknown): IllustrationAgentRequestBody {
     throw new Error('插画参考图无效');
   }
   const rawRevisionBase = 'revisionBase' in value ? value.revisionBase : null;
-  const revisionBase = rawRevisionBase === null ? null : parseVersionReference(rawRevisionBase);
+  const revisionBase =
+    rawRevisionBase === null ? null : parseIllustrationRevisionReference(rawRevisionBase);
   if (rawRevisionBase !== null && !revisionBase) {
     throw new Error('插画调整版本无效');
   }
@@ -80,7 +81,7 @@ function errorResponse(error: unknown): Response {
 function attachTopicReferences(
   messages: unknown[],
   references: Awaited<ReturnType<typeof resolveTopicIllustrationReferences>>,
-  revisionBase: Awaited<ReturnType<typeof resolveIllustrationVersionReference>> | null,
+  revisionBase: Awaited<ReturnType<typeof resolveIllustrationRevisionReference>> | null,
 ): unknown[] {
   const nextMessages = messages.map(message => {
     if (!isPlainObject(message) || !Array.isArray(message.parts)) return message;
@@ -103,7 +104,7 @@ function attachTopicReferences(
     ...(revisionBase
       ? [
           {
-            filename: `正在讨论 V${revisionBase.versionNumber}`,
+            filename: `正在讨论 ${revisionBase.label}`,
             mediaType: revisionBase.mimeType,
             type: 'file',
             url: revisionBase.dataUrl,
@@ -140,7 +141,7 @@ export async function handleIllustrationAgentRequest(request: Request): Promise<
       getIllustrationTopic(body.topicId),
     ]);
     const revisionBase = body.revisionBase
-      ? await resolveIllustrationVersionReference(topic, body.revisionBase)
+      ? await resolveIllustrationRevisionReference(topic, body.revisionBase)
       : null;
     const maxReferences = Math.max(
       0,
@@ -167,7 +168,7 @@ export async function handleIllustrationAgentRequest(request: Request): Promise<
         .map((reference, index) => `参考图 ${index + 1}：${reference.purpose}`)
         .join('；'),
       revisionContext: revisionBase
-        ? { prompt: revisionBase.prompt, versionNumber: revisionBase.versionNumber }
+        ? { label: revisionBase.label, prompt: revisionBase.prompt }
         : null,
     });
     return await createAgentUIStreamResponse({

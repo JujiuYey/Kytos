@@ -1,7 +1,7 @@
 import type {
   IllustrationReference,
+  IllustrationRevisionReference,
   IllustrationTopic,
-  IllustrationVersionReference,
 } from '../../../shared/illustration';
 import { getCharacterExpressionWorkspace } from '../character-expression';
 import { getCharacterLibrary } from '../character-library';
@@ -23,12 +23,12 @@ export interface ResolvedIllustrationReference {
   reference: IllustrationReference;
 }
 
-export interface ResolvedIllustrationVersionReference {
+export interface ResolvedIllustrationRevisionReference {
   dataUrl: string;
   fileName: string;
+  label: string;
   mimeType: string;
   prompt: string;
-  versionNumber: number;
 }
 
 function referencePurpose(
@@ -132,10 +132,27 @@ export async function resolveTopicIllustrationReferences(
   return resolveIllustrationReferences(await loadStore(), topic.references);
 }
 
-export async function resolveIllustrationVersionReference(
+export async function resolveIllustrationRevisionReferenceForStore(
+  store: StoredIllustrationWorkspace,
   topic: IllustrationTopic,
-  reference: IllustrationVersionReference,
-): Promise<ResolvedIllustrationVersionReference> {
+  reference: IllustrationRevisionReference,
+): Promise<ResolvedIllustrationRevisionReference> {
+  if (reference.source === 'uploaded') {
+    const upload = store.uploads.find(
+      item => item.id === reference.uploadId && item.fileName === reference.fileName,
+    );
+    if (!upload) {
+      throw new Error('选择的上传插画已失效');
+    }
+    return {
+      dataUrl: await readReferenceImage(ASSET_DIRECTORY, upload),
+      fileName: upload.fileName,
+      label: upload.originalName,
+      mimeType: upload.mimeType,
+      prompt: '',
+    };
+  }
+
   const version = topic.versions.find(item => item.id === reference.versionId);
   const image = version?.images.find(item => item.fileName === reference.fileName);
   if (!version || !image || version.status !== 'completed') {
@@ -144,10 +161,17 @@ export async function resolveIllustrationVersionReference(
   return {
     dataUrl: await readReferenceImage(ASSET_DIRECTORY, image),
     fileName: image.fileName,
+    label: `V${version.versionNumber}`,
     mimeType: image.mimeType,
     prompt: version.prompt,
-    versionNumber: version.versionNumber,
   };
+}
+
+export async function resolveIllustrationRevisionReference(
+  topic: IllustrationTopic,
+  reference: IllustrationRevisionReference,
+): Promise<ResolvedIllustrationRevisionReference> {
+  return resolveIllustrationRevisionReferenceForStore(await loadStore(), topic, reference);
 }
 
 export async function resolveIllustrationReferencesForStore(

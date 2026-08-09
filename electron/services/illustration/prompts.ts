@@ -6,7 +6,12 @@ import type {
   IllustrationReference,
 } from '../../../shared/illustration';
 import { MAX_TEXT_LENGTH } from '../../constants';
-import { isResolution, isSize, parseIllustrationReference, parseVersionReference } from './parsers';
+import {
+  isResolution,
+  isSize,
+  parseIllustrationReference,
+  parseIllustrationRevisionReference,
+} from './parsers';
 
 export function buildIllustrationPrompt(
   prompt: string,
@@ -75,13 +80,13 @@ export function validateGenerateRequest(request: GenerateIllustrationRequest): v
       (typeof request.revisionPrompt !== 'string' ||
         !request.revisionPrompt.trim() ||
         request.revisionPrompt.length > MAX_TEXT_LENGTH)) ||
-    (request.revisionPrompt !== null && request.baseVersion === null) ||
+    (request.revisionPrompt !== null && request.revisionBase === null) ||
     !isSize(request.size) ||
     !isResolution(request.resolution) ||
     !Array.isArray(request.references) ||
     request.references.length > MAX_ILLUSTRATION_REFERENCE_IMAGES ||
     request.references.some(reference => !parseIllustrationReference(reference)) ||
-    (request.baseVersion !== null && !parseVersionReference(request.baseVersion))
+    (request.revisionBase !== null && !parseIllustrationRevisionReference(request.revisionBase))
   ) {
     throw new Error('插画生成参数无效');
   }

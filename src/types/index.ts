@@ -124,6 +124,7 @@ export type {
   IllustrationBriefUpdateResult,
   IllustrationReference,
   IllustrationReferencePurpose,
+  IllustrationRevisionReference,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,

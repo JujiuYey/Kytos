@@ -25,10 +25,10 @@ import type {
   IllustrationAgentMessage,
   IllustrationBriefUpdateResult,
   IllustrationReference,
+  IllustrationRevisionReference,
   IllustrationSize,
   IllustrationTopic,
   IllustrationVersion,
-  IllustrationVersionReference,
   UploadedIllustration,
 } from '@/types';
 import { ILLUSTRATION_AGENT_ENDPOINT, MAX_ILLUSTRATION_REFERENCE_IMAGES } from '@/types';
@@ -73,7 +73,9 @@ const prompt = ref('');
 const size = ref<IllustrationSize>('16:9');
 const resolution = ref<CharacterVisualResolution>('1k');
 const revisionTarget = ref<IllustrationVersion | null>(null);
+const revisionUploadTarget = ref<UploadedIllustration | null>(null);
 const revisionInstructions = ref<string[]>([]);
+const pendingRevisionTaskId = ref<string | null>(null);
 const selectedVersionId = ref<string | null>(null);
 const transientChatReferences = ref<IllustrationReference[]>([]);
 
@@ -92,19 +94,24 @@ const { pollingStates, schedulePoll } = useGenerationPolling<IllustrationVersion
     replaceVersion(version);
     generationError.value = '';
   },
-  onCompleted: (_id, version) => {
+  onCompleted: (id, version) => {
     toast.success(`V${version.versionNumber} 已生成并保存到工作区`);
     const owner = topics.value.find(topic => topic.versions.some(item => item.id === version.id));
     if (owner?.id === activeTopicId.value) {
       selectedVersionId.value = version.id;
-      if (version.baseVersion && version.images.length) {
+      if ((version.baseVersion || pendingRevisionTaskId.value === id) && version.images.length) {
         revisionTarget.value = version;
+        revisionUploadTarget.value = null;
         revisionInstructions.value = [];
+        pendingRevisionTaskId.value = null;
       }
       mobilePane.value = 'workspace';
     }
   },
-  onFailed: (_id, version) => {
+  onFailed: (id, version) => {
+    if (pendingRevisionTaskId.value === id) {
+      pendingRevisionTaskId.value = null;
+    }
     generationError.value = version.errorMessage || '插画生成任务未完成';
   },
   onError: (_id, err) => {
@@ -235,8 +242,38 @@ const referencePreviews = computed(() =>
     ];
   }),
 );
+const revisionActive = computed(() => Boolean(revisionTarget.value || revisionUploadTarget.value));
+const revisionImage = computed(() => {
+  const versionImage = revisionTarget.value?.images[0];
+  if (versionImage) return versionImage;
+  const upload = revisionUploadTarget.value;
+  return upload ? { fileName: upload.fileName, mimeType: upload.mimeType, url: upload.url } : null;
+});
+const revisionLabel = computed(() => {
+  if (revisionTarget.value) return `V${revisionTarget.value.versionNumber}`;
+  return revisionUploadTarget.value?.originalName ?? null;
+});
+const revisionReference = computed<IllustrationRevisionReference | null>(() => {
+  const image = revisionImage.value;
+  if (!image) return null;
+  if (revisionTarget.value) {
+    return {
+      fileName: image.fileName,
+      source: 'generated',
+      versionId: revisionTarget.value.id,
+    };
+  }
+  if (revisionUploadTarget.value) {
+    return {
+      fileName: image.fileName,
+      source: 'uploaded',
+      uploadId: revisionUploadTarget.value.id,
+    };
+  }
+  return null;
+});
 const maxReferenceCount = computed(
-  () => MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(Boolean(revisionTarget.value)),
+  () => MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(revisionActive.value),
 );
 
 function illustrationReferenceKey(reference: IllustrationReference): string {
@@ -305,17 +342,15 @@ const inputDisabled = computed(
     !activeTopic.value ||
     !chatProviderConfigured.value ||
     (Boolean(activeTopic.value.references.length) && !supportsImageInput.value) ||
-    (Boolean(revisionTarget.value) && !supportsImageInput.value) ||
+    (revisionActive.value && !supportsImageInput.value) ||
     isUploadingChatImages.value ||
     chatStatus.value === 'error',
 );
-const revisionReady = computed(
-  () => Boolean(revisionTarget.value) && revisionInstructions.value.length > 0,
-);
-const adjustmentVersionPreview = computed(() => {
-  const version = revisionTarget.value;
-  const image = version?.images[0];
-  return version && image ? { image, versionNumber: version.versionNumber } : null;
+const revisionReady = computed(() => revisionActive.value && revisionInstructions.value.length > 0);
+const adjustmentBasePreview = computed(() => {
+  const image = revisionImage.value;
+  const label = revisionLabel.value;
+  return image && label ? { image, label } : null;
 });
 const errorMessage = computed(
   () => initializationError.value || generationError.value || error.value?.message || '',
@@ -385,7 +420,9 @@ function applyTopic(topic: IllustrationTopic): void {
   activeTopicId.value = topic.id;
   transientChatReferences.value = [];
   revisionTarget.value = null;
+  revisionUploadTarget.value = null;
   revisionInstructions.value = [];
+  pendingRevisionTaskId.value = null;
   selectedVersionId.value = topic.versions[0]?.id ?? null;
   messages.value = topic.messages;
   prompt.value = topic.brief.finalPrompt;
@@ -418,6 +455,16 @@ async function loadCharacterReferenceWorkspaces(
   );
 }
 
+function clearRequestedRevisionQuery(): void {
+  const {
+    revisionTopicId: _revisionTopicId,
+    revisionUploadId: _revisionUploadId,
+    revisionVersionId: _revisionVersionId,
+    ...query
+  } = route.query;
+  void router.replace({ query });
+}
+
 function openRequestedRevision(topic: IllustrationTopic): void {
   const requestedTopicId = route.query.revisionTopicId;
   const requestedVersionId = route.query.revisionVersionId;
@@ -435,12 +482,14 @@ function openRequestedRevision(topic: IllustrationTopic): void {
     return;
   }
   startVersionAdjustment(version);
-  const {
-    revisionTopicId: _revisionTopicId,
-    revisionVersionId: _revisionVersionId,
-    ...query
-  } = route.query;
-  void router.replace({ query });
+  clearRequestedRevisionQuery();
+}
+
+function getUploadRevisionTopicTitle(upload: UploadedIllustration): string {
+  const extensionIndex = upload.originalName.lastIndexOf('.');
+  const baseName =
+    extensionIndex > 0 ? upload.originalName.slice(0, extensionIndex) : upload.originalName;
+  return `修改 ${baseName}`.slice(0, 100);
 }
 
 async function initialize(): Promise<void> {
@@ -456,18 +505,39 @@ async function initialize(): Promise<void> {
     topics.value = workspace.topics;
     uploads.value = workspace.uploads;
 
-    const requestedTopicId = route.query.revisionTopicId;
-    let topic =
-      typeof requestedTopicId === 'string'
-        ? topics.value.find(item => item.id === requestedTopicId)
+    const requestedUploadId = route.query.revisionUploadId;
+    const requestedUpload =
+      typeof requestedUploadId === 'string'
+        ? uploads.value.find(item => item.id === requestedUploadId)
         : undefined;
-    topic ??= topics.value[0];
-    if (!topic) {
-      topic = await window.desktop.illustration.createIllustrationTopic({});
-      topics.value = [topic];
+    if (requestedUpload) {
+      let topic = await window.desktop.illustration.createIllustrationTopic({});
+      topic = await window.desktop.illustration.updateIllustrationTopic({
+        title: getUploadRevisionTopicTitle(requestedUpload),
+        topicId: topic.id,
+      });
+      topics.value = [topic, ...topics.value];
+      applyTopic(topic);
+      startUploadAdjustment(requestedUpload);
+      clearRequestedRevisionQuery();
+    } else {
+      if (typeof requestedUploadId === 'string') {
+        toast.error('要修改的上传插画已不存在');
+        clearRequestedRevisionQuery();
+      }
+      const requestedTopicId = route.query.revisionTopicId;
+      let topic =
+        typeof requestedTopicId === 'string'
+          ? topics.value.find(item => item.id === requestedTopicId)
+          : undefined;
+      topic ??= topics.value[0];
+      if (!topic) {
+        topic = await window.desktop.illustration.createIllustrationTopic({});
+        topics.value = [topic];
+      }
+      applyTopic(topic);
+      openRequestedRevision(topic);
     }
-    applyTopic(topic);
-    openRequestedRevision(topic);
     for (const item of topics.value) {
       for (const version of item.versions) {
         if (['submitted', 'pending', 'processing'].includes(version.status)) {
@@ -509,8 +579,8 @@ async function uploadChatFiles(
   if (!files.length) return { files: [], references: [] };
   if (topic.references.length + files.length > maxReferenceCount.value) {
     throw new Error(
-      revisionTarget.value
-        ? `调整版本会占用 1 张图片，请将其他参考图控制在 ${maxReferenceCount.value} 张以内`
+      revisionActive.value
+        ? `调整底图会占用 1 张图片，请将其他参考图控制在 ${maxReferenceCount.value} 张以内`
         : `当前主题最多使用 ${MAX_ILLUSTRATION_REFERENCE_IMAGES} 张参考图，请先移除部分素材`,
     );
   }
@@ -556,19 +626,20 @@ async function send(input: string | { files: FileUIPart[]; text: string }): Prom
   try {
     const uploaded = await uploadChatFiles(payload.files, topic);
     transientChatReferences.value = uploaded.references;
-    const revisionImage = revisionTarget.value?.images[0];
+    const currentRevisionImage = revisionImage.value;
+    const currentRevisionLabel = revisionLabel.value;
     const revisionFiles =
-      revisionTarget.value && revisionImage
+      revisionActive.value && currentRevisionImage && currentRevisionLabel
         ? [
             {
-              filename: `正在讨论 V${revisionTarget.value.versionNumber}`,
-              mediaType: revisionImage.mimeType,
+              filename: `正在讨论 ${currentRevisionLabel}`,
+              mediaType: currentRevisionImage.mimeType,
               type: 'file' as const,
-              url: revisionImage.url,
+              url: currentRevisionImage.url,
             },
           ]
         : [];
-    if (revisionTarget.value) {
+    if (revisionActive.value) {
       revisionInstructions.value = [...revisionInstructions.value, payload.text.trim()];
     }
     await sendMessage(
@@ -577,10 +648,7 @@ async function send(input: string | { files: FileUIPart[]; text: string }): Prom
         body: {
           model: model.value,
           references: uploaded.references,
-          revisionBase:
-            revisionTarget.value && revisionImage
-              ? { fileName: revisionImage.fileName, versionId: revisionTarget.value.id }
-              : null,
+          revisionBase: revisionReference.value,
           topicId: topic.id,
         },
       },
@@ -601,13 +669,7 @@ async function retry(): Promise<void> {
     body: {
       model: model.value,
       references: transientChatReferences.value,
-      revisionBase:
-        revisionTarget.value && revisionTarget.value.images[0]
-          ? {
-              fileName: revisionTarget.value.images[0].fileName,
-              versionId: revisionTarget.value.id,
-            }
-          : null,
+      revisionBase: revisionReference.value,
       topicId: topic.id,
     },
   });
@@ -650,13 +712,12 @@ async function renameTopic(title: string): Promise<void> {
 
 async function generate(): Promise<boolean> {
   const topic = activeTopic.value;
-  const revisionVersion = revisionTarget.value;
-  const revisionImage = revisionVersion?.images[0];
+  const currentRevisionReference = revisionReference.value;
   if (
     !topic ||
     generationBusy.value ||
     !prompt.value.trim() ||
-    (revisionVersion && (!revisionImage || !revisionInstructions.value.length))
+    (revisionActive.value && (!currentRevisionReference || !revisionInstructions.value.length))
   ) {
     return false;
   }
@@ -665,22 +726,18 @@ async function generate(): Promise<boolean> {
   try {
     const maxReferences = Math.max(
       0,
-      MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(Boolean(revisionVersion)),
+      MAX_ILLUSTRATION_REFERENCE_IMAGES - Number(revisionActive.value),
     );
     const references = topic.references
       .slice(0, maxReferences)
       .map(reference => ({ ...reference }));
     if (references.length < topic.references.length) {
-      toast.info('修改版本会额外使用原插画，已将总参考图控制在 16 张以内');
+      toast.info('调整底图会额外使用原插画，已将总参考图控制在 16 张以内');
     }
-    const baseVersion: IllustrationVersionReference | null =
-      revisionVersion && revisionImage
-        ? { fileName: revisionImage.fileName, versionId: revisionVersion.id }
-        : null;
     const version = await window.desktop.illustration.generateIllustration({
-      baseVersion,
       prompt: prompt.value.trim(),
-      revisionPrompt: revisionVersion
+      revisionBase: currentRevisionReference,
+      revisionPrompt: revisionActive.value
         ? revisionInstructions.value.join('\n').slice(-MAX_REVISION_INSTRUCTION_LENGTH)
         : null,
       references,
@@ -688,6 +745,7 @@ async function generate(): Promise<boolean> {
       size: size.value,
       topicId: topic.id,
     });
+    pendingRevisionTaskId.value = revisionActive.value ? version.id : null;
     selectedVersionId.value = version.id;
     replaceTopic({
       ...topic,
@@ -715,10 +773,23 @@ function startVersionAdjustment(version: IllustrationVersion): void {
     revisionInstructions.value = [];
   }
   revisionTarget.value = version;
+  revisionUploadTarget.value = null;
   if ((activeTopic.value?.references.length ?? 0) > maxReferenceCount.value) {
     toast.info(`调整版本会额外使用原插画，生图时只会使用前 ${maxReferenceCount.value} 张素材`);
   }
   selectedVersionId.value = version.id;
+  mobilePane.value = 'chat';
+}
+
+function startUploadAdjustment(upload: UploadedIllustration): void {
+  if (revisionUploadTarget.value?.id !== upload.id) {
+    revisionInstructions.value = [];
+  }
+  revisionTarget.value = null;
+  revisionUploadTarget.value = upload;
+  if ((activeTopic.value?.references.length ?? 0) > maxReferenceCount.value) {
+    toast.info(`调整底图会额外占用一张图片，生图时只会使用前 ${maxReferenceCount.value} 张素材`);
+  }
   mobilePane.value = 'chat';
 }
 
@@ -727,6 +798,7 @@ function clearRevisionTarget(): void {
     return;
   }
   revisionTarget.value = null;
+  revisionUploadTarget.value = null;
   revisionInstructions.value = [];
 }
 
@@ -833,7 +905,7 @@ onMounted(() => {
       >
         <IllustrationChatMessages :messages="messages" :status="chatStatus" @suggest="send" />
         <IllustrationChatInput
-          :adjustment-version="adjustmentVersionPreview"
+          :adjustment-base="adjustmentBasePreview"
           :disabled="inputDisabled"
           :provider-name="chatProvider === 'minimax' ? 'MiniMax' : 'DeepSeek'"
           :references="referencePreviews"
@@ -841,7 +913,7 @@ onMounted(() => {
           :status="chatStatus"
           :uploading="isUploadingChatImages"
           @open-library="referenceDialogOpen = true"
-          @clear-adjustment-version="clearRevisionTarget"
+          @clear-adjustment="clearRevisionTarget"
           @send="send"
           @stop="stop"
         />
@@ -860,8 +932,10 @@ onMounted(() => {
           :prompt="prompt"
           :polling-states="pollingStates"
           :references="referencePreviews"
-          :revision-base="revisionTarget"
+          :revision-active="revisionActive"
+          :revision-label="revisionLabel"
           :revision-ready="revisionReady"
+          :revision-version-id="revisionTarget?.id ?? null"
           :resolution="resolution"
           :selected-version-id="selectedVersionId"
           :size="size"

@@ -23,9 +23,9 @@ import { Button } from '@/components/ui/button';
 import IllustrationChatAttachments from './illustration-chat-attachments.vue';
 
 const props = defineProps<{
-  adjustmentVersion: {
+  adjustmentBase: {
     image: CharacterVisualImage;
-    versionNumber: number;
+    label: string;
   } | null;
   disabled: boolean;
   providerName: string;
@@ -37,7 +37,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'send', payload: { files: FileUIPart[]; text: string }): void;
-  (event: 'clear-adjustment-version'): void;
+  (event: 'clear-adjustment'): void;
   (event: 'stop'): void;
   (event: 'open-library'): void;
 }>();
@@ -45,7 +45,7 @@ const emit = defineEmits<{
 function handleSubmit(message: PromptInputMessage): void {
   const text = message.text.trim();
   if (
-    (!text && !message.files.length && !props.references.length && !props.adjustmentVersion) ||
+    (!text && !message.files.length && !props.references.length && !props.adjustmentBase) ||
     props.disabled ||
     props.status !== 'ready'
   ) {
@@ -81,19 +81,17 @@ function handleSubmitClick(event: MouseEvent): void {
         multiple
       >
         <PromptInputHeader
-          v-if="adjustmentVersion"
+          v-if="adjustmentBase"
           class="flex-nowrap justify-between gap-3 border-b px-3 py-2"
         >
           <div class="flex min-w-0 items-center gap-2">
             <AiImage
-              :src="adjustmentVersion.image.url"
-              :alt="`正在调整 V${adjustmentVersion.versionNumber}`"
+              :src="adjustmentBase.image.url"
+              :alt="`正在调整 ${adjustmentBase.label}`"
               class="size-10 shrink-0 rounded object-cover"
             />
             <div class="min-w-0">
-              <p class="truncate text-xs font-medium">
-                正在基于 V{{ adjustmentVersion.versionNumber }} 调整
-              </p>
+              <p class="truncate text-xs font-medium">正在基于 {{ adjustmentBase.label }} 调整</p>
               <p class="truncate text-[11px] text-muted-foreground">
                 该版本图片会随消息发送给 Agent
               </p>
@@ -105,8 +103,8 @@ function handleSubmitClick(event: MouseEvent): void {
             variant="ghost"
             class="size-8 shrink-0"
             :disabled="disabled || status !== 'ready'"
-            :aria-label="`停止调整 V${adjustmentVersion.versionNumber}`"
-            @click="emit('clear-adjustment-version')"
+            :aria-label="`停止调整${adjustmentBase.label}`"
+            @click="emit('clear-adjustment')"
           >
             <X class="size-4" />
           </Button>
@@ -116,8 +114,8 @@ function handleSubmitClick(event: MouseEvent): void {
           <PromptInputTextarea
             class="scrollbar-subtle"
             :placeholder="
-              adjustmentVersion
-                ? `描述 V${adjustmentVersion.versionNumber} 需要调整的地方…`
+              adjustmentBase
+                ? `描述${adjustmentBase.label}需要调整的地方…`
                 : '描述想画的情境，或回答 Agent 的问题…'
             "
             :disabled="disabled"

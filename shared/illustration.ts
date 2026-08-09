@@ -70,6 +70,19 @@ export interface IllustrationVersionReference {
   versionId: string;
 }
 
+// 插画调整底图引用：可以来自当前主题的生成版本，也可以来自上传插画。
+export type IllustrationRevisionReference =
+  | {
+      fileName: string;
+      source: 'generated';
+      versionId: string;
+    }
+  | {
+      fileName: string;
+      source: 'uploaded';
+      uploadId: string;
+    };
+
 // 参考图用途：同一张图在 Agent 和生图阶段不能被当成同一种证据处理。
 export type IllustrationReferencePurpose = 'style' | 'content' | 'character';
 
@@ -193,8 +206,8 @@ export interface SaveIllustrationConversationRequest {
 
 // 生成插画请求
 export interface GenerateIllustrationRequest {
-  // 基础版本
-  baseVersion: IllustrationVersionReference | null;
+  // 调整底图
+  revisionBase: IllustrationRevisionReference | null;
   // 本次生成使用的画面素材
   references: IllustrationReference[];
   // 提示词

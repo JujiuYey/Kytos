@@ -12,11 +12,13 @@ export {
 } from './crud';
 export { deleteIllustrationVersion, generateIllustration, getIllustrationTask } from './generation';
 export {
-  resolveIllustrationVersionReference,
+  resolveIllustrationRevisionReference,
+  resolveIllustrationRevisionReferenceForStore,
   resolveTopicIllustrationReferences,
 } from './reference-images';
 export {
   illustrationReferenceKey,
+  parseIllustrationRevisionReference,
   parseIllustrationReferences,
   parseVersionReference,
 } from './parsers';
