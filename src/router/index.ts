@@ -32,11 +32,11 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '角色管理' },
       },
       {
-        path: '/character-visual',
-        alias: '/character-portrait',
-        name: 'character-visual',
-        component: () => import('@/views/character-visual/index.vue'),
-        meta: { title: '角色视觉' },
+        path: '/character-anchor',
+        alias: ['/character-visual', '/character-portrait'],
+        name: 'character-anchor',
+        component: () => import('@/views/character-anchor/index.vue'),
+        meta: { title: '角色锚点' },
       },
       {
         path: '/character-expression',

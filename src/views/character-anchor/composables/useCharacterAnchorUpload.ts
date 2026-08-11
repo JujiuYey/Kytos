@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 
-export function useCharacterVisualUpload() {
+export function useCharacterAnchorUpload() {
   const uploadDialogOpen = ref(false);
 
   function openUploadDialog(): void {

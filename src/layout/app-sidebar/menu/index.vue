@@ -23,6 +23,9 @@ function handleClick(menu: MenuItem) {
 const currentKey = computed(() => {
   const pathParts = route.path.split('/').filter(Boolean);
   const rootKey = pathParts[0] ?? 'home';
+  if (rootKey === 'character-visual' || rootKey === 'character-portrait') {
+    return 'character-anchor';
+  }
   if (rootKey === 'character-expression') {
     return rootKey;
   }

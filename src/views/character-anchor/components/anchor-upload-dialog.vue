@@ -10,6 +10,7 @@ import {
 import { FileUpload } from '@/components/sag/file-upload';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { characterAnchorApi } from '@/lib/character-anchor-api';
 import type { SaveFileRequest, SavedFileResult } from '@/types';
 
 const props = defineProps<{
@@ -23,13 +24,13 @@ const emit = defineEmits<{
 }>();
 
 const uploadKey = ref(0);
-const name = ref('角色视觉');
+const name = ref('角色锚点');
 const normalizedName = computed(() => name.value.trim());
 
 watch(open, value => {
   if (value) {
     uploadKey.value += 1;
-    name.value = '角色视觉';
+    name.value = '角色锚点';
   }
 });
 
@@ -37,7 +38,7 @@ function upload(request: SaveFileRequest): Promise<SavedFileResult> {
   if (!normalizedName.value) {
     return Promise.reject(new Error('请先填写图片名称'));
   }
-  return window.desktop.character.assets.uploadCharacterVisualAsset({
+  return characterAnchorApi.uploadAnchor({
     ...request,
     characterId: props.characterId,
     name: normalizedName.value,
@@ -54,18 +55,18 @@ function handleUploaded(result: SavedFileResult): void {
   <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
-        <DialogTitle>上传角色视觉图片</DialogTitle>
+        <DialogTitle>上传角色锚点图片</DialogTitle>
         <DialogDescription>
           填写图片名称后上传。上传完成后可按需要设为正式资产。
         </DialogDescription>
       </DialogHeader>
       <div class="space-y-2">
         <div class="flex items-center justify-between gap-3">
-          <Label for="visual-asset-name">图片名称</Label>
+          <Label for="anchor-asset-name">图片名称</Label>
           <span class="text-xs tabular-nums text-muted-foreground">{{ name.length }} / 80</span>
         </div>
         <Input
-          id="visual-asset-name"
+          id="anchor-asset-name"
           v-model="name"
           maxlength="80"
           placeholder="例如：基础形象、冬季造型、挥手动作"

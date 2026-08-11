@@ -156,7 +156,7 @@ export const CHARACTER_WORKFLOW_STEPS = [
   {
     number: 4,
     label: '精修定稿',
-    description: '用选中的候选图进行 2k 精修，确认后保存为角色正式视觉。',
+    description: '用选中的候选图进行 2k 精修，确认后保存为角色正式锚点。',
   },
 ] as const;
 

@@ -12,6 +12,7 @@ import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagMissingPrerequisiteAlert } from '@/components/sag/missing-prerequisite-alert';
 import { SagPage } from '@/components/sag/sag-page';
+import { characterAnchorApi } from '@/lib/character-anchor-api';
 import { useAppStore } from '@/stores/app';
 import { useCharacterLibraryStore } from '@/stores/character-library';
 import type {
@@ -22,7 +23,7 @@ import type {
   CharacterExpressionWorkspaceState,
   CharacterVisualImage,
   CharacterVisualResolution,
-  CharacterVisualWorkspaceState,
+  CharacterAnchorWorkspaceState,
 } from '@/types';
 import { getChatModelDefinition, MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
 import ExpressionEmptyState from './components/expression-empty-state.vue';
@@ -79,7 +80,7 @@ function selectCharacter(characterId: string): void {
 // 角色工作区
 const records = ref<CharacterExpressionRecord[]>([]);
 const tasks = ref<CharacterExpressionTask[]>([]);
-const visualWorkspace = ref<CharacterVisualWorkspaceState | null>(null);
+const anchorWorkspace = ref<CharacterAnchorWorkspaceState | null>(null);
 let loadRequestId = 0;
 
 const {
@@ -90,7 +91,7 @@ const {
   selectedReferenceKeys,
   selectedReferenceOptions,
   selectReferenceAssets,
-} = useExpressionReferences({ records, visualWorkspace });
+} = useExpressionReferences({ anchorWorkspace, records });
 
 function replaceRecord(updatedRecord: CharacterExpressionRecord): void {
   records.value = [
@@ -111,11 +112,11 @@ function removeTask(taskId: string): void {
 
 function applyExpressionPageData(
   expressionWorkspace: CharacterExpressionWorkspaceState,
-  currentVisualWorkspace: CharacterVisualWorkspaceState,
+  currentAnchorWorkspace: CharacterAnchorWorkspaceState,
 ): void {
   records.value = expressionWorkspace.records;
   tasks.value = expressionWorkspace.tasks;
-  visualWorkspace.value = currentVisualWorkspace;
+  anchorWorkspace.value = currentAnchorWorkspace;
   resetReferences();
 
   const latestGeneratedRecord = expressionWorkspace.records.find(
@@ -143,18 +144,18 @@ async function loadExpressionPageData(characterId: string): Promise<void> {
   errorMessage.value = '';
   records.value = [];
   tasks.value = [];
-  visualWorkspace.value = null;
+  anchorWorkspace.value = null;
   resetReferences();
 
   try {
-    const [expressionWorkspace, currentVisualWorkspace] = await Promise.all([
+    const [expressionWorkspace, currentAnchorWorkspace] = await Promise.all([
       window.desktop.character.expression.getCharacterExpressionWorkspace({ characterId }),
-      window.desktop.character.assets.getCharacterVisualWorkspace({ characterId }),
+      characterAnchorApi.getWorkspace({ characterId }),
     ]);
     if (requestId !== loadRequestId || selectedCharacterId.value !== characterId) {
       return;
     }
-    applyExpressionPageData(expressionWorkspace, currentVisualWorkspace);
+    applyExpressionPageData(expressionWorkspace, currentAnchorWorkspace);
   } catch (initializationError: unknown) {
     if (requestId !== loadRequestId) {
       return;
@@ -414,9 +415,9 @@ onMounted(() => {
       v-if="!isInitializing && !hasReferences"
       class="mx-4 mt-3 shrink-0 sm:mx-5"
       title="生成表情需要角色参考"
-      description="可以先准备角色视觉，或上传一张已有表情。"
-      action-label="前往角色视觉"
-      to="/character-visual"
+      description="可以先准备角色锚点，或上传一张已有表情。"
+      action-label="前往角色锚点"
+      to="/character-anchor"
     />
 
     <SagMissingPrerequisiteAlert
@@ -490,7 +491,7 @@ onMounted(() => {
     <ImageReferencePickerDialog
       v-model:open="referenceDialogOpen"
       :busy="isSubmitting"
-      description="可以混选当前角色的视觉资产和已有表情，生成时只使用这里确认的图片。"
+      description="可以混选当前角色的锚点资产和已有表情，生成时只使用这里确认的图片。"
       :filters="REFERENCE_FILTERS"
       :max-selection="MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES"
       :options="referenceOptions"

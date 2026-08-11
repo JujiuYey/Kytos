@@ -26,6 +26,8 @@ export type {
   UpdateCharacterRequest,
 } from '../../shared/character-library';
 export type {
+  CharacterVisualGeneration as CharacterAnchorGeneration,
+  CharacterVisualReferenceImage as CharacterAnchorReferenceImage,
   CharacterCreateAgentMessage,
   CharacterCreateDraft,
   CharacterCreateDraftUpdateResult,
@@ -61,6 +63,10 @@ export {
   MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES,
 } from '../../shared/character-expression';
 export type {
+  CharacterVisualAssetRecord as CharacterAnchorRecord,
+  CharacterVisualAssetSelection as CharacterAnchorSelection,
+  CharacterVisualAssetUpload as CharacterAnchorUpload,
+  CharacterVisualWorkspaceState as CharacterAnchorWorkspaceState,
   CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
   CharacterVisualAssetUpload,

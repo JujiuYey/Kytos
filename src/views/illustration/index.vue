@@ -16,12 +16,13 @@ import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import { useCredentialStatus } from '@/composables/use-credential-status';
 import { useGenerationPolling } from '@/composables/use-generation-polling';
+import { characterAnchorApi } from '@/lib/character-anchor-api';
 import { useAppStore } from '@/stores/app';
 import type {
   CharacterLibraryCharacter,
   CharacterExpressionWorkspaceState,
   CharacterVisualResolution,
-  CharacterVisualWorkspaceState,
+  CharacterAnchorWorkspaceState,
   IllustrationAgentMessage,
   IllustrationBriefUpdateResult,
   IllustrationReference,
@@ -44,10 +45,10 @@ interface IllustrationReferenceOption extends ImageReferencePickerOption {
 }
 
 interface CharacterReferenceWorkspace {
+  anchor: CharacterAnchorWorkspaceState;
   characterId: string;
   characterName: string;
   expression: CharacterExpressionWorkspaceState;
-  visual: CharacterVisualWorkspaceState;
 }
 
 const MAX_REVISION_INSTRUCTION_LENGTH = 20_000;
@@ -129,14 +130,14 @@ const activeTopic = computed(
   () => topics.value.find(topic => topic.id === activeTopicId.value) ?? null,
 );
 const referenceFilters: ImageReferencePickerFilter[] = [
-  { label: '角色视觉', value: 'character-visual' },
+  { label: '角色锚点', value: 'character-visual' },
   { label: '角色表情', value: 'character-expression' },
   { label: '已有插画', value: 'illustration' },
 ];
 const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() => {
   const characterOptions = characterReferenceWorkspaces.value.flatMap(workspace => {
-    const visualOptions = workspace.visual.officialAssets.flatMap(selection => {
-      const record = workspace.visual.records.find(item => item.id === selection.taskId);
+    const anchorOptions = workspace.anchor.officialAssets.flatMap(selection => {
+      const record = workspace.anchor.records.find(item => item.id === selection.taskId);
       const image = record?.images.find(item => item.fileName === selection.fileName);
       if (!record || !image) return [];
       const reference: IllustrationReference = {
@@ -148,10 +149,10 @@ const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() 
       };
       return [
         {
-          detail: `${workspace.characterName} · 正式视觉 · ${record.size}`,
+          detail: `${workspace.characterName} · 正式锚点 · ${record.size}`,
           image,
           key: illustrationReferenceKey(reference),
-          label: image.name || record.name || '正式角色视觉',
+          label: image.name || record.name || '正式角色锚点',
           reference,
           source: 'character-visual',
         },
@@ -176,7 +177,7 @@ const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() 
         };
       }),
     );
-    return [...visualOptions, ...expressionOptions];
+    return [...anchorOptions, ...expressionOptions];
   });
   const uploadedOptions = uploads.value.map(upload => {
     const reference: IllustrationReference = {
@@ -439,8 +440,8 @@ async function loadCharacterReferenceWorkspaces(
 ): Promise<void> {
   characterReferenceWorkspaces.value = await Promise.all(
     characters.map(async character => {
-      const [visual, expression] = await Promise.all([
-        window.desktop.character.assets.getCharacterVisualWorkspace({ characterId: character.id }),
+      const [anchor, expression] = await Promise.all([
+        characterAnchorApi.getWorkspace({ characterId: character.id }),
         window.desktop.character.expression.getCharacterExpressionWorkspace({
           characterId: character.id,
         }),
@@ -449,7 +450,7 @@ async function loadCharacterReferenceWorkspaces(
         characterId: character.id,
         characterName: character.name,
         expression,
-        visual,
+        anchor,
       };
     }),
   );
@@ -957,7 +958,7 @@ onMounted(() => {
     <ImageReferencePickerDialog
       v-model:open="referenceDialogOpen"
       :busy="generationBusy"
-      description="可加入多个角色的正式视觉或表情，也可以加入已有插画和上传图作为本次画面的参考。"
+      description="可加入多个角色的正式锚点或表情，也可以加入已有插画和上传图作为本次画面的参考。"
       empty-description="还没有可加入的角色或插画素材。"
       :filters="referenceFilters"
       :max-selection="maxReferenceCount"

@@ -84,7 +84,7 @@ function selectQuickAction(action: (typeof quickActions)[number]): void {
         <section aria-labelledby="action-reference-heading">
           <div class="mb-3 flex items-start justify-between gap-3">
             <div>
-              <h2 id="action-reference-heading" class="text-sm font-medium">正式角色视觉</h2>
+              <h2 id="action-reference-heading" class="text-sm font-medium">正式角色锚点</h2>
               <p class="mt-1 text-xs leading-5 text-muted-foreground">
                 生成时固定角色外观，只改变姿势。
               </p>
@@ -120,7 +120,7 @@ function selectQuickAction(action: (typeof quickActions)[number]): void {
             v-else
             class="flex min-h-24 items-center justify-center rounded-md border border-dashed px-3 text-center text-xs leading-5 text-muted-foreground"
           >
-            当前角色还没有可用的正式视觉
+            当前角色还没有可用的正式锚点
           </div>
         </section>
 
@@ -214,8 +214,8 @@ function selectQuickAction(action: (typeof quickActions)[number]): void {
       <p class="mt-2 text-center text-xs text-muted-foreground">
         {{
           referenceAssets.length
-            ? '使用所选正式视觉进行 GPT-Image-2 图生图，点击后将产生实际费用'
-            : '请先选择一张正式角色视觉'
+            ? '使用所选正式锚点进行 GPT-Image-2 图生图，点击后将产生实际费用'
+            : '请先选择一张正式角色锚点'
         }}
       </p>
     </footer>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { CharacterVisualSize, CharacterLibraryCharacter } from '@/types';
 
-const visualAssetAspectClasses: Record<CharacterVisualSize, string> = {
+const anchorAspectClasses: Record<CharacterVisualSize, string> = {
   '1:1': 'aspect-square',
   '16:9': 'aspect-video',
   '2:3': 'aspect-[2/3]',
@@ -13,8 +13,8 @@ const visualAssetAspectClasses: Record<CharacterVisualSize, string> = {
   '4:5': 'aspect-[4/5]',
 };
 
-function getVisualAssetAspectClass(size: CharacterVisualSize): string {
-  return visualAssetAspectClasses[size];
+function getAnchorAspectClass(size: CharacterVisualSize): string {
+  return anchorAspectClasses[size];
 }
 
 defineProps<{
@@ -23,7 +23,7 @@ defineProps<{
 }>();
 
 defineEmits<{
-  (event: 'open-visual', character: CharacterLibraryCharacter): void;
+  (event: 'open-anchor', character: CharacterLibraryCharacter): void;
   (event: 'rename', character: CharacterLibraryCharacter): void;
   (event: 'request-delete', character: CharacterLibraryCharacter): void;
 }>();
@@ -39,17 +39,17 @@ defineEmits<{
       :disabled="busy"
       :aria-label="
         character.visualAsset
-          ? `管理角色 ${character.name} 的视觉`
+          ? `管理角色 ${character.name} 的锚点`
           : `为角色 ${character.name} 创建第一个形象`
       "
-      @click="$emit('open-visual', character)"
+      @click="$emit('open-anchor', character)"
     >
       <AiImage
         v-if="character.visualAsset"
         :alt="`${character.name}的${character.visualAsset.name}`"
         :src="character.visualAsset.url"
         :class="[
-          getVisualAssetAspectClass(character.visualAsset.size),
+          getAnchorAspectClass(character.visualAsset.size),
           'w-full rounded-none bg-muted/30 object-cover transition-opacity hover:opacity-95',
         ]"
       />
@@ -58,7 +58,7 @@ defineEmits<{
         class="flex aspect-[3/4] w-full flex-col items-center justify-center gap-3 bg-muted/30 px-4 text-muted-foreground"
       >
         <UserRound class="size-10" />
-        <span class="text-xs">尚无正式角色视觉</span>
+        <span class="text-xs">尚无正式角色锚点</span>
       </div>
     </Button>
 
@@ -70,7 +70,7 @@ defineEmits<{
             {{
               character.visualAsset
                 ? `正式资产 · ${character.visualAsset.name}`
-                : '等待添加正式角色视觉'
+                : '等待添加正式角色锚点'
             }}
           </p>
         </div>
@@ -81,11 +81,11 @@ defineEmits<{
           size="sm"
           variant="outline"
           :disabled="busy"
-          @click="$emit('open-visual', character)"
+          @click="$emit('open-anchor', character)"
         >
           <Camera v-if="character.visualAsset" class="size-4" />
           <ImagePlus v-else class="size-4" />
-          {{ character.visualAsset ? '管理视觉' : '创建第一个形象' }}
+          {{ character.visualAsset ? '管理锚点' : '创建第一个形象' }}
         </Button>
         <div class="flex shrink-0 items-center gap-1">
           <TooltipProvider :delay-duration="300">

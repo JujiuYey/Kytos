@@ -74,7 +74,7 @@ const emit = defineEmits<{
         <dl class="space-y-2 text-xs">
           <div class="flex items-center justify-between gap-3">
             <dt class="text-muted-foreground">类型</dt>
-            <dd>角色视觉</dd>
+            <dd>角色锚点</dd>
           </div>
           <div class="flex items-center justify-between gap-3">
             <dt class="text-muted-foreground">状态</dt>

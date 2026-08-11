@@ -54,7 +54,7 @@ const emit = defineEmits<{
             <div>
               <h2 id="expression-reference-heading" class="text-sm font-medium">角色参考</h2>
               <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                可选择当前角色的视觉资产或已有表情。
+                可选择当前角色的锚点资产或已有表情。
               </p>
             </div>
             <Button

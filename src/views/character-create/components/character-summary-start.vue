@@ -146,8 +146,8 @@ onBeforeUnmount(revokeVisualAssetUrl);
                 :disabled="loading"
                 enable-drop-zone
                 description="支持 JPG / PNG / WebP，单张最大 10MB"
-                dropzone-hint="拖放已有角色视觉到此处，或"
-                label="选择已有角色视觉"
+                dropzone-hint="拖放已有角色锚点到此处，或"
+                label="选择已有角色锚点"
                 @upload-success="handleUploadSuccess"
               />
               <div
@@ -157,14 +157,14 @@ onBeforeUnmount(revokeVisualAssetUrl);
               >
                 <img
                   :src="visualAssetUrl"
-                  alt="已选择的正式角色视觉"
+                  alt="已选择的正式角色锚点"
                   class="size-16 shrink-0 rounded-md border object-cover"
                 />
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-medium">{{ visualAssetName }}</p>
                   <p class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Check class="size-3.5" />
-                    将直接保存为正式视觉
+                    将直接保存为正式锚点
                   </p>
                 </div>
                 <Button
@@ -172,8 +172,8 @@ onBeforeUnmount(revokeVisualAssetUrl);
                   variant="ghost"
                   size="icon-sm"
                   :disabled="loading"
-                  aria-label="移除已有角色视觉"
-                  title="移除已有角色视觉"
+                  aria-label="移除已有角色锚点"
+                  title="移除已有角色锚点"
                   @click="removeVisualAsset"
                 >
                   <X class="size-4" />

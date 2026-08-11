@@ -14,29 +14,30 @@ import {
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagMissingPrerequisiteAlert } from '@/components/sag/missing-prerequisite-alert';
 import { SagPage } from '@/components/sag/sag-page';
+import { characterAnchorApi } from '@/lib/character-anchor-api';
 import { useAppStore } from '@/stores/app';
 import { useCharacterLibraryStore } from '@/stores/character-library';
 import type {
-  CharacterVisualAssetRecord,
-  CharacterVisualAssetSelection,
+  CharacterAnchorRecord,
+  CharacterAnchorSelection,
   CharacterVisualImage,
   CharacterVisualResolution,
   CharacterVisualSize,
-  CharacterVisualWorkspaceState,
+  CharacterAnchorWorkspaceState,
   CredentialStatus,
 } from '@/types';
 import { getChatModelDefinition, MAX_CHARACTER_ACTION_LENGTH } from '@/types';
-import { useCharacterVisualUpload } from './composables/use-character-visual-upload';
-import { useCharacterVisualRename } from './composables/use-character-visual-rename';
-import { useCharacterVisualGenerator } from './composables/use-character-visual-generator';
+import { useCharacterAnchorUpload } from './composables/useCharacterAnchorUpload';
+import { useCharacterAnchorRename } from './composables/useCharacterAnchorRename';
+import { useCharacterAnchorGenerator } from './composables/useCharacterAnchorGenerator';
 import CharacterActionGeneratorPanel from './components/character-action-generator-panel.vue';
-import VisualGallery from './components/visual-gallery.vue';
-import VisualPageHeader from './components/visual-page-header.vue';
-import VisualAssetRenameDialog from './components/visual-asset-rename-dialog.vue';
-import VisualUploadDialog from './components/visual-upload-dialog.vue';
+import AnchorGallery from './components/anchor-gallery.vue';
+import AnchorPageHeader from './components/anchor-page-header.vue';
+import AnchorAssetRenameDialog from './components/anchor-asset-rename-dialog.vue';
+import AnchorUploadDialog from './components/anchor-upload-dialog.vue';
 
 interface ActionReferenceOption extends ImageReferencePickerOption {
-  selection: CharacterVisualAssetSelection;
+  selection: CharacterAnchorSelection;
 }
 
 const appStore = useAppStore();
@@ -48,9 +49,9 @@ const router = useRouter();
 const selectedCharacterId = ref('');
 const characters = computed(() => characterLibraryStore.characters);
 
-// 视觉工作区
-const records = ref<CharacterVisualAssetRecord[]>([]);
-const officialAssets = ref<CharacterVisualAssetSelection[]>([]);
+// 角色锚点工作区
+const records = ref<CharacterAnchorRecord[]>([]);
+const officialAssets = ref<CharacterAnchorSelection[]>([]);
 const errorMessage = ref('');
 const isInitializing = ref(true);
 
@@ -63,9 +64,9 @@ const assetCount = computed(() =>
 );
 
 // 参考资产
-const selectedReferenceAsset = ref<CharacterVisualAssetSelection | null>(null);
+const selectedReferenceAsset = ref<CharacterAnchorSelection | null>(null);
 
-function referenceAssetKey(selection: CharacterVisualAssetSelection): string {
+function referenceAssetKey(selection: CharacterAnchorSelection): string {
   return `${selection.taskId}:${selection.fileName}`;
 }
 
@@ -76,10 +77,10 @@ const referenceOptions = computed<ActionReferenceOption[]>(() =>
     if (!record || !image) return [];
     return [
       {
-        detail: `${record.source === 'uploaded' ? '已上传' : '已生成'} · 正式视觉`,
+        detail: `${record.source === 'uploaded' ? '已上传' : '已生成'} · 正式锚点`,
         image,
         key: referenceAssetKey(selection),
-        label: image.name || record.name || '角色视觉',
+        label: image.name || record.name || '角色锚点',
         selection,
         source: 'visual',
       },
@@ -95,7 +96,7 @@ const selectedReferenceOptions = computed(() => {
 });
 const hasOfficialReference = computed(() => referenceOptions.value.length > 0);
 
-function syncSelectedReference(preferred?: CharacterVisualAssetSelection | null): void {
+function syncSelectedReference(preferred?: CharacterAnchorSelection | null): void {
   const availableKeys = new Set(referenceOptions.value.map(option => option.key));
   const currentKey = selectedReferenceAsset.value
     ? referenceAssetKey(selectedReferenceAsset.value)
@@ -140,11 +141,11 @@ function schedulePoll(taskId: string): void {
     taskId,
   };
   pollTimer = setTimeout(() => {
-    void pollVisualTask(taskId);
+    void pollAnchorTask(taskId);
   }, 2500);
 }
 
-async function pollVisualTask(taskId: string): Promise<void> {
+async function pollAnchorTask(taskId: string): Promise<void> {
   if (isDisposed) {
     return;
   }
@@ -154,7 +155,7 @@ async function pollVisualTask(taskId: string): Promise<void> {
     taskId,
   };
   try {
-    const record = await window.desktop.character.assets.getCharacterVisualAssetTask(taskId);
+    const record = await characterAnchorApi.getTask(taskId);
     records.value = replaceRecord(records.value, record);
     errorMessage.value = '';
     if (activeStatuses.includes(record.status)) {
@@ -163,9 +164,9 @@ async function pollVisualTask(taskId: string): Promise<void> {
     }
     resetPollingState();
     if (record.status === 'completed') {
-      toast.success(`“${record.name}”已生成并保存到角色视觉`);
+      toast.success(`“${record.name}”已生成并保存到角色锚点`);
     } else {
-      errorMessage.value = record.errorMessage || '角色视觉生成任务未完成';
+      errorMessage.value = record.errorMessage || '角色锚点生成任务未完成';
     }
   } catch (pollError: unknown) {
     pollingState.value = { ...pollingState.value, phase: 'paused' };
@@ -180,7 +181,7 @@ function retryPolling(): void {
     return;
   }
   errorMessage.value = '';
-  void pollVisualTask(activeRecord.value.id);
+  void pollAnchorTask(activeRecord.value.id);
 }
 
 // 生成器
@@ -214,7 +215,7 @@ async function generateActions(): Promise<void> {
   isSubmitting.value = true;
   errorMessage.value = '';
   try {
-    const record = await window.desktop.character.assets.generateCharacterAction({
+    const record = await characterAnchorApi.generateAction({
       action: action.value.trim(),
       count: count.value,
       name: imageName.value.trim(),
@@ -223,7 +224,7 @@ async function generateActions(): Promise<void> {
       size: size.value,
     });
     records.value = replaceRecord(records.value, record);
-    await pollVisualTask(record.id);
+    await pollAnchorTask(record.id);
   } catch (generationError: unknown) {
     errorMessage.value =
       generationError instanceof Error ? generationError.message : String(generationError);
@@ -238,7 +239,7 @@ async function generateActionPrompt(): Promise<void> {
   }
   isGeneratingPrompt.value = true;
   try {
-    action.value = await window.desktop.character.assets.generateCharacterActionPrompt({
+    action.value = await characterAnchorApi.generateActionPrompt({
       model: appStore.settings.fastModel,
       name: imageName.value.trim(),
     });
@@ -256,12 +257,12 @@ const deletingFileName = ref('');
 const deleteDialogOpen = ref(false);
 const deleteTarget = ref<{
   image: CharacterVisualImage;
-  record: CharacterVisualAssetRecord;
+  record: CharacterAnchorRecord;
 } | null>(null);
 const referenceDialogOpen = ref(false);
-const { openUploadDialog, uploadDialogOpen } = useCharacterVisualUpload();
+const { openUploadDialog, uploadDialogOpen } = useCharacterAnchorUpload();
 const { renameAsset, renameDialogOpen, renamingFileName, renameTarget, requestRename } =
-  useCharacterVisualRename({
+  useCharacterAnchorRename({
     onRenamed(nextRecords) {
       records.value = nextRecords;
     },
@@ -301,13 +302,13 @@ const isGenerateDisabled = computed(
     action.value.length > MAX_CHARACTER_ACTION_LENGTH,
 );
 
-const { closeGenerator, generatorOpen, openGenerator } = useCharacterVisualGenerator({
+const { closeGenerator, generatorOpen, openGenerator } = useCharacterAnchorGenerator({
   disabled: operationDisabled,
-  onOpen: refreshVisualWorkspace,
+  onOpen: refreshAnchorWorkspace,
 });
 
 // 工作区加载
-function replaceRecord<TRecord extends CharacterVisualAssetRecord>(
+function replaceRecord<TRecord extends CharacterAnchorRecord>(
   recordList: TRecord[],
   updatedRecord: TRecord,
 ): TRecord[] {
@@ -317,26 +318,26 @@ function replaceRecord<TRecord extends CharacterVisualAssetRecord>(
 }
 
 function applyWorkspace(
-  workspace: CharacterVisualWorkspaceState,
-  preferredReference?: CharacterVisualAssetSelection | null,
+  workspace: CharacterAnchorWorkspaceState,
+  preferredReference?: CharacterAnchorSelection | null,
 ): void {
   officialAssets.value = workspace.officialAssets;
   records.value = workspace.records;
   syncSelectedReference(preferredReference);
 }
 
-function applyCharacterWorkspace(visualWorkspace: CharacterVisualWorkspaceState): void {
-  const latestGeneratedRecord = visualWorkspace.records.find(
+function applyCharacterAnchorWorkspace(anchorWorkspace: CharacterAnchorWorkspaceState): void {
+  const latestGeneratedRecord = anchorWorkspace.records.find(
     record => record.generationMode === 'action',
   );
-  applyWorkspace(visualWorkspace, latestGeneratedRecord?.referenceAssets[0]);
+  applyWorkspace(anchorWorkspace, latestGeneratedRecord?.referenceAssets[0]);
   action.value = latestGeneratedRecord?.prompt || '自然站立，抬起右手挥手，左手自然垂下。';
   imageName.value = latestGeneratedRecord?.name || '挥手';
   size.value = latestGeneratedRecord?.size ?? '2:3';
   resolution.value = latestGeneratedRecord?.resolution ?? '1k';
   count.value = latestGeneratedRecord?.count ?? 2;
 
-  const unfinishedRecord = visualWorkspace.records.find(record =>
+  const unfinishedRecord = anchorWorkspace.records.find(record =>
     activeStatuses.includes(record.status),
   );
   if (unfinishedRecord) {
@@ -355,13 +356,13 @@ async function loadCharacterWorkspace(characterId: string): Promise<void> {
   officialAssets.value = [];
   selectedReferenceAsset.value = null;
   try {
-    const visualWorkspace = await window.desktop.character.assets.getCharacterVisualWorkspace({
+    const anchorWorkspace = await characterAnchorApi.getWorkspace({
       characterId,
     });
     if (requestId !== loadRequestId || selectedCharacterId.value !== characterId) {
       return;
     }
-    applyCharacterWorkspace(visualWorkspace);
+    applyCharacterAnchorWorkspace(anchorWorkspace);
   } catch (initializationError: unknown) {
     if (requestId !== loadRequestId) {
       return;
@@ -377,10 +378,10 @@ async function loadCharacterWorkspace(characterId: string): Promise<void> {
   }
 }
 
-async function refreshVisualWorkspace(): Promise<void> {
+async function refreshAnchorWorkspace(): Promise<void> {
   try {
     applyWorkspace(
-      await window.desktop.character.assets.getCharacterVisualWorkspace({
+      await characterAnchorApi.getWorkspace({
         characterId: selectedCharacterId.value,
       }),
     );
@@ -412,7 +413,7 @@ async function selectCharacter(characterId: string): Promise<void> {
 }
 
 async function selectAsset(
-  record: CharacterVisualAssetRecord,
+  record: CharacterAnchorRecord,
   image: CharacterVisualImage,
   official: boolean,
 ): Promise<void> {
@@ -421,7 +422,7 @@ async function selectAsset(
   }
   selectingFileName.value = image.fileName;
   try {
-    const workspace = await window.desktop.character.assets.setCharacterVisualAssetOfficial({
+    const workspace = await characterAnchorApi.setOfficial({
       fileName: image.fileName,
       official,
       taskId: record.id,
@@ -435,7 +436,7 @@ async function selectAsset(
   }
 }
 
-function requestDelete(record: CharacterVisualAssetRecord, image: CharacterVisualImage): void {
+function requestDelete(record: CharacterAnchorRecord, image: CharacterVisualImage): void {
   if (selectingFileName.value || deletingFileName.value) {
     return;
   }
@@ -443,13 +444,13 @@ function requestDelete(record: CharacterVisualAssetRecord, image: CharacterVisua
   deleteDialogOpen.value = true;
 }
 
-function editImage(record: CharacterVisualAssetRecord, image: CharacterVisualImage): void {
+function editImage(record: CharacterAnchorRecord, image: CharacterVisualImage): void {
   void router.push({
     name: 'image-editor',
     query: {
       fileName: image.name || record.name || image.fileName,
       mimeType: image.mimeType,
-      returnTo: 'character-visual',
+      returnTo: 'character-anchor',
       sourceUrl: image.url,
     },
   });
@@ -462,14 +463,14 @@ async function deleteAsset(): Promise<void> {
   const { image, record } = deleteTarget.value;
   deletingFileName.value = image.fileName;
   try {
-    const workspace = await window.desktop.character.assets.deleteCharacterVisualAsset({
+    const workspace = await characterAnchorApi.deleteAnchor({
       fileName: image.fileName,
       taskId: record.id,
     });
     applyWorkspace(workspace);
     deleteDialogOpen.value = false;
     deleteTarget.value = null;
-    toast.success('角色视觉图片已删除');
+    toast.success('角色锚点图片已删除');
   } catch (deletionError: unknown) {
     toast.error(deletionError instanceof Error ? deletionError.message : String(deletionError));
   } finally {
@@ -488,11 +489,11 @@ function openUpload(): void {
 async function handleUploaded(): Promise<void> {
   try {
     applyWorkspace(
-      await window.desktop.character.assets.getCharacterVisualWorkspace({
+      await characterAnchorApi.getWorkspace({
         characterId: selectedCharacterId.value,
       }),
     );
-    toast.success('角色视觉图片已上传');
+    toast.success('角色锚点图片已上传');
   } catch (uploadError: unknown) {
     toast.error(uploadError instanceof Error ? uploadError.message : String(uploadError));
   }
@@ -546,13 +547,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <SagPage title="角色视觉资产" description="基于正式视觉生成和管理角色动作" :icon="Camera">
+  <SagPage title="角色锚点资产" description="基于正式锚点生成和管理角色动作" :icon="Camera">
     <template #header-leading>
       <Badge variant="secondary" class="shrink-0 tabular-nums">{{ assetCount }}</Badge>
     </template>
 
     <template #header-actions>
-      <VisualPageHeader
+      <AnchorPageHeader
         :characters="characters"
         :character-selection-disabled="characterSelectionDisabled"
         :generator-open="generatorOpen"
@@ -569,10 +570,10 @@ onBeforeUnmount(() => {
       class="mx-4 mt-3 w-auto shrink-0 sm:mx-5"
     >
       <AlertCircle class="size-4" />
-      <AlertTitle>生成动作需要正式角色视觉</AlertTitle>
+      <AlertTitle>生成动作需要正式角色锚点</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
         <span>请先上传角色图片，或将图库中的一张图片设为正式资产。</span>
-        <Button size="sm" variant="outline" @click="openUpload">上传角色视觉</Button>
+        <Button size="sm" variant="outline" @click="openUpload">上传角色锚点</Button>
       </AlertDescription>
     </Alert>
 
@@ -580,7 +581,7 @@ onBeforeUnmount(() => {
       v-if="!isInitializing && !keyConfigured"
       class="mx-4 mt-3 w-auto shrink-0 sm:mx-5"
       title="生成图片需要 APIMart API Key"
-      description="上传已有角色视觉图片不受影响。"
+      description="上传已有角色锚点图片不受影响。"
       action-label="前往设置"
       to="/settings"
     />
@@ -603,7 +604,7 @@ onBeforeUnmount(() => {
       ]"
     >
       <div class="flex min-h-0 min-w-0 lg:flex">
-        <VisualGallery
+        <AnchorGallery
           :deleting-file-name="deletingFileName"
           :official-assets="officialAssets"
           :polling-state="pollingState"
@@ -638,7 +639,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <VisualUploadDialog
+    <AnchorUploadDialog
       v-model:open="uploadDialogOpen"
       :character-id="selectedCharacterId"
       @uploaded="handleUploaded"
@@ -647,16 +648,16 @@ onBeforeUnmount(() => {
     <ImageReferencePickerDialog
       v-model:open="referenceDialogOpen"
       :busy="isSubmitting"
-      description="只能选择当前角色的正式视觉。生成时将锁定角色外观，只改变姿势。"
+      description="只能选择当前角色的正式锚点。生成时将锁定角色外观，只改变姿势。"
       :filters="[]"
       :max-selection="1"
       :options="referenceOptions"
       :selected-keys="selectedReferenceKeys"
-      title="选择正式角色视觉"
+      title="选择正式角色锚点"
       @confirm="selectReferenceAsset"
     />
 
-    <VisualAssetRenameDialog
+    <AnchorAssetRenameDialog
       v-model:open="renameDialogOpen"
       :current-name="renameTarget?.image.name || renameTarget?.record.name || ''"
       :loading="Boolean(renamingFileName)"

@@ -3,18 +3,18 @@ import { computed } from 'vue';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import type {
-  CharacterVisualAssetRecord,
-  CharacterVisualAssetSelection,
+  CharacterAnchorRecord,
+  CharacterAnchorSelection,
   CharacterVisualImage,
 } from '@/types';
-import VisualEmptyState from './visual-empty-state.vue';
-import VisualImageCard from './visual-image-card.vue';
-import VisualTaskCard from './visual-task-card.vue';
+import AnchorEmptyState from './anchor-empty-state.vue';
+import AnchorImageCard from './anchor-image-card.vue';
+import AnchorTaskCard from './anchor-task-card.vue';
 
 interface GalleryEntryBase {
   imageIndex: number;
   key: string;
-  record: CharacterVisualAssetRecord;
+  record: CharacterAnchorRecord;
 }
 
 interface GalleryImageEntry extends GalleryEntryBase {
@@ -31,30 +31,30 @@ type GalleryEntry = GalleryImageEntry | GalleryTaskEntry;
 
 const props = defineProps<{
   deletingFileName: string;
-  officialAssets: CharacterVisualAssetSelection[];
+  officialAssets: CharacterAnchorSelection[];
   pollingState: GenerationTaskPollingState;
-  records: CharacterVisualAssetRecord[];
+  records: CharacterAnchorRecord[];
   renamingFileName: string;
   selectingFileName: string;
 }>();
 
 const emit = defineEmits<{
-  (event: 'delete', record: CharacterVisualAssetRecord, image: CharacterVisualImage): void;
-  (event: 'edit', record: CharacterVisualAssetRecord, image: CharacterVisualImage): void;
+  (event: 'delete', record: CharacterAnchorRecord, image: CharacterVisualImage): void;
+  (event: 'edit', record: CharacterAnchorRecord, image: CharacterVisualImage): void;
   (
     event: 'official',
-    record: CharacterVisualAssetRecord,
+    record: CharacterAnchorRecord,
     image: CharacterVisualImage,
     official: boolean,
   ): void;
-  (event: 'rename', record: CharacterVisualAssetRecord, image: CharacterVisualImage): void;
+  (event: 'rename', record: CharacterAnchorRecord, image: CharacterVisualImage): void;
 }>();
 
 const activeStatuses = ['submitted', 'pending', 'processing'] as const;
 
 const galleryEntries = computed<GalleryEntry[]>(() => createEntries(props.records));
 
-function createEntries(records: CharacterVisualAssetRecord[]): GalleryEntry[] {
+function createEntries(records: CharacterAnchorRecord[]): GalleryEntry[] {
   return records.flatMap((record): GalleryEntry[] => {
     if (
       activeStatuses.includes(record.status as (typeof activeStatuses)[number]) ||
@@ -109,12 +109,12 @@ function isSelected(entry: GalleryEntry): boolean {
             isSelected(entry) && 'border-primary/40 ring-1 ring-primary/10',
           ]"
         >
-          <VisualTaskCard
+          <AnchorTaskCard
             v-if="entry.type === 'task'"
             :polling-state="pollingState"
             :record="entry.record"
           />
-          <VisualImageCard
+          <AnchorImageCard
             v-else
             :deleting-file-name="deletingFileName"
             :image="entry.image"
@@ -131,9 +131,9 @@ function isSelected(entry: GalleryEntry): boolean {
         </article>
       </div>
 
-      <VisualEmptyState
+      <AnchorEmptyState
         v-else
-        description="可以创建或上传已有图片，建立角色的视觉资产。"
+        description="可以创建或上传已有图片，建立角色锚点资产。"
         title="还没有角色图片"
       />
     </ScrollArea>

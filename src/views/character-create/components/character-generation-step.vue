@@ -3,12 +3,12 @@ import { Check, History, ImageUpscale, LoaderCircle } from '@lucide/vue';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import type { CharacterVisualImage, CharacterVisualGeneration } from '@/types';
+import type { CharacterVisualImage, CharacterAnchorGeneration } from '@/types';
 
 defineProps<{
   baseImage: CharacterVisualImage;
   finalImage: CharacterVisualImage | null;
-  finalVersions: CharacterVisualGeneration[];
+  finalVersions: CharacterAnchorGeneration[];
   isGenerating: boolean;
   isSaved: boolean;
   progress: number;
@@ -26,7 +26,7 @@ const emit = defineEmits<{
   <section class="w-full" aria-labelledby="result-heading">
     <div class="mb-6 flex flex-col justify-between gap-3 border-b pb-5 sm:flex-row sm:items-start">
       <div>
-        <h3 id="result-heading" class="text-lg font-semibold">精修正式视觉</h3>
+        <h3 id="result-heading" class="text-lg font-semibold">精修正式锚点</h3>
         <p class="mt-1 text-sm leading-6 text-muted-foreground">
           默认会以选中候选为基底生成一张 2k 定稿，尽量保持脸型、发型与画风。
         </p>
@@ -57,7 +57,7 @@ const emit = defineEmits<{
           <Progress :value="progress" class="mt-4 max-w-xs" />
         </div>
         <div v-else-if="finalImage" class="aspect-[3/4] bg-muted/10">
-          <img :src="finalImage.url" alt="精修后的角色正式视觉" class="size-full object-contain" />
+          <img :src="finalImage.url" alt="精修后的角色正式锚点" class="size-full object-contain" />
         </div>
         <div
           v-else
@@ -72,7 +72,7 @@ const emit = defineEmits<{
           class="flex items-center gap-1.5 border-t px-3 py-2 text-xs text-muted-foreground"
         >
           <Check v-if="isSaved" class="size-3.5 text-emerald-600" />
-          {{ isSaved ? '已设为正式视觉' : skipRefinement ? '直接保存' : '2k 精修定稿' }}
+          {{ isSaved ? '已设为正式锚点' : skipRefinement ? '直接保存' : '2k 精修定稿' }}
         </figcaption>
       </figure>
     </div>

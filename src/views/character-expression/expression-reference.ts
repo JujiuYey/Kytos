@@ -15,6 +15,6 @@ export interface ExpressionReferenceOption {
   label: string;
   // 提交生成请求时用于定位原始图片的领域数据。
   selection: CharacterExpressionReferenceSelection;
-  // 选择器的筛选分组：已有表情或角色视觉资产。
+  // 选择器的筛选分组：已有表情或角色锚点资产。
   source: ExpressionReferenceSource;
 }

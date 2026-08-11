@@ -65,7 +65,7 @@ async function submitCharacterRename(name: string): Promise<void> {
   }
 }
 
-async function openCharacterVisual(character: CharacterLibraryCharacter): Promise<void> {
+async function openCharacterAnchor(character: CharacterLibraryCharacter): Promise<void> {
   if (busy.value) {
     return;
   }
@@ -73,7 +73,7 @@ async function openCharacterVisual(character: CharacterLibraryCharacter): Promis
   try {
     await router.push(
       character.visualAsset
-        ? { name: 'character-visual', query: { characterId: character.id } }
+        ? { name: 'character-anchor', query: { characterId: character.id } }
         : { name: 'character-create', query: { characterId: character.id } },
     );
   } catch (error: unknown) {
@@ -143,7 +143,7 @@ async function confirmDelete(): Promise<void> {
           :key="character.id"
           :busy="busy"
           :character="character"
-          @open-visual="openCharacterVisual"
+          @open-anchor="openCharacterAnchor"
           @rename="renameCharacter"
           @request-delete="requestDelete"
         />

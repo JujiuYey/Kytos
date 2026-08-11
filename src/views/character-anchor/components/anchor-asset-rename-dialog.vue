@@ -56,15 +56,15 @@ function submit(): void {
       <form class="space-y-5" @submit.prevent="submit">
         <DialogHeader>
           <DialogTitle>重命名图片</DialogTitle>
-          <DialogDescription>名称用于区分角色视觉中的不同图片。</DialogDescription>
+          <DialogDescription>名称用于区分角色锚点中的不同图片。</DialogDescription>
         </DialogHeader>
         <div class="space-y-2">
           <div class="flex items-center justify-between gap-3">
-            <Label for="rename-character-visual">图片名称</Label>
+            <Label for="rename-character-anchor">图片名称</Label>
             <span class="text-xs tabular-nums text-muted-foreground">{{ name.length }} / 80</span>
           </div>
           <Input
-            id="rename-character-visual"
+            id="rename-character-anchor"
             v-model="name"
             maxlength="80"
             placeholder="例如：基础形象、冬季造型、挥手动作"

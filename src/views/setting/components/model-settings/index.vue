@@ -68,7 +68,7 @@ const fastModelDefinition = computed(() => CHAT_MODEL_DEFINITIONS[fastModel.valu
           <div>
             <h3 class="text-sm font-medium">生图模型</h3>
             <p class="mt-1.5 text-sm leading-5 text-muted-foreground">
-              用于角色视觉、表情和插画生成。
+              用于角色锚点、表情和插画生成。
             </p>
           </div>
         </div>

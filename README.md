@@ -2,7 +2,7 @@
 
 Kytos 是一个本地优先的 AI 角色与视觉内容创作工作台。
 
-它把角色创建、角色视觉、表情、插画和故事创作放在同一个桌面应用中。
+它把角色创建、角色锚点、表情、插画和故事创作放在同一个桌面应用中。
 作品文件保存在你选择的本地工作区，模型凭据由操作系统安全存储保护。
 
 [完整文档](https://jujiuyey.github.io/Kytos/) · [快速开始](https://jujiuyey.github.io/Kytos/getting-started/) · [开发架构](https://jujiuyey.github.io/Kytos/developer/architecture)
@@ -15,14 +15,14 @@ Kytos 是一个本地优先的 AI 角色与视觉内容创作工作台。
 
 - 创建角色：选择视觉风格，提供可选参考图，生成多张候选形象。
 - 角色管理：创建、选择、重命名和删除角色。
-- 角色视觉：管理正式角色视觉、动作图片和角色参考板。
+- 角色锚点：管理正式角色锚点、动作图片和角色参考板。
 - 表情管理：基于角色参考生成、上传、重命名和整理表情素材。
 
 ![创建角色页面](docs/screenshots/02-character-create.png)
 
 ![角色管理页面](docs/screenshots/03-character-library.png)
 
-![角色视觉与表情页面](docs/screenshots/04-character-assets.png)
+![角色锚点与表情页面](docs/screenshots/04-character-assets.png)
 
 ### 内容创作
 
@@ -68,7 +68,7 @@ Kytos 不读取项目根目录中的 `.env` 来保存用户凭据。
 | -------- | ---------------------------------------------- |
 | DeepSeek | DeepSeek V4 Flash / Pro 对话和内容整理         |
 | MiniMax  | MiniMax M3 文本与多模态共创                    |
-| APIMart  | GPT-Image-2 角色视觉、表情、插画和故事画面生成 |
+| APIMart  | GPT-Image-2 角色锚点、表情、插画和故事画面生成 |
 
 应用只在主进程调用外部服务时读取 API Key。
 已保存的 API Key 不会回传到渲染界面。

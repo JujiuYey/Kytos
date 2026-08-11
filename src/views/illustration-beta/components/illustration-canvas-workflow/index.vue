@@ -26,12 +26,13 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { characterAnchorApi } from '@/lib/character-anchor-api';
 import type {
-  CharacterVisualAssetRecord,
-  CharacterVisualAssetSelection,
+  CharacterAnchorRecord,
+  CharacterAnchorSelection,
   CharacterVisualImage,
   CharacterVisualResolution,
-  CharacterVisualWorkspaceState,
+  CharacterAnchorWorkspaceState,
   CredentialStatus,
 } from '@/types';
 import { MAX_CHARACTER_REFERENCE_IMAGES } from '@/types';
@@ -127,20 +128,20 @@ function buildSheetPrompt(): string {
   ].join('\n');
 }
 
-function assetKey(selection: CharacterVisualAssetSelection): string {
+function assetKey(selection: CharacterAnchorSelection): string {
   return `${selection.taskId}:${selection.fileName}`;
 }
 
 function findImage(
-  workspace: CharacterVisualWorkspaceState,
-  selection: CharacterVisualAssetSelection,
-): { image: CharacterVisualImage; record: CharacterVisualAssetRecord } | null {
+  workspace: CharacterAnchorWorkspaceState,
+  selection: CharacterAnchorSelection,
+): { image: CharacterVisualImage; record: CharacterAnchorRecord } | null {
   const record = workspace.records.find(item => item.id === selection.taskId);
   const image = record?.images.find(item => item.fileName === selection.fileName);
   return record && image ? { image, record } : null;
 }
 
-function createAssetOptions(workspace: CharacterVisualWorkspaceState): WorkflowAssetOption[] {
+function createAssetOptions(workspace: CharacterAnchorWorkspaceState): WorkflowAssetOption[] {
   return workspace.officialAssets.flatMap(selection => {
     const match = findImage(workspace, selection);
     if (!match) {
@@ -157,12 +158,12 @@ function createAssetOptions(workspace: CharacterVisualWorkspaceState): WorkflowA
   });
 }
 
-function toRunStatus(status: CharacterVisualAssetRecord['status'] | undefined): WorkflowRunStatus {
+function toRunStatus(status: CharacterAnchorRecord['status'] | undefined): WorkflowRunStatus {
   return status ?? 'idle';
 }
 
 function initializeGraph(
-  workspace: CharacterVisualWorkspaceState,
+  workspace: CharacterAnchorWorkspaceState,
   options: WorkflowAssetOption[],
 ): void {
   const latestReferenceBoard = workspace.records.find(
@@ -463,7 +464,7 @@ async function pollTask(taskId: string): Promise<void> {
     return;
   }
   try {
-    const record = await window.desktop.character.assets.getCharacterVisualAssetTask(taskId);
+    const record = await characterAnchorApi.getTask(taskId);
     updateGeneratorStatus('generator', {
       errorMessage: record.errorMessage || '',
       progress: record.progress,
@@ -487,7 +488,7 @@ async function pollTask(taskId: string): Promise<void> {
       emit('workspace-updated');
       toast.success(`“${record.name}”已生成并保存到资产库`);
     } else {
-      errorMessage.value = record.errorMessage || '角色视觉生成任务未完成';
+      errorMessage.value = record.errorMessage || '角色锚点生成任务未完成';
     }
   } catch (pollError: unknown) {
     isSubmitting.value = false;
@@ -512,7 +513,7 @@ async function generateFromNode(generatorId = 'generator'): Promise<void> {
   ) {
     return;
   }
-  const referenceAssets = assetNodes.flatMap<CharacterVisualAssetSelection>(node => {
+  const referenceAssets = assetNodes.flatMap<CharacterAnchorSelection>(node => {
     if (node.data.kind !== 'asset') {
       return [];
     }
@@ -533,7 +534,7 @@ async function generateFromNode(generatorId = 'generator'): Promise<void> {
     status: 'submitted',
   });
   try {
-    const record = await window.desktop.character.assets.generateCharacterReferenceBoard({
+    const record = await characterAnchorApi.generateReferenceBoard({
       name: generator.data.name.trim(),
       prompt: generator.data.prompt.trim(),
       referenceAssets,
@@ -560,7 +561,7 @@ async function initialize(): Promise<void> {
   errorMessage.value = '';
   try {
     const [workspace, status] = await Promise.all([
-      window.desktop.character.assets.getCharacterVisualWorkspace(),
+      characterAnchorApi.getWorkspace(),
       window.desktop.settings.getCredentialStatus('apimart'),
     ]);
     credentialStatus.value = status;
@@ -614,7 +615,7 @@ onBeforeUnmount(() => {
         <div class="mx-auto flex size-10 items-center justify-center rounded-md border bg-muted/30">
           <ImageOff class="size-4 text-muted-foreground" />
         </div>
-        <h2 class="mt-4 text-sm font-medium">缺少正式角色视觉</h2>
+        <h2 class="mt-4 text-sm font-medium">缺少正式角色锚点</h2>
         <p class="mt-1 text-sm leading-6 text-muted-foreground">
           需要至少一张正式资产才能建立参考图生成流程。
         </p>
@@ -625,7 +626,7 @@ onBeforeUnmount(() => {
       v-else
       class="grid min-h-0 min-w-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]"
     >
-      <section ref="canvasSection" class="relative min-h-0 min-w-0" aria-label="角色视觉节点画布">
+      <section ref="canvasSection" class="relative min-h-0 min-w-0" aria-label="角色锚点节点画布">
         <Canvas
           id="illustration-canvas-workflow"
           :default-edge-options="defaultEdgeOptions"

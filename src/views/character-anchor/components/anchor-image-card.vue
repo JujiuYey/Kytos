@@ -8,14 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagStatusBadge } from '@/components/sag/status-badge';
-import type { CharacterVisualAssetRecord, CharacterVisualImage } from '@/types';
+import type { CharacterAnchorRecord, CharacterVisualImage } from '@/types';
 
 const props = defineProps<{
   deletingFileName: string;
   image: CharacterVisualImage;
   imageIndex: number;
   isSelected: boolean;
-  record: CharacterVisualAssetRecord;
+  record: CharacterAnchorRecord;
   renamingFileName: string;
   selectingFileName: string;
 }>();
@@ -27,7 +27,7 @@ const emit = defineEmits<{
   (event: 'rename'): void;
 }>();
 
-const aspectClasses: Record<CharacterVisualAssetRecord['size'], string> = {
+const aspectClasses: Record<CharacterAnchorRecord['size'], string> = {
   '1:1': 'aspect-square',
   '16:9': 'aspect-video',
   '2:3': 'aspect-[2/3]',
@@ -50,7 +50,7 @@ const isDeleteDisabled = computed(
 );
 const isOfficialSaving = computed(() => props.selectingFileName === props.image.fileName);
 
-function getAspectClass(size: CharacterVisualAssetRecord['size']): string {
+function getAspectClass(size: CharacterAnchorRecord['size']): string {
   return aspectClasses[size];
 }
 
@@ -65,7 +65,7 @@ function formatDate(value: string): string {
     :alt="`${imageName}预览`"
     :src="props.image.url"
     :title="imageName"
-    description="查看角色视觉大图，可缩放和拖拽"
+    description="查看角色锚点大图，可缩放和拖拽"
   >
     <Button
       variant="ghost"

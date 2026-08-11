@@ -284,7 +284,7 @@ function handleTitleChange(event: Event): void {
                 @click="emit('manage-assets')"
               >
                 <Images class="size-4" />
-                准备角色视觉
+                准备角色锚点
               </Button>
               <Button
                 v-if="!apimartConfigured"

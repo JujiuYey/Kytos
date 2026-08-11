@@ -5,11 +5,11 @@ import {
   type GenerationTaskPollingState,
 } from '@/components/sag/generation-polling-status';
 import { SagStatusBadge } from '@/components/sag/status-badge';
-import type { CharacterVisualAssetRecord, CharacterVisualTaskStatus } from '@/types';
+import type { CharacterAnchorRecord, CharacterVisualTaskStatus } from '@/types';
 
 const props = defineProps<{
   pollingState: GenerationTaskPollingState;
-  record: CharacterVisualAssetRecord;
+  record: CharacterAnchorRecord;
 }>();
 
 const activeStatuses: CharacterVisualTaskStatus[] = ['submitted', 'pending', 'processing'];
@@ -23,11 +23,11 @@ const statusLabels: Record<CharacterVisualTaskStatus, string> = {
   submitted: '已提交',
 };
 
-function isActive(record: CharacterVisualAssetRecord): boolean {
+function isActive(record: CharacterAnchorRecord): boolean {
   return activeStatuses.includes(record.status);
 }
 
-function getStatusLabel(record: CharacterVisualAssetRecord): string {
+function getStatusLabel(record: CharacterAnchorRecord): string {
   if (record.source === 'uploaded') {
     return '已上传';
   }

@@ -17,12 +17,13 @@ import { toast } from 'vue-sonner';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SagPage } from '@/components/sag/sag-page';
+import { characterAnchorCreationApi } from '@/lib/character-anchor-api';
 import { useAppStore } from '@/stores/app';
 import { useCharacterLibraryStore } from '@/stores/character-library';
 import type {
   CharacterCreateAgentMessage,
   CharacterVisualImage,
-  CharacterVisualGeneration,
+  CharacterAnchorGeneration,
   SaveFileRequest,
   SavedFileResult,
 } from '@/types';
@@ -60,9 +61,9 @@ const summaryInitialName = ref('');
 const summaryTargetId = ref('');
 const prompt = ref('');
 const promptDraft = ref<CharacterPromptDraft>(createEmptyCharacterPromptDraft());
-const candidateGeneration = ref<CharacterVisualGeneration | null>(null);
-const pendingFinalGeneration = ref<CharacterVisualGeneration | null>(null);
-const finalVersions = ref<CharacterVisualGeneration[]>([]);
+const candidateGeneration = ref<CharacterAnchorGeneration | null>(null);
+const pendingFinalGeneration = ref<CharacterAnchorGeneration | null>(null);
+const finalVersions = ref<CharacterAnchorGeneration[]>([]);
 const selectedFinalGenerationId = ref('');
 const baseImage = ref<CharacterVisualImage | null>(null);
 const isCandidateGenerating = ref(false);
@@ -223,7 +224,7 @@ async function generateCandidates(): Promise<void> {
   try {
     await compilePrompt();
     if (!prompt.value.trim()) throw new Error('提示词整理失败，请重试');
-    candidateGeneration.value = await window.desktop.character.visual.generateCharacterVisual({
+    candidateGeneration.value = await characterAnchorCreationApi.generate({
       prompt: prompt.value,
       n: 4,
       resolution: '1k',
@@ -276,7 +277,7 @@ async function generateFinalImage(): Promise<void> {
   try {
     const imageUrls = [await imageUrlToDataUrl(baseImage.value.url)];
     if (sourceImageFile.value) imageUrls.push(await referenceImageToDataUrl(sourceImageFile.value));
-    pendingFinalGeneration.value = await window.desktop.character.visual.generateCharacterVisual({
+    pendingFinalGeneration.value = await characterAnchorCreationApi.generate({
       imageUrls,
       n: 1,
       prompt: `${prompt.value}\n\nKeep the same character identity, face shape, hairstyle and art style from the reference image. One single full-body character, centered, pure white background, no shadow, refined high-definition character design sheet.`,
@@ -292,7 +293,7 @@ async function generateFinalImage(): Promise<void> {
 
 async function pollGeneration(generationId: string, phase: 'candidates' | 'final'): Promise<void> {
   try {
-    const generation = await window.desktop.character.visual.getCharacterVisualGeneration({
+    const generation = await characterAnchorCreationApi.getGeneration({
       generationId,
     });
     if (phase === 'candidates') candidateGeneration.value = generation;
@@ -304,7 +305,7 @@ async function pollGeneration(generationId: string, phase: 'candidates' | 'final
     if (phase === 'candidates') isCandidateGenerating.value = false;
     else isFinalGenerating.value = false;
     if (generation.status === 'completed') {
-      toast.success(phase === 'candidates' ? '候选图已生成，请选择一张作为基底' : '正式视觉已生成');
+      toast.success(phase === 'candidates' ? '候选图已生成，请选择一张作为基底' : '正式锚点已生成');
     } else {
       toast.error(generation.errorMessage || '角色形象生成失败');
     }
@@ -315,7 +316,7 @@ async function pollGeneration(generationId: string, phase: 'candidates' | 'final
   }
 }
 
-function updateFinalGeneration(generation: CharacterVisualGeneration): void {
+function updateFinalGeneration(generation: CharacterAnchorGeneration): void {
   if (generation.status !== 'completed' || !generation.image) {
     pendingFinalGeneration.value = generation;
     return;
@@ -341,13 +342,13 @@ async function saveImage(): Promise<void> {
   if (isSaving.value || !generation || !baseImage.value || !characterId.value) return;
   isSaving.value = true;
   try {
-    await window.desktop.character.visual.saveCharacterVisual({
+    await characterAnchorCreationApi.saveGenerated({
       characterId: characterId.value,
       generationId: generation.id,
       imageFileName: skipRefinement.value ? baseImage.value.fileName : generation.image?.fileName,
     });
     isSaved.value = true;
-    toast.success('第一个正式角色视觉已保存');
+    toast.success('第一个正式角色锚点已保存');
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : String(error));
   } finally {
@@ -414,7 +415,7 @@ async function saveCharacterSummary(
     summaryInitialName.value = character.name;
 
     if (visualAsset) {
-      await window.desktop.character.visual.saveCharacterVisualAsset({
+      await characterAnchorCreationApi.saveUploaded({
         characterId: character.id,
         fileData: visualAsset.fileData,
         fileName: visualAsset.fileName,
@@ -458,8 +459,8 @@ async function initialize(): Promise<void> {
       throw new Error('未找到这个角色');
     }
     if (character.visualAsset) {
-      toast.info('这个角色已经有正式视觉，请在角色视觉中继续管理');
-      await router.replace({ name: 'character-visual', query: { characterId: character.id } });
+      toast.info('这个角色已经有正式锚点，请在角色锚点中继续管理');
+      await router.replace({ name: 'character-anchor', query: { characterId: character.id } });
       return;
     }
     characterName.value = character.name;
@@ -501,7 +502,7 @@ onBeforeUnmount(() => {
       needsSummary
         ? '先建立角色概要，再创建第一个正式形象'
         : characterName
-          ? `正在为「${characterName}」建立正式视觉`
+          ? `正在为「${characterName}」建立正式锚点`
           : '正在读取角色概要'
     "
     :icon="Sparkles"
@@ -644,7 +645,7 @@ onBeforeUnmount(() => {
             @click="saveImage"
           >
             <Save class="size-4" />
-            {{ isSaving ? '保存中' : '满意，设为正式视觉' }}
+            {{ isSaving ? '保存中' : '满意，设为正式锚点' }}
           </Button>
           <Button
             v-if="currentStep < 3 && !isSaved"

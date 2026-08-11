@@ -1,23 +1,24 @@
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { characterAnchorApi } from '@/lib/character-anchor-api';
 import { toErrorMessage } from '@/utils/helpers';
-import type { CharacterVisualAssetRecord, CharacterVisualImage } from '@/types';
+import type { CharacterAnchorRecord, CharacterVisualImage } from '@/types';
 
 interface RenameTarget {
   image: CharacterVisualImage;
-  record: CharacterVisualAssetRecord;
+  record: CharacterAnchorRecord;
 }
 
-interface UseCharacterVisualRenameOptions {
-  onRenamed: (records: CharacterVisualAssetRecord[]) => void;
+interface UseCharacterAnchorRenameOptions {
+  onRenamed: (records: CharacterAnchorRecord[]) => void;
 }
 
-export function useCharacterVisualRename(options: UseCharacterVisualRenameOptions) {
+export function useCharacterAnchorRename(options: UseCharacterAnchorRenameOptions) {
   const renameDialogOpen = ref(false);
   const renamingFileName = ref('');
   const renameTarget = ref<RenameTarget | null>(null);
 
-  function requestRename(record: CharacterVisualAssetRecord, image: CharacterVisualImage): void {
+  function requestRename(record: CharacterAnchorRecord, image: CharacterVisualImage): void {
     renameTarget.value = { image, record };
     renameDialogOpen.value = true;
   }
@@ -29,7 +30,7 @@ export function useCharacterVisualRename(options: UseCharacterVisualRenameOption
     }
     renamingFileName.value = target.image.fileName;
     try {
-      const workspace = await window.desktop.character.assets.renameCharacterVisualAsset({
+      const workspace = await characterAnchorApi.renameAnchor({
         fileName: target.image.fileName,
         name: nextName,
         taskId: target.record.id,

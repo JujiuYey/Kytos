@@ -2,12 +2,12 @@ import { computed, ref, type Ref } from 'vue';
 import type {
   CharacterExpressionRecord,
   CharacterExpressionReferenceSelection,
-  CharacterVisualWorkspaceState,
+  CharacterAnchorWorkspaceState,
 } from '@/types';
 import type { ExpressionReferenceOption } from '../expression-reference';
 
 interface UseExpressionReferencesOptions {
-  visualWorkspace: Readonly<Ref<CharacterVisualWorkspaceState | null>>;
+  anchorWorkspace: Readonly<Ref<CharacterAnchorWorkspaceState | null>>;
   records: Readonly<Ref<CharacterExpressionRecord[]>>;
 }
 
@@ -19,12 +19,12 @@ export function useExpressionReferences(options: UseExpressionReferencesOptions)
   const selectedReferenceAssets = ref<CharacterExpressionReferenceSelection[]>([]);
 
   const referenceOptions = computed<ExpressionReferenceOption[]>(() => {
-    const workspace = options.visualWorkspace.value;
+    const workspace = options.anchorWorkspace.value;
     if (!workspace) {
       return [];
     }
 
-    const visualOptions = workspace.records.flatMap(record =>
+    const anchorOptions = workspace.records.flatMap(record =>
       record.status === 'completed'
         ? record.images.map(image => {
             const selection = {
@@ -33,10 +33,10 @@ export function useExpressionReferences(options: UseExpressionReferencesOptions)
               taskId: record.id,
             };
             return {
-              detail: `角色视觉 · ${record.size}`,
+              detail: `角色锚点 · ${record.size}`,
               image,
               key: referenceAssetKey(selection),
-              label: image.name || record.name || '角色视觉',
+              label: image.name || record.name || '角色锚点',
               selection,
               source: 'visual' as const,
             };
@@ -63,7 +63,7 @@ export function useExpressionReferences(options: UseExpressionReferencesOptions)
         : [],
     );
 
-    return [...visualOptions, ...expressionOptions];
+    return [...anchorOptions, ...expressionOptions];
   });
   const selectedReferenceKeys = computed(() =>
     selectedReferenceAssets.value.map(referenceAssetKey),

@@ -2,7 +2,7 @@ import type { Node as FlowNode } from '@vue-flow/core';
 import type {
   CharacterVisualImage,
   CharacterVisualResolution,
-  CharacterVisualAssetSelection,
+  CharacterAnchorSelection,
 } from '@/types';
 
 export type WorkflowNodeKind = 'asset' | 'generator' | 'result';
@@ -19,7 +19,7 @@ export interface WorkflowAssetOption {
   image: CharacterVisualImage;
   key: string;
   label: string;
-  selection: CharacterVisualAssetSelection;
+  selection: CharacterAnchorSelection;
 }
 
 export interface WorkflowAssetNodeData {
@@ -27,7 +27,7 @@ export interface WorkflowAssetNodeData {
   image: CharacterVisualImage;
   kind: 'asset';
   label: string;
-  selection: CharacterVisualAssetSelection;
+  selection: CharacterAnchorSelection;
 }
 
 export interface WorkflowGeneratorNodeData {

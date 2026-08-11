@@ -1,11 +1,11 @@
 import { ref, type Ref } from 'vue';
 
-interface UseCharacterVisualGeneratorOptions {
+interface UseCharacterAnchorGeneratorOptions {
   disabled: Ref<boolean>;
   onOpen?: () => void;
 }
 
-export function useCharacterVisualGenerator(options: UseCharacterVisualGeneratorOptions) {
+export function useCharacterAnchorGenerator(options: UseCharacterAnchorGeneratorOptions) {
   const generatorOpen = ref(false);
 
   function openGenerator(): void {
