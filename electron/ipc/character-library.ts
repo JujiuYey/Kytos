@@ -6,12 +6,6 @@ import type {
   SelectCharacterRequest,
   UpdateCharacterRequest,
 } from '../../shared/character-library';
-import type {
-  GenerateCharacterVisualRequest,
-  GetCharacterVisualGenerationRequest,
-  SaveCharacterVisualAssetRequest,
-  SaveCharacterVisualRequest,
-} from '../../shared/character-create';
 import {
   createCharacter,
   deleteCharacter,
@@ -19,12 +13,6 @@ import {
   selectCharacter,
   updateCharacter,
 } from '../services/character-library';
-import {
-  generateCharacterVisual,
-  getCharacterVisualGeneration,
-  saveCharacterVisual,
-  saveCharacterVisualAsset,
-} from '../services/character-create';
 import type { TrustedSenderGuard } from './trusted-sender';
 
 // 每个 handler 都先调 assertTrustedSender 验证发送方
@@ -42,38 +30,6 @@ export function registerCharacterLibraryIpc(assertTrustedSender: TrustedSenderGu
     assertTrustedSender(event);
     return getCharacterLibrary();
   });
-  // 保存角色视觉素材资源
-  ipcMain.handle(
-    'character-library:save-visual-asset',
-    async (event, request: SaveCharacterVisualAssetRequest) => {
-      assertTrustedSender(event);
-      return saveCharacterVisualAsset(request);
-    },
-  );
-  // 生成角色视觉素材
-  ipcMain.handle(
-    'character-library:generate-visual',
-    async (event, request: GenerateCharacterVisualRequest) => {
-      assertTrustedSender(event);
-      return generateCharacterVisual(request);
-    },
-  );
-  // 查询角色视觉素材生成结果
-  ipcMain.handle(
-    'character-library:get-visual-generation',
-    async (event, request: GetCharacterVisualGenerationRequest) => {
-      assertTrustedSender(event);
-      return getCharacterVisualGeneration(request);
-    },
-  );
-  // 保存角色视觉素材
-  ipcMain.handle(
-    'character-library:save-visual',
-    async (event, request: SaveCharacterVisualRequest) => {
-      assertTrustedSender(event);
-      return saveCharacterVisual(request);
-    },
-  );
   // 删除角色
   ipcMain.handle(
     'character-library:delete-character',

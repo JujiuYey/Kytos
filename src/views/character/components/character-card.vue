@@ -40,7 +40,7 @@ defineEmits<{
       :aria-label="
         character.visualAsset
           ? `管理角色 ${character.name} 的锚点`
-          : `为角色 ${character.name} 创建第一个形象`
+          : `为角色 ${character.name} 添加角色锚点`
       "
       @click="$emit('open-anchor', character)"
     >
@@ -85,7 +85,7 @@ defineEmits<{
         >
           <Camera v-if="character.visualAsset" class="size-4" />
           <ImagePlus v-else class="size-4" />
-          {{ character.visualAsset ? '管理锚点' : '创建第一个形象' }}
+          {{ character.visualAsset ? '管理锚点' : '添加角色锚点' }}
         </Button>
         <div class="flex shrink-0 items-center gap-1">
           <TooltipProvider :delay-duration="300">

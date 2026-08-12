@@ -4,7 +4,6 @@ import type { IllustrationApi } from './illustration';
 import type { CharacterLibraryApi } from './character-library';
 import type { CharacterVisualAssetApi } from './character-visual';
 import type { CharacterExpressionApi } from './character-expression';
-import type { CharacterVisualApi } from './character-create';
 import type {
   FileApi,
   SaveFileRequest,
@@ -29,7 +28,6 @@ export type {
   CharacterLibraryApi,
   CharacterVisualAssetApi,
   CharacterExpressionApi,
-  CharacterVisualApi,
   FileApi,
   SaveFileRequest,
   SavedFileResult,
@@ -59,8 +57,6 @@ export interface DesktopApi {
     assets: CharacterVisualAssetApi;
     // 角色表情
     expression: CharacterExpressionApi;
-    // 角色视觉素材生成
-    visual: CharacterVisualApi;
   };
   // 设置与凭据
   settings: SettingsApi;

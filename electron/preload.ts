@@ -4,7 +4,6 @@ import type {
   CharacterExpressionApi,
   CharacterLibraryApi,
   CharacterVisualAssetApi,
-  CharacterVisualApi,
   DesktopApi,
   FileApi,
   IllustrationApi,
@@ -106,6 +105,9 @@ const assetsApi: CharacterVisualAssetApi = {
     ipcRenderer.invoke('character-visual:set-official', request),
   // 上传角色视觉素材
   uploadCharacterVisualAsset: request => ipcRenderer.invoke('character-visual:upload', request),
+  // 保存创建角色时上传的已有视觉素材
+  saveCharacterVisualAsset: request =>
+    ipcRenderer.invoke('character-visual:save-official', request),
 };
 
 // 角色表情 IPC 桥接
@@ -128,21 +130,6 @@ const expressionApi: CharacterExpressionApi = {
   renameCharacterExpression: request => ipcRenderer.invoke('character-expression:rename', request),
   // 上传角色表情
   uploadCharacterExpression: request => ipcRenderer.invoke('character-expression:upload', request),
-};
-
-// 角色视觉素材生成 IPC 桥接
-const visualApi: CharacterVisualApi = {
-  // 生成角色视觉素材
-  generateCharacterVisual: request =>
-    ipcRenderer.invoke('character-library:generate-visual', request),
-  // 查询角色视觉素材生成结果
-  getCharacterVisualGeneration: request =>
-    ipcRenderer.invoke('character-library:get-visual-generation', request),
-  // 保存角色视觉素材
-  saveCharacterVisual: request => ipcRenderer.invoke('character-library:save-visual', request),
-  // 保存角色视觉素材资源
-  saveCharacterVisualAsset: request =>
-    ipcRenderer.invoke('character-library:save-visual-asset', request),
 };
 
 // 设置与凭据 IPC 桥接
@@ -188,7 +175,6 @@ const desktop: DesktopApi = {
     library: libraryApi,
     assets: assetsApi,
     expression: expressionApi,
-    visual: visualApi,
   },
   settings: settingsApi,
   file: fileApi,

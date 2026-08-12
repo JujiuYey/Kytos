@@ -1,7 +1,7 @@
 // 角色视觉资产的公共类型与请求/响应模型
 import type { ChatModel } from './chat-model';
 import type { CharacterScopeRequest } from './character-library';
-import type { SavedFileResult } from './desktop';
+import type { SaveFileRequest, SavedFileResult } from './desktop';
 
 // 角色视觉支持的尺寸
 export const CHARACTER_VISUAL_SIZES = ['2:3', '3:4', '4:5', '1:1', '16:9'] as const;
@@ -106,6 +106,20 @@ export interface CharacterVisualAssetUpload {
 export interface UploadCharacterVisualAssetRequest
   extends CharacterScopeRequest, CharacterVisualAssetUpload {}
 
+// 创建角色时上传已有视觉资产的请求
+export interface SaveCharacterVisualAssetRequest extends SaveFileRequest {
+  // 所属角色 ID
+  characterId: string;
+}
+
+// 保存已有视觉资产后的角色库结果
+export interface SaveCharacterVisualResult {
+  // 角色 ID
+  characterId: string;
+  // 更新后的角色库状态
+  library: import('./character-library').CharacterLibraryState;
+}
+
 export interface CharacterVisualAssetApi {
   deleteCharacterVisualAsset: (
     request: CharacterVisualAssetSelection,
@@ -130,4 +144,7 @@ export interface CharacterVisualAssetApi {
   uploadCharacterVisualAsset: (
     request: UploadCharacterVisualAssetRequest,
   ) => Promise<SavedFileResult>;
+  saveCharacterVisualAsset: (
+    request: SaveCharacterVisualAssetRequest,
+  ) => Promise<SaveCharacterVisualResult>;
 }

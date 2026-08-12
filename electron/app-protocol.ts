@@ -2,7 +2,6 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { net, protocol } from 'electron';
-import { handleCharacterCreateAgentRequest } from './agents/character-create-agent/route';
 import { handleIllustrationAgentRequest } from './agents/illustration-agent/route';
 import { handleStoryAgentRequest } from './agents/story-agent/route';
 import { getWorkspaceDirectory } from './services/workspace';
@@ -61,10 +60,6 @@ export function registerAppProtocol(): void {
     // AI Agent 端点：渲染端用 fetch() 调用，命中后转交各 Agent 路由
     if (url.pathname === '/api/illustration-agent') {
       return handleIllustrationAgentRequest(request);
-    }
-
-    if (url.pathname === '/api/character-create-agent') {
-      return handleCharacterCreateAgentRequest(request);
     }
 
     if (url.pathname === '/api/story-agent') {

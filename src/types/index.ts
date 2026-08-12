@@ -25,22 +25,6 @@ export type {
   SelectCharacterRequest,
   UpdateCharacterRequest,
 } from '../../shared/character-library';
-export type {
-  CharacterVisualGeneration as CharacterAnchorGeneration,
-  CharacterVisualReferenceImage as CharacterAnchorReferenceImage,
-  CharacterCreateAgentMessage,
-  CharacterCreateDraft,
-  CharacterCreateDraftUpdateResult,
-  CharacterCreatePromptResult,
-  CharacterVisualGeneration,
-  CharacterVisualReferenceImage,
-  GenerateCharacterVisualRequest,
-  GetCharacterVisualGenerationRequest,
-  SaveCharacterVisualAssetRequest,
-  SaveCharacterVisualRequest,
-  SaveCharacterVisualResult,
-} from '../../shared/character-create';
-export { CHARACTER_CREATE_AGENT_ENDPOINT } from '../../shared/character-create';
 export { getMimeTypeExtensions, getPreferredImageExtension } from '../../shared/image-formats';
 export type {
   CharacterExpressionRecord,
@@ -65,7 +49,6 @@ export {
 export type {
   CharacterVisualAssetRecord as CharacterAnchorRecord,
   CharacterVisualAssetSelection as CharacterAnchorSelection,
-  CharacterVisualAssetUpload as CharacterAnchorUpload,
   CharacterVisualWorkspaceState as CharacterAnchorWorkspaceState,
   CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
@@ -80,6 +63,8 @@ export type {
   GenerateCharacterActionPromptRequest,
   GenerateCharacterReferenceBoardRequest,
   RenameCharacterVisualAssetRequest,
+  SaveCharacterVisualAssetRequest,
+  SaveCharacterVisualResult,
   SetCharacterVisualAssetOfficialRequest,
   UploadCharacterVisualAssetRequest,
 } from '../../shared/character-visual';

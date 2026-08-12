@@ -3,11 +3,8 @@ import type {
   GenerateCharacterActionPromptRequest,
   GenerateCharacterActionRequest,
   GenerateCharacterReferenceBoardRequest,
-  GenerateCharacterVisualRequest,
-  GetCharacterVisualGenerationRequest,
   RenameCharacterVisualAssetRequest,
   SaveCharacterVisualAssetRequest,
-  SaveCharacterVisualRequest,
   SetCharacterVisualAssetOfficialRequest,
   UploadCharacterVisualAssetRequest,
 } from '@/types';
@@ -43,17 +40,8 @@ export const characterAnchorApi = {
   },
 };
 
-export const characterAnchorCreationApi = {
-  generate(request: GenerateCharacterVisualRequest) {
-    return window.desktop.character.visual.generateCharacterVisual(request);
-  },
-  getGeneration(request: GetCharacterVisualGenerationRequest) {
-    return window.desktop.character.visual.getCharacterVisualGeneration(request);
-  },
-  saveGenerated(request: SaveCharacterVisualRequest) {
-    return window.desktop.character.visual.saveCharacterVisual(request);
-  },
-  saveUploaded(request: SaveCharacterVisualAssetRequest) {
-    return window.desktop.character.visual.saveCharacterVisualAsset(request);
+export const characterAnchorUploadApi = {
+  save(request: SaveCharacterVisualAssetRequest) {
+    return window.desktop.character.assets.saveCharacterVisualAsset(request);
   },
 };

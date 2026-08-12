@@ -5,6 +5,8 @@ import type {
   CharacterVisualSource,
   CharacterVisualWorkspaceState,
   RenameCharacterVisualAssetRequest,
+  SaveCharacterVisualAssetRequest,
+  SaveCharacterVisualResult,
   SetCharacterVisualAssetOfficialRequest,
   UploadCharacterVisualAssetRequest,
 } from '../../../shared/character-visual';
@@ -21,6 +23,7 @@ import {
   validateVisualAssetSelection,
 } from './store';
 import { deleteAssetFile, saveUploadedImage } from './assets';
+import { getCharacterLibrary, prepareCharacterVisualSave } from '../character-library';
 import { isNodeError } from '../../utils/node-error';
 import type {
   LegacyActionRecord,
@@ -127,6 +130,22 @@ export async function saveOfficialCharacterVisual(
     await deleteAssetFileSafe(LEGACY_ACTION_ASSET_DIRECTORY, image.fileName);
     throw error;
   }
+}
+
+export async function saveCharacterVisualAsset(
+  request: SaveCharacterVisualAssetRequest,
+): Promise<SaveCharacterVisualResult> {
+  if (
+    !isPlainObject(request) ||
+    !(request.fileData instanceof Uint8Array) ||
+    !request.fileName ||
+    !request.mimeType.startsWith('image/')
+  ) {
+    throw new Error('角色视觉资产无效');
+  }
+  const characterId = await prepareCharacterVisualSave(request.characterId);
+  await saveOfficialCharacterVisual(characterId, request, 'uploaded');
+  return { characterId, library: await getCharacterLibrary() };
 }
 
 export async function renameCharacterVisualAsset(

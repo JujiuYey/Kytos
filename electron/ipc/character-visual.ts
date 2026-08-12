@@ -7,6 +7,7 @@ import type {
   GenerateCharacterActionRequest,
   GenerateCharacterReferenceBoardRequest,
   RenameCharacterVisualAssetRequest,
+  SaveCharacterVisualAssetRequest,
   SetCharacterVisualAssetOfficialRequest,
   UploadCharacterVisualAssetRequest,
 } from '../../shared/character-visual';
@@ -18,6 +19,7 @@ import {
   getCharacterVisualAssetTask,
   getCharacterVisualWorkspace,
   renameCharacterVisualAsset,
+  saveCharacterVisualAsset,
   setCharacterVisualAssetOfficial,
   uploadCharacterVisualAsset,
 } from '../services/character-visual';
@@ -74,6 +76,14 @@ export function registerCharacterVisualIpc(assertTrustedSender: TrustedSenderGua
     async (event, request: RenameCharacterVisualAssetRequest) => {
       assertTrustedSender(event);
       return renameCharacterVisualAsset(request);
+    },
+  );
+
+  ipcMain.handle(
+    'character-visual:save-official',
+    async (event, request: SaveCharacterVisualAssetRequest) => {
+      assertTrustedSender(event);
+      return saveCharacterVisualAsset(request);
     },
   );
 

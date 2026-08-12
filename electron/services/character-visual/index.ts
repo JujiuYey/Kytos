@@ -6,6 +6,7 @@ export {
   getOfficialCharacterVisualReferences,
   deleteCharacterVisualAsset,
   renameCharacterVisualAsset,
+  saveCharacterVisualAsset,
   saveOfficialCharacterVisual,
   setCharacterVisualAssetOfficial,
   uploadCharacterVisualAsset,

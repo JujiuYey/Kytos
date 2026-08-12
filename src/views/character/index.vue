@@ -153,7 +153,7 @@ async function confirmDelete(): Promise<void> {
         <UserRoundPlus class="size-10 text-muted-foreground" />
         <h2 class="mt-4 text-base font-semibold">还没有角色</h2>
         <p class="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-          先创建角色概要，再继续为它建立第一个正式形象。
+          先创建角色并上传一张正式角色锚点。
         </p>
         <Button class="mt-5" @click="createCharacter">
           <UserRoundPlus class="size-4" />
