@@ -199,11 +199,11 @@ const extension = computed(() => (exportFormat.value === 'jpeg' ? 'jpg' : export
 const outputMimeType = computed(() => `image/${exportFormat.value}`);
 
 function updateQuality(value: number): void {
-  quality.value = clamp(Math.round(value || 90), 10, 100);
+  quality.value = clamp(Math.round(value), 10, 100);
 }
 
 function updateTargetSize(value: number): void {
-  targetSizeKb.value = clamp(Math.round(value || 500), 10, 102_400);
+  targetSizeKb.value = clamp(Math.round(value), 10, 102_400);
 }
 
 function stripExtension(fileName: string): string {

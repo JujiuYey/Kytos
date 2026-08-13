@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue';
 import { Input } from '@/components/ui/input';
 import {
   InputGroup,
@@ -10,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { CompressionMode } from './types';
 
-defineProps<{
+const props = defineProps<{
   compressionMode: CompressionMode;
   quality: number;
   targetSizeKb: number;
@@ -21,6 +22,58 @@ const emit = defineEmits<{
   (event: 'qualityInput', value: number): void;
   (event: 'targetSizeInput', value: number): void;
 }>();
+
+const qualityText = ref(String(props.quality));
+const targetSizeText = ref(String(props.targetSizeKb));
+let syncingQuality = false;
+let syncingTargetSize = false;
+
+watch(
+  () => props.quality,
+  value => {
+    if (syncingQuality) {
+      syncingQuality = false;
+      return;
+    }
+    qualityText.value = String(value);
+  },
+);
+
+watch(
+  () => props.targetSizeKb,
+  value => {
+    if (syncingTargetSize) {
+      syncingTargetSize = false;
+      return;
+    }
+    targetSizeText.value = String(value);
+  },
+);
+
+function parseStrictNumber(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed === '') return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function handleQualityInput(value: string | number): void {
+  const text = String(value);
+  qualityText.value = text;
+  const parsed = parseStrictNumber(text);
+  if (parsed === null) return;
+  syncingQuality = true;
+  emit('qualityInput', parsed);
+}
+
+function handleTargetSizeInput(value: string | number): void {
+  const text = String(value);
+  targetSizeText.value = text;
+  const parsed = parseStrictNumber(text);
+  if (parsed === null) return;
+  syncingTargetSize = true;
+  emit('targetSizeInput', parsed);
+}
 </script>
 
 <template>
@@ -40,11 +93,11 @@ const emit = defineEmits<{
           <Label for="export-quality">质量（{{ quality }}%）</Label>
           <Input
             id="export-quality"
-            :model-value="quality"
+            :model-value="qualityText"
             type="number"
             min="10"
             max="100"
-            @update:model-value="emit('qualityInput', Number($event))"
+            @update:model-value="handleQualityInput"
           />
         </div>
         <p class="text-xs leading-5 text-muted-foreground">
@@ -58,11 +111,11 @@ const emit = defineEmits<{
           <InputGroup>
             <InputGroupInput
               id="target-file-size"
-              :model-value="targetSizeKb"
+              :model-value="targetSizeText"
               type="number"
               min="10"
               max="102400"
-              @update:model-value="emit('targetSizeInput', Number($event))"
+              @update:model-value="handleTargetSizeInput"
             />
             <InputGroupAddon align="inline-end">
               <InputGroupText>KB</InputGroupText>
