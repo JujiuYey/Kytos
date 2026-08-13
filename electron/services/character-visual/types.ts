@@ -1,5 +1,6 @@
 // character-visual 模块内部类型
 import type {
+  CharacterAnchorBinding,
   CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
   CharacterVisualImage,
@@ -20,13 +21,18 @@ export interface LegacyReferenceBoardRecord extends Omit<
   CharacterVisualAssetRecord,
   'referenceAssets'
 > {
+  anchorRole?: Extract<
+    import('../../../shared/character-visual').CharacterAnchorRole,
+    'turnaround' | 'face' | 'full-body' | 'three-quarter' | 'side' | 'back'
+  >;
   count: 1;
   referenceAssets: LegacyVisualAssetSelection[];
   referenceImage: CharacterVisualAssetSelection | null;
-  size: typeof import('../../../shared/character-visual').CHARACTER_REFERENCE_BOARD_SIZE;
+  size: import('../../../shared/character-visual').CharacterVisualSize;
 }
 
 export interface StoredVisualWorkspace {
+  anchorBindings: CharacterAnchorBinding[];
   officialAssets: LegacyVisualAssetSelection[];
   records: LegacyActionRecord[];
   selectedImage: CharacterVisualAssetSelection | null;

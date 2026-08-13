@@ -19,7 +19,10 @@ import { CHARACTER_VISUAL_RESOLUTIONS } from '../../../shared/character-visual';
 import { MAX_NAME_LENGTH, MAX_PROMPT_LENGTH } from '../../constants';
 import { createChatLanguageModel, getChatProviderOptions } from '../../providers/chat-provider';
 import { getCredentialValue } from '../credentials';
-import { getCharacterVisualReferences, getCharacterVisualWorkspace } from '../character-visual';
+import {
+  getCharacterVisualWorkspace,
+  getOfficialCharacterVisualReferences,
+} from '../character-visual';
 import { downloadTaskImages, getReferenceData } from './assets';
 import { EXPRESSION_ASSET_DIRECTORY } from './constants';
 import { parseReferenceSelection, selectionKey } from './parsers';
@@ -66,7 +69,7 @@ const generatePromptRequestSchema = z.object({
 
 // 获取可用的参考图
 export function getAvailableReferences(
-  visualReferences: ReturnType<typeof getCharacterVisualReferences>,
+  visualReferences: ReturnType<typeof getOfficialCharacterVisualReferences>,
   expressionRecords: CharacterExpressionRecord[],
 ): ExpressionReferenceData[] {
   const characterVisualReferences = visualReferences.map(reference => ({
@@ -113,7 +116,7 @@ export async function generateCharacterExpression(
     getExpressionWorkspace(request.characterId),
   ]);
   const availableReferences = getAvailableReferences(
-    getCharacterVisualReferences(visualWorkspace),
+    getOfficialCharacterVisualReferences(visualWorkspace),
     expressionWorkspace.records,
   );
   const referencesByKey = new Map(

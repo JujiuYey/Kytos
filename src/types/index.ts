@@ -48,6 +48,8 @@ export {
 } from '../../shared/character-expression';
 export type {
   CharacterVisualAssetRecord as CharacterAnchorRecord,
+  CharacterAnchorBinding,
+  CharacterAnchorRole,
   CharacterVisualAssetSelection as CharacterAnchorSelection,
   CharacterVisualWorkspaceState as CharacterAnchorWorkspaceState,
   CharacterVisualAssetRecord,
@@ -98,6 +100,7 @@ export type {
 export { DEFAULT_IMAGE_MODEL, IMAGE_MODELS, isImageModel } from '../../shared/image-model';
 export type { ImageModel } from '../../shared/image-model';
 export {
+  CHARACTER_ANCHOR_ROLES,
   CHARACTER_VISUAL_RESOLUTIONS,
   CHARACTER_VISUAL_SIZES,
   CHARACTER_REFERENCE_BOARD_SIZE,

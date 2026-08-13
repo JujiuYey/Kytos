@@ -17,6 +17,18 @@ export const MAX_CHARACTER_ACTION_LENGTH = 500;
 export type CharacterVisualSize = (typeof CHARACTER_VISUAL_SIZES)[number];
 export type CharacterVisualResolution = (typeof CHARACTER_VISUAL_RESOLUTIONS)[number];
 export type CharacterVisualSource = 'generated' | 'uploaded';
+// 核心身份参考图的单一职责；动作、表情和参考板不属于这些角色锚点槽位。
+export const CHARACTER_ANCHOR_ROLES = [
+  'unassigned',
+  'standard',
+  'turnaround',
+  'face',
+  'full-body',
+  'three-quarter',
+  'side',
+  'back',
+] as const;
+export type CharacterAnchorRole = (typeof CHARACTER_ANCHOR_ROLES)[number];
 export type CharacterVisualTaskStatus =
   | 'submitted'
   | 'pending'
@@ -37,6 +49,10 @@ export interface CharacterVisualImage {
 export interface CharacterVisualAssetSelection {
   fileName: string;
   taskId: string;
+}
+
+export interface CharacterAnchorBinding extends CharacterVisualAssetSelection {
+  role: CharacterAnchorRole;
 }
 
 // 统一的视觉资产记录
@@ -64,6 +80,7 @@ export interface CharacterVisualAssetRecord<
 
 export interface CharacterVisualWorkspaceState {
   officialAssets: CharacterVisualAssetSelection[];
+  anchorBindings: CharacterAnchorBinding[];
   records: CharacterVisualAssetRecord[];
 }
 
@@ -82,10 +99,12 @@ export interface GenerateCharacterActionPromptRequest {
 }
 
 export interface GenerateCharacterReferenceBoardRequest {
+  anchorRole?: Exclude<CharacterAnchorRole, 'unassigned' | 'standard'>;
   name: string;
   prompt: string;
   referenceAssets: CharacterVisualAssetSelection[];
   resolution: CharacterVisualResolution;
+  size?: CharacterVisualSize;
 }
 
 export interface RenameCharacterVisualAssetRequest extends CharacterVisualAssetSelection {
@@ -94,6 +113,7 @@ export interface RenameCharacterVisualAssetRequest extends CharacterVisualAssetS
 
 export interface SetCharacterVisualAssetOfficialRequest extends CharacterVisualAssetSelection {
   official: boolean;
+  role?: CharacterAnchorRole;
 }
 
 export interface CharacterVisualAssetUpload {

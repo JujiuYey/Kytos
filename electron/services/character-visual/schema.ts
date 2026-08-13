@@ -20,6 +20,10 @@ function createCharacterVisualTables(database: DatabaseSync): void {
       progress REAL NOT NULL CHECK (progress BETWEEN 0 AND 100),
       original_name TEXT,
       error_message TEXT,
+      anchor_role TEXT CHECK (anchor_role IN (
+        'unassigned', 'standard', 'turnaround', 'face', 'full-body',
+        'three-quarter', 'side', 'back'
+      )),
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       PRIMARY KEY (character_id, id)
@@ -71,5 +75,125 @@ export const CHARACTER_VISUAL_MIGRATIONS: readonly DatabaseMigration[] = [
   {
     migrate: createCharacterVisualTables,
     name: '004_character_visual_tables',
+  },
+  {
+    migrate: database => {
+      database.exec(`
+        ALTER TABLE character_official_visuals
+        ADD COLUMN anchor_role TEXT NOT NULL DEFAULT 'unassigned'
+          CHECK (anchor_role IN (
+            'unassigned', 'standard', 'turnaround', 'face', 'full-body',
+            'three-quarter', 'side', 'back'
+          ));
+      `);
+    },
+    name: '005_character_anchor_roles',
+  },
+  {
+    migrate: database => {
+      const columns = database.prepare('PRAGMA table_info(character_visual_records)').all() as {
+        name: string;
+      }[];
+      if (!columns.some(column => column.name === 'generation_mode')) {
+        database.exec(`
+          ALTER TABLE character_visual_records
+          ADD COLUMN generation_mode TEXT;
+        `);
+      }
+    },
+    name: '006_character_visual_generation_mode',
+  },
+  {
+    migrate: database => {
+      database.exec(`
+        CREATE TABLE character_official_visuals_v2 (
+          character_id TEXT NOT NULL,
+          position INTEGER NOT NULL CHECK (position >= 0),
+          kind TEXT NOT NULL CHECK (kind IN ('portrait', 'sheet')),
+          record_id TEXT NOT NULL,
+          file_name TEXT NOT NULL,
+          anchor_role TEXT NOT NULL DEFAULT 'unassigned' CHECK (
+            anchor_role IN (
+              'unassigned', 'standard', 'turnaround', 'face', 'full-body',
+              'three-quarter', 'side', 'back'
+            )
+          ),
+          PRIMARY KEY (character_id, record_id, file_name),
+          UNIQUE (character_id, position),
+          FOREIGN KEY (character_id, record_id)
+            REFERENCES character_visual_records (character_id, id) ON DELETE CASCADE
+        ) STRICT;
+
+        INSERT INTO character_official_visuals_v2 (
+          character_id, position, kind, record_id, file_name, anchor_role
+        )
+        SELECT character_id, position, kind, record_id, file_name, anchor_role
+        FROM character_official_visuals;
+
+        DROP TABLE character_official_visuals;
+        ALTER TABLE character_official_visuals_v2 RENAME TO character_official_visuals;
+      `);
+    },
+    name: '007_character_anchor_role_contract',
+  },
+  {
+    migrate: database => {
+      database.exec(`
+        CREATE TABLE character_official_visuals_v3 (
+          character_id TEXT NOT NULL,
+          position INTEGER NOT NULL CHECK (position >= 0),
+          kind TEXT NOT NULL CHECK (kind IN ('portrait', 'sheet')),
+          record_id TEXT NOT NULL,
+          file_name TEXT NOT NULL,
+          anchor_role TEXT NOT NULL DEFAULT 'unassigned' CHECK (
+            anchor_role IN (
+              'unassigned', 'standard', 'turnaround', 'face', 'full-body',
+              'three-quarter', 'side', 'back'
+            )
+          ),
+          PRIMARY KEY (character_id, record_id, file_name),
+          UNIQUE (character_id, position),
+          FOREIGN KEY (character_id, record_id)
+            REFERENCES character_visual_records (character_id, id) ON DELETE CASCADE
+        ) STRICT;
+
+        INSERT INTO character_official_visuals_v3 (
+          character_id, position, kind, record_id, file_name, anchor_role
+        )
+        SELECT character_id, position, kind, record_id, file_name,
+          CASE anchor_role
+            WHEN 'standard' THEN 'standard'
+            WHEN 'turnaround' THEN 'turnaround'
+            WHEN 'face' THEN 'face'
+            WHEN 'full-body' THEN 'full-body'
+            WHEN 'three-quarter' THEN 'three-quarter'
+            WHEN 'side' THEN 'side'
+            WHEN 'back' THEN 'back'
+            ELSE 'unassigned'
+          END
+        FROM character_official_visuals;
+
+        DROP TABLE character_official_visuals;
+        ALTER TABLE character_official_visuals_v3 RENAME TO character_official_visuals;
+      `);
+    },
+    name: '008_character_anchor_role_contract_final',
+  },
+  {
+    migrate: database => {
+      const columns = database.prepare('PRAGMA table_info(character_visual_records)').all() as {
+        name: string;
+      }[];
+      if (!columns.some(column => column.name === 'anchor_role')) {
+        database.exec(`
+          ALTER TABLE character_visual_records
+          ADD COLUMN anchor_role TEXT CHECK (anchor_role IN (
+            'unassigned', 'standard', 'turnaround', 'face', 'full-body',
+            'three-quarter', 'side', 'back'
+          ));
+        `);
+      }
+    },
+    name: '009_character_visual_record_anchor_role',
   },
 ];

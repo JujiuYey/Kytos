@@ -2,12 +2,13 @@
 import path from 'node:path';
 import { isPlainObject } from 'es-toolkit';
 import {
-  CHARACTER_REFERENCE_BOARD_SIZE,
+  CHARACTER_ANCHOR_ROLES,
   CHARACTER_VISUAL_RESOLUTIONS,
   CHARACTER_VISUAL_SIZES,
   MAX_CHARACTER_REFERENCE_IMAGES,
 } from '../../../shared/character-visual';
 import type {
+  CharacterAnchorRole,
   CharacterVisualAssetSelection,
   CharacterVisualImage,
   CharacterVisualResolution,
@@ -28,6 +29,10 @@ export function isVisualSize(value: unknown): value is CharacterVisualSize {
 
 export function isVisualResolution(value: unknown): value is CharacterVisualResolution {
   return CHARACTER_VISUAL_RESOLUTIONS.includes(value as CharacterVisualResolution);
+}
+
+export function isCharacterAnchorRole(value: unknown): value is CharacterAnchorRole {
+  return CHARACTER_ANCHOR_ROLES.includes(value as CharacterAnchorRole);
 }
 
 // 重新导出，让 character-visual 的 'status' 类型守卫从 './parsers' 拿
@@ -150,7 +155,7 @@ export function parseLegacyReferenceBoardRecord(value: unknown): LegacyReference
     !ID_PATTERN.test(value.id) ||
     typeof value.prompt !== 'string' ||
     value.prompt.length > MAX_STORED_PROMPT_LENGTH ||
-    value.size !== CHARACTER_REFERENCE_BOARD_SIZE ||
+    !isVisualSize(value.size) ||
     !isVisualResolution(value.resolution)
   ) {
     return null;
@@ -196,7 +201,7 @@ export function parseLegacyReferenceBoardRecord(value: unknown): LegacyReference
         ? { fileName: referenceAssets[0].fileName, taskId: referenceAssets[0].taskId }
         : null),
     resolution: value.resolution,
-    size: CHARACTER_REFERENCE_BOARD_SIZE,
+    size: value.size,
     source: value.source === 'uploaded' ? 'uploaded' : 'generated',
     status,
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),

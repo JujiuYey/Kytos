@@ -47,6 +47,7 @@ export async function loadVisualStore(characterId?: string): Promise<StoredVisua
     else records.push(record as LegacyActionRecord);
   }
   const store: StoredVisualWorkspace = {
+    anchorBindings: readAnchorBindings(database, resolvedCharacterId),
     officialAssets: readOfficialAssets(database, resolvedCharacterId),
     records,
     selectedImage: null,
@@ -90,11 +91,21 @@ export async function saveVisualStore(
     }
     const insertOfficial = database.prepare(
       `INSERT INTO character_official_visuals (
-         character_id, position, kind, record_id, file_name
-       ) VALUES (?, ?, ?, ?, ?)`,
+         character_id, position, kind, record_id, file_name, anchor_role
+       ) VALUES (?, ?, ?, ?, ?, ?)`,
     );
     store.officialAssets.forEach((asset, position) => {
-      insertOfficial.run(resolvedCharacterId, position, asset.kind, asset.taskId, asset.fileName);
+      const binding = store.anchorBindings.find(
+        item => item.taskId === asset.taskId && item.fileName === asset.fileName,
+      );
+      insertOfficial.run(
+        resolvedCharacterId,
+        position,
+        asset.kind,
+        asset.taskId,
+        asset.fileName,
+        binding?.role ?? 'unassigned',
+      );
     });
   });
 }
@@ -145,6 +156,7 @@ export function toWorkspaceState(store: StoredVisualWorkspace): CharacterVisualW
     ...store.sheetRecords.map(record => toVisualAssetRecord(record, 'reference-board')),
   ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   return {
+    anchorBindings: store.anchorBindings,
     officialAssets: [
       ...new Map(
         store.officialAssets.map(asset => {
@@ -310,12 +322,15 @@ function readVisualRecord(
   if (kind === 'sheet') {
     return {
       ...base,
+      ...(readText(row.anchor_role)
+        ? { anchorRole: readText(row.anchor_role) as LegacyReferenceBoardRecord['anchorRole'] }
+        : {}),
       count: 1,
       referenceAssets: references,
       referenceImage: references[0]
         ? { fileName: references[0].fileName, taskId: references[0].taskId }
         : null,
-      size: '16:9',
+      size: base.size,
     };
   }
   return { ...base, referenceAsset: references[0] ?? null };
@@ -340,6 +355,27 @@ function readOfficialAssets(
   }));
 }
 
+function readAnchorBindings(
+  database: DatabaseSync,
+  characterId: string,
+): import('../../../shared/character-visual').CharacterAnchorBinding[] {
+  const rows = database
+    .prepare(
+      `SELECT record_id, file_name, anchor_role
+       FROM character_official_visuals
+       WHERE character_id = ?
+       ORDER BY position`,
+    )
+    .all(characterId) as DatabaseRow[];
+  return rows.map(row => ({
+    fileName: readText(row.file_name),
+    role: readText(
+      row.anchor_role,
+    ) as import('../../../shared/character-visual').CharacterAnchorRole,
+    taskId: readText(row.record_id),
+  }));
+}
+
 function saveVisualRecord(
   database: DatabaseSync,
   characterId: string,
@@ -350,8 +386,8 @@ function saveVisualRecord(
     .prepare(
       `INSERT INTO character_visual_records (
          character_id, id, kind, name, count, prompt, resolution, size, source, status,
-         progress, original_name, error_message, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         progress, original_name, error_message, created_at, updated_at, anchor_role
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (character_id, id) DO UPDATE SET
          kind = excluded.kind,
          name = excluded.name,
@@ -364,6 +400,7 @@ function saveVisualRecord(
          progress = excluded.progress,
          original_name = excluded.original_name,
          error_message = excluded.error_message,
+         anchor_role = excluded.anchor_role,
          updated_at = excluded.updated_at`,
     )
     .run(
@@ -382,6 +419,7 @@ function saveVisualRecord(
       record.errorMessage,
       record.createdAt,
       record.updatedAt,
+      'anchorRole' in record ? (record.anchorRole ?? null) : null,
     );
   database
     .prepare('DELETE FROM character_visual_images WHERE character_id = ? AND record_id = ?')

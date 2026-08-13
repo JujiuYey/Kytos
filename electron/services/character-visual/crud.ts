@@ -1,6 +1,8 @@
 // 角色视觉资产的 CRUD：上传 / 设为正式 / 重命名 / 删除 / 工作区查询
 import type { SaveFileRequest, SavedFileResult } from '../../../shared/desktop';
+import { isPlainObject } from 'es-toolkit';
 import type {
+  CharacterAnchorRole,
   CharacterVisualAssetSelection,
   CharacterVisualSource,
   CharacterVisualWorkspaceState,
@@ -11,7 +13,7 @@ import type {
   UploadCharacterVisualAssetRequest,
 } from '../../../shared/character-visual';
 import { LEGACY_ACTION_ASSET_DIRECTORY, MAX_NAME_LENGTH } from './constants';
-import { legacySelectionKey, selectionKey } from './parsers';
+import { isCharacterAnchorRole, legacySelectionKey, selectionKey } from './parsers';
 import {
   findVisualAsset,
   getAssetDirectory,
@@ -49,8 +51,15 @@ export function getOfficialCharacterVisualReferences(
   workspace: CharacterVisualWorkspaceState,
 ): OfficialCharacterVisualReference[] {
   const officialKeys = new Set(workspace.officialAssets.map(selectionKey));
-  return getCharacterVisualReferences(workspace).filter(reference =>
-    officialKeys.has(selectionKey(reference.selection)),
+  return workspace.records.flatMap(record =>
+    record.status === 'completed' && record.generationMode !== 'action'
+      ? record.images.flatMap(image => {
+          const selection = { fileName: image.fileName, taskId: record.id };
+          return officialKeys.has(selectionKey(selection))
+            ? [{ directoryName: getAssetDirectory(image), image, selection }]
+            : [];
+        })
+      : [],
   );
 }
 
@@ -85,6 +94,20 @@ export async function uploadCharacterVisualAsset(
     updatedAt: now,
   };
   const store = replaceRecord(await loadVisualStore(request.characterId), record);
+  const selection = { fileName: image.fileName, kind: 'portrait' as const, taskId: uploadId };
+  store.officialAssets = [
+    ...store.officialAssets.filter(
+      asset => legacySelectionKey(asset) !== legacySelectionKey(selection),
+    ),
+    selection,
+  ];
+  store.anchorBindings = [
+    ...store.anchorBindings
+      .filter(item => selectionKey(item) !== selectionKey(selection))
+      .map(item => (item.role === 'standard' ? { ...item, role: 'unassigned' as const } : item)),
+    { fileName: selection.fileName, role: 'standard', taskId: selection.taskId },
+  ];
+  syncLegacySelections(store);
   try {
     await saveVisualStore(store, request.characterId);
   } catch (error: unknown) {
@@ -122,6 +145,7 @@ export async function saveOfficialCharacterVisual(
   };
   const selection = { fileName: image.fileName, kind: 'portrait' as const, taskId: uploadId };
   const store = replaceRecord(await loadVisualStore(characterId), record);
+  store.anchorBindings = [{ ...selection, role: 'standard' }];
   store.officialAssets = [selection];
   syncLegacySelections(store);
   try {
@@ -192,6 +216,9 @@ export async function setCharacterVisualAssetOfficial(
   if (typeof request.official !== 'boolean') {
     throw new Error('正式资产状态无效');
   }
+  if (request.role !== undefined && !isCharacterAnchorRole(request.role)) {
+    throw new Error('身份锚点职责无效');
+  }
   const store = await loadVisualStore();
   const match = findVisualAsset(store, selection);
   const key = legacySelectionKey(match.selection);
@@ -203,6 +230,25 @@ export async function setCharacterVisualAssetOfficial(
           : []),
       ]
     : store.officialAssets.filter(asset => legacySelectionKey(asset) !== key);
+  store.anchorBindings = request.official
+    ? [
+        ...store.anchorBindings
+          .filter(item => selectionKey(item) !== selectionKey(selection))
+          .map(item =>
+            request.role && request.role !== 'unassigned' && item.role === request.role
+              ? { ...item, role: 'unassigned' as const }
+              : item,
+          ),
+        {
+          ...selection,
+          role:
+            request.role ??
+            store.anchorBindings.find(item => selectionKey(item) === selectionKey(selection))
+              ?.role ??
+            ('unassigned' as CharacterAnchorRole),
+        },
+      ]
+    : store.anchorBindings.filter(item => selectionKey(item) !== selectionKey(selection));
   syncLegacySelections(store);
   await saveVisualStore(store);
   return toWorkspaceState(store);
@@ -225,6 +271,9 @@ export async function deleteCharacterVisualAsset(
   const remainingImages = record.images.filter(item => item.fileName !== selection.fileName);
   const nextStore: import('./types').StoredVisualWorkspace = {
     ...store,
+    anchorBindings: store.anchorBindings.filter(
+      item => selectionKey(item) !== selectionKey(selection),
+    ),
     ...(legacySelection.kind === 'portrait'
       ? {
           records: remainingImages.length

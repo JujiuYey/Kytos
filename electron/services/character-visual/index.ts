@@ -11,6 +11,7 @@ export {
   setCharacterVisualAssetOfficial,
   uploadCharacterVisualAsset,
 } from './crud';
+export { getAssetDirectory } from './store';
 export {
   generateCharacterAction,
   generateCharacterActionPrompt,

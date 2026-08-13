@@ -28,7 +28,13 @@ import {
   submitImageTask,
 } from '../../utils';
 import type { GptImage2Resolution } from '../../utils';
-import { isVisualResolution, isVisualSize, legacySelectionKey, selectionKey } from './parsers';
+import {
+  isCharacterAnchorRole,
+  isVisualResolution,
+  isVisualSize,
+  legacySelectionKey,
+  selectionKey,
+} from './parsers';
 import {
   findVisualAsset,
   loadVisualStore,
@@ -161,17 +167,40 @@ export async function getCharacterVisualAssetTask(
     status: taskData.status,
     updatedAt: new Date().toISOString(),
   };
-  await saveVisualStore(
-    actionRecord
-      ? replaceRecord(store, updatedRecord as LegacyActionRecord)
-      : replaceSheetRecord(store, updatedRecord as LegacyReferenceBoardRecord),
-  );
+  const nextStore = actionRecord
+    ? replaceRecord(store, updatedRecord as LegacyActionRecord)
+    : replaceSheetRecord(store, updatedRecord as LegacyReferenceBoardRecord);
+  if (taskData.status === 'completed' && referenceBoardRecord?.anchorRole && images[0]) {
+    const selection = {
+      fileName: images[0].fileName,
+      kind: 'sheet' as const,
+      taskId,
+    };
+    nextStore.officialAssets = [
+      ...nextStore.officialAssets.filter(
+        asset => legacySelectionKey(asset) !== legacySelectionKey(selection),
+      ),
+      selection,
+    ];
+    nextStore.anchorBindings = [
+      ...nextStore.anchorBindings
+        .filter(asset => selectionKey(asset) !== selectionKey(selection))
+        .map(binding =>
+          binding.role === referenceBoardRecord.anchorRole
+            ? { ...binding, role: 'unassigned' as const }
+            : binding,
+        ),
+      { fileName: selection.fileName, role: referenceBoardRecord.anchorRole, taskId },
+    ];
+  }
+  await saveVisualStore(nextStore);
   return toVisualAssetRecord(updatedRecord, actionRecord ? 'action' : 'reference-board');
 }
 
 export async function generateCharacterReferenceBoard(
   request: GenerateCharacterReferenceBoardRequest,
 ): Promise<CharacterVisualAssetRecord> {
+  const anchorRole = (request as { anchorRole?: unknown }).anchorRole;
   if (
     !isPlainObject(request) ||
     typeof request.name !== 'string' ||
@@ -182,11 +211,15 @@ export async function generateCharacterReferenceBoard(
     request.prompt.length > MAX_PROMPT_LENGTH ||
     !Array.isArray(request.referenceAssets) ||
     request.referenceAssets.length < 1 ||
-    !isVisualResolution(request.resolution)
+    !isVisualResolution(request.resolution) ||
+    (request.size !== undefined && !isVisualSize(request.size)) ||
+    (anchorRole !== undefined &&
+      (!isCharacterAnchorRole(anchorRole) ||
+        anchorRole === 'unassigned' ||
+        anchorRole === 'standard'))
   ) {
     throw new Error('参考图生成参数无效');
   }
-
   const store = await loadVisualStore();
   const parsedReferenceAssets = request.referenceAssets.map(validateVisualAssetSelection);
   const publicReferenceAssets = [
@@ -215,12 +248,13 @@ export async function generateCharacterReferenceBoard(
     n: 1,
     prompt: request.prompt.trim(),
     resolution: request.resolution as GptImage2Resolution,
-    size: CHARACTER_REFERENCE_BOARD_SIZE,
+    size: request.size ?? CHARACTER_REFERENCE_BOARD_SIZE,
   });
   const taskId = await submitImageTask(body, apiKey);
 
   const now = new Date().toISOString();
   const record: LegacyReferenceBoardRecord = {
+    ...(anchorRole ? { anchorRole } : {}),
     count: 1,
     createdAt: now,
     errorMessage: null,
@@ -238,7 +272,7 @@ export async function generateCharacterReferenceBoard(
         }
       : null,
     resolution: request.resolution,
-    size: CHARACTER_REFERENCE_BOARD_SIZE,
+    size: request.size ?? CHARACTER_REFERENCE_BOARD_SIZE,
     source: 'generated',
     status: 'submitted',
     updatedAt: now,
