@@ -12,6 +12,7 @@ export {
 } from './crud';
 export { deleteIllustrationVersion, generateIllustration, getIllustrationTask } from './generation';
 export {
+  resolveIllustrationReferences,
   resolveIllustrationRevisionReference,
   resolveIllustrationRevisionReferenceForStore,
   resolveTopicIllustrationReferences,

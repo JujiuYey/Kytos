@@ -40,6 +40,16 @@ export function buildIllustrationPrompt(
         ? '除本次修改要求明确指定的项目外，必须保持角色身份、脸型、五官、发型、身材比例、服装、鞋履、配饰和颜色一致。'
         : '必须保持角色身份、脸型、五官、发型、身材比例、服装、鞋履、配饰和颜色一致，不要重新设计或美化角色。',
     );
+    if (references.some(reference => reference.kind === 'character-action')) {
+      lines.push(
+        '角色动作参考图用于锁定姿势、肢体关系和动作节奏；复用动作信息，但不要改变角色身份。',
+      );
+    }
+    if (references.some(reference => reference.kind === 'character-expression')) {
+      lines.push(
+        '角色表情参考图用于锁定眉眼、视线、嘴型和面部情绪；只复用表情信息，不要替换角色外观。',
+      );
+    }
   }
   if (hasStyleReferences) {
     lines.push(

@@ -92,7 +92,9 @@ export function parseIllustrationReference(value: unknown): IllustrationReferenc
     return null;
   }
   if (
-    (value.kind === 'character-expression' || value.kind === 'character-visual') &&
+    (value.kind === 'character-action' ||
+      value.kind === 'character-anchor' ||
+      value.kind === 'character-expression') &&
     typeof value.characterId === 'string' &&
     ID_PATTERN.test(value.characterId)
   ) {

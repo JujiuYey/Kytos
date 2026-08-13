@@ -130,8 +130,9 @@ const activeTopic = computed(
   () => topics.value.find(topic => topic.id === activeTopicId.value) ?? null,
 );
 const referenceFilters: ImageReferencePickerFilter[] = [
-  { label: '角色锚点', value: 'character-visual' },
+  { label: '角色锚点', value: 'character-anchor' },
   { label: '角色表情', value: 'character-expression' },
+  { label: '角色动作', value: 'character-action' },
   { label: '已有插画', value: 'illustration' },
 ];
 const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() => {
@@ -139,11 +140,11 @@ const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() 
     const anchorOptions = workspace.anchor.officialAssets.flatMap(selection => {
       const record = workspace.anchor.records.find(item => item.id === selection.taskId);
       const image = record?.images.find(item => item.fileName === selection.fileName);
-      if (!record || !image) return [];
+      if (!record || !image || record.generationMode === 'action') return [];
       const reference: IllustrationReference = {
         characterId: workspace.characterId,
         fileName: image.fileName,
-        kind: 'character-visual',
+        kind: 'character-anchor',
         purpose: 'character',
         taskId: record.id,
       };
@@ -154,10 +155,31 @@ const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() 
           key: illustrationReferenceKey(reference),
           label: image.name || record.name || '正式角色锚点',
           reference,
-          source: 'character-visual',
+          source: 'character-anchor',
         },
       ];
     });
+    const actionOptions = workspace.anchor.records
+      .filter(record => record.status === 'completed' && record.generationMode === 'action')
+      .flatMap(record =>
+        record.images.map((image, index) => {
+          const reference: IllustrationReference = {
+            characterId: workspace.characterId,
+            fileName: image.fileName,
+            kind: 'character-action',
+            purpose: 'character',
+            taskId: record.id,
+          };
+          return {
+            detail: `${workspace.characterName} · 角色动作`,
+            image,
+            key: illustrationReferenceKey(reference),
+            label: record.images.length > 1 ? `${record.name} ${index + 1}` : record.name,
+            reference,
+            source: 'character-action',
+          };
+        }),
+      );
     const expressionOptions = workspace.expression.records.flatMap(record =>
       record.images.map((image, index) => {
         const reference: IllustrationReference = {
@@ -177,7 +199,7 @@ const illustrationReferenceOptions = computed<IllustrationReferenceOption[]>(() 
         };
       }),
     );
-    return [...anchorOptions, ...expressionOptions];
+    return [...anchorOptions, ...expressionOptions, ...actionOptions];
   });
   const uploadedOptions = uploads.value.map(upload => {
     const reference: IllustrationReference = {

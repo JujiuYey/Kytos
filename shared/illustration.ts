@@ -91,7 +91,7 @@ export type IllustrationReference =
   | {
       characterId: string;
       fileName: string;
-      kind: 'character-expression' | 'character-visual';
+      kind: 'character-action' | 'character-anchor' | 'character-expression';
       purpose?: IllustrationReferencePurpose;
       taskId: string;
     }

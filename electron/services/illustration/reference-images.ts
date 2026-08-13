@@ -6,6 +6,7 @@ import type {
 import { getCharacterExpressionWorkspace } from '../character-expression';
 import { getCharacterLibrary } from '../character-library';
 import {
+  getAssetDirectory,
   getCharacterVisualWorkspace,
   getOfficialCharacterVisualReferences,
 } from '../character-visual';
@@ -39,7 +40,7 @@ function referencePurpose(
   return reference.source === 'generated' ? 'style' : 'content';
 }
 
-async function resolveIllustrationReferences(
+async function resolveIllustrationReferenceList(
   store: StoredIllustrationWorkspace,
   references: IllustrationReference[],
 ): Promise<ResolvedIllustrationReference[]> {
@@ -82,7 +83,7 @@ async function resolveIllustrationReferences(
   for (const reference of references) {
     let image: CharacterVisualImage | undefined;
     let directory = ASSET_DIRECTORY;
-    if (reference.kind === 'character-visual') {
+    if (reference.kind === 'character-anchor') {
       const workspace = visualWorkspaces.get(reference.characterId);
       const match =
         workspace &&
@@ -94,6 +95,14 @@ async function resolveIllustrationReferences(
       if (!match) throw new Error('选择的角色视觉已失效');
       directory = match.directoryName;
       image = match.image;
+    } else if (reference.kind === 'character-action') {
+      const workspace = visualWorkspaces.get(reference.characterId);
+      const record = workspace?.records.find(
+        item => item.id === reference.taskId && item.generationMode === 'action',
+      );
+      image = record?.images.find(item => item.fileName === reference.fileName);
+      if (!image) throw new Error('选择的角色动作已失效');
+      directory = getAssetDirectory(image);
     } else if (reference.kind === 'character-expression') {
       const record = expressionWorkspaces
         .get(reference.characterId)
@@ -129,7 +138,7 @@ async function resolveIllustrationReferences(
 export async function resolveTopicIllustrationReferences(
   topic: IllustrationTopic,
 ): Promise<ResolvedIllustrationReference[]> {
-  return resolveIllustrationReferences(await loadStore(), topic.references);
+  return resolveIllustrationReferenceList(await loadStore(), topic.references);
 }
 
 export async function resolveIllustrationRevisionReferenceForStore(
@@ -178,5 +187,11 @@ export async function resolveIllustrationReferencesForStore(
   store: StoredIllustrationWorkspace,
   references: IllustrationReference[],
 ): Promise<ResolvedIllustrationReference[]> {
-  return resolveIllustrationReferences(store, references);
+  return resolveIllustrationReferenceList(store, references);
+}
+
+export async function resolveIllustrationReferences(
+  references: IllustrationReference[],
+): Promise<ResolvedIllustrationReference[]> {
+  return resolveIllustrationReferencesForStore(await loadStore(), references);
 }

@@ -15,6 +15,10 @@ function referenceAssetKey(selection: CharacterExpressionReferenceSelection): st
   return `${selection.kind}:${selection.taskId}:${selection.fileName}`;
 }
 
+function visualAssetKey(selection: { fileName: string; taskId: string }): string {
+  return `${selection.taskId}:${selection.fileName}`;
+}
+
 export function useExpressionReferences(options: UseExpressionReferencesOptions) {
   const selectedReferenceAssets = ref<CharacterExpressionReferenceSelection[]>([]);
 
@@ -24,22 +28,28 @@ export function useExpressionReferences(options: UseExpressionReferencesOptions)
       return [];
     }
 
+    const officialAssetKeys = new Set(workspace.officialAssets.map(visualAssetKey));
     const anchorOptions = workspace.records.flatMap(record =>
-      record.status === 'completed'
-        ? record.images.map(image => {
+      record.status === 'completed' && record.generationMode !== 'action'
+        ? record.images.flatMap(image => {
             const selection = {
               fileName: image.fileName,
               kind: 'visual' as const,
               taskId: record.id,
             };
-            return {
-              detail: `角色锚点 · ${record.size}`,
-              image,
-              key: referenceAssetKey(selection),
-              label: image.name || record.name || '角色锚点',
-              selection,
-              source: 'visual' as const,
-            };
+            if (!officialAssetKeys.has(visualAssetKey(selection))) {
+              return [];
+            }
+            return [
+              {
+                detail: `角色锚点 · ${record.size}`,
+                image,
+                key: referenceAssetKey(selection),
+                label: image.name || record.name || '角色锚点',
+                selection,
+                source: 'visual' as const,
+              },
+            ];
           })
         : [],
     );
