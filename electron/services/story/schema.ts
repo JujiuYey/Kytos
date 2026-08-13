@@ -7,6 +7,7 @@ function createStoryTables(database: DatabaseSync): void {
     CREATE TABLE stories (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
+      character_ids_json TEXT NOT NULL DEFAULT '[]',
       key_shot_id TEXT,
       resolution TEXT NOT NULL CHECK (resolution IN ('1k', '2k', '4k')),
       size TEXT NOT NULL CHECK (size IN ('1:1', '3:4', '4:5', '16:9', '9:16')),
@@ -23,7 +24,8 @@ function createStoryTables(database: DatabaseSync): void {
       draft_tone TEXT NOT NULL,
       draft_turning_point TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      references_json TEXT NOT NULL DEFAULT '[]'
     ) STRICT;
 
     CREATE TABLE story_shots (
@@ -41,6 +43,7 @@ function createStoryTables(database: DatabaseSync): void {
       purpose TEXT NOT NULL,
       scene TEXT NOT NULL,
       title TEXT NOT NULL,
+      references_json TEXT NOT NULL DEFAULT '[]',
       PRIMARY KEY (story_id, id),
       UNIQUE (story_id, position),
       FOREIGN KEY (story_id) REFERENCES stories (id) ON DELETE CASCADE
@@ -65,6 +68,7 @@ function createStoryTables(database: DatabaseSync): void {
       ),
       progress REAL NOT NULL CHECK (progress BETWEEN 0 AND 100),
       error_message TEXT,
+      references_json TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       PRIMARY KEY (story_id, shot_id, id),
@@ -105,5 +109,37 @@ export const STORY_MIGRATIONS: readonly DatabaseMigration[] = [
   {
     migrate: createStoryTables,
     name: '006_story_tables',
+  },
+  {
+    migrate: database => {
+      for (const statement of [
+        "ALTER TABLE stories ADD COLUMN references_json TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE story_shots ADD COLUMN references_json TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE story_shot_versions ADD COLUMN references_json TEXT NOT NULL DEFAULT '[]'",
+      ]) {
+        try {
+          database.exec(statement);
+        } catch (error) {
+          if (!(error instanceof Error) || !error.message.includes('duplicate column name')) {
+            throw error;
+          }
+        }
+      }
+    },
+    name: '010_story_reference_sets',
+  },
+  {
+    migrate: database => {
+      try {
+        database.exec(
+          "ALTER TABLE stories ADD COLUMN character_ids_json TEXT NOT NULL DEFAULT '[]'",
+        );
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes('duplicate column name')) {
+          throw error;
+        }
+      }
+    },
+    name: '011_story_characters',
   },
 ];

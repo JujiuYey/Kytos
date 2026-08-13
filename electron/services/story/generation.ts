@@ -12,6 +12,11 @@ import type {
   StoryShotVersion,
   StoryVersionReference,
 } from '../../../shared/story';
+import type { IllustrationReference } from '../../../shared/illustration';
+import { MAX_ILLUSTRATION_REFERENCE_IMAGES } from '../../../shared/illustration';
+import { parseReferences } from './parsers';
+import { resolveIllustrationReferences } from '../illustration/reference-images';
+import { getCharacterLibrary } from '../character-library';
 import { ID_PATTERN, MAX_TEXT_LENGTH } from '../../constants';
 import {
   buildGptImage2RequestBody,
@@ -38,6 +43,17 @@ function buildPrompt(story: StoryProject, shot: StoryShot, prompt: string): stri
     '故事连续性参考图只用于延续角色状态、场景、时间和关键道具，不要照搬上一镜的景别或构图。',
     '只生成一个画面。不要添加标题、大段文字、边框、Logo、水印、漫画格、多格排版、重复人物或重复肢体。',
   ].join('\n');
+}
+
+function buildReferenceInstructions(references: IllustrationReference[]): string[] {
+  const instructions: string[] = [];
+  if (references.some(reference => reference.kind === 'character-action')) {
+    instructions.push('角色动作参考图只用于锁定姿势、肢体关系和动作节奏。');
+  }
+  if (references.some(reference => reference.kind === 'character-expression')) {
+    instructions.push('角色表情参考图只用于锁定眉眼、视线、嘴型和面部情绪。');
+  }
+  return instructions;
 }
 
 function getSelectedVersionReference(shot: StoryShot): StoryVersionReference | null {
@@ -103,14 +119,63 @@ export async function generateStoryShot(
     throw new Error('这个分镜已有图片正在生成');
   }
 
-  const visualWorkspace = await getCharacterVisualWorkspace();
-  const visualReferences = getOfficialCharacterVisualReferences(visualWorkspace);
-  if (!visualReferences.length) {
-    throw new Error('请先将至少一张角色视觉图片设为正式资产');
-  }
-  const referenceImages = await Promise.all(
-    visualReferences.map(reference => readReferenceImage(reference.directoryName, reference.image)),
+  const requestedReferences = parseReferences(
+    request.references ?? (shot.references.length ? shot.references : story.references),
   );
+  if (!story.characterIds.length) {
+    throw new Error('请先为故事选择参演角色');
+  }
+  if (
+    requestedReferences.some(
+      reference =>
+        reference.kind !== 'illustration' && !story.characterIds.includes(reference.characterId),
+    )
+  ) {
+    throw new Error('故事参考图包含未参演角色，请重新选择');
+  }
+  const library = await getCharacterLibrary();
+  const selectedCharacters = story.characterIds.map(characterId =>
+    library.characters.find(character => character.id === characterId),
+  );
+  if (selectedCharacters.some(character => !character)) {
+    throw new Error('故事绑定的角色已不存在，请重新选择参演角色');
+  }
+  const workspaces = await Promise.all(
+    story.characterIds.map(characterId => getCharacterVisualWorkspace(characterId)),
+  );
+  const explicitVisualCharacterIds = new Set(
+    requestedReferences.flatMap(reference =>
+      reference.kind === 'character-anchor' ? [reference.characterId] : [],
+    ),
+  );
+  const automaticCharacterReferences = workspaces.flatMap((visualWorkspace, index) => {
+    const characterId = story.characterIds[index];
+    if (!characterId || explicitVisualCharacterIds.has(characterId)) return [];
+    const officialReferences = getOfficialCharacterVisualReferences(visualWorkspace);
+    if (!officialReferences.length) {
+      throw new Error(`角色“${selectedCharacters[index]?.name ?? characterId}”还没有正式角色锚点`);
+    }
+    return officialReferences.map(reference => ({
+      characterId,
+      fileName: reference.image.fileName,
+      kind: 'character-anchor' as const,
+      purpose: 'character' as const,
+      taskId: reference.selection.taskId,
+    }));
+  });
+  const references: IllustrationReference[] = [
+    ...new Map(
+      [...automaticCharacterReferences, ...requestedReferences].map(reference => [
+        JSON.stringify(reference),
+        reference,
+      ]),
+    ).values(),
+  ];
+  if (references.length > MAX_ILLUSTRATION_REFERENCE_IMAGES) {
+    throw new Error(`故事参考图最多 ${MAX_ILLUSTRATION_REFERENCE_IMAGES} 张`);
+  }
+  const resolvedReferences = await resolveIllustrationReferences(references);
+  const referenceImages = resolvedReferences.map(reference => reference.dataUrl);
   let continuityVersion = resolveContinuityReference(story, shot);
   if (continuityVersion) {
     const image = resolveVersionImage(story, continuityVersion);
@@ -132,8 +197,16 @@ export async function generateStoryShot(
       referenceImages.push(await readReferenceImage(ASSET_DIRECTORY, image));
     }
   }
+  if (referenceImages.length > MAX_ILLUSTRATION_REFERENCE_IMAGES) {
+    throw new Error(
+      `当前参考、连续性画面和修改底图合计最多 ${MAX_ILLUSTRATION_REFERENCE_IMAGES} 张`,
+    );
+  }
 
-  const prompt = buildPrompt(story, shot, request.prompt);
+  const prompt = [
+    buildPrompt(story, shot, request.prompt),
+    ...buildReferenceInstructions(references),
+  ].join('\n');
   const apiKey = await getCredentialValue('apimart');
   const body = buildGptImage2RequestBody({
     imageUrls: referenceImages,
@@ -147,7 +220,13 @@ export async function generateStoryShot(
   const now = new Date().toISOString();
   const version: StoryShotVersion = {
     baseVersion,
-    characterReferences: visualReferences.map(reference => ({ ...reference.selection })),
+    characterReferences: references
+      .filter(reference => reference.kind === 'character-anchor')
+      .map(reference => ({
+        taskId: reference.kind === 'character-anchor' ? reference.taskId : '',
+        fileName: reference.fileName,
+      })),
+    references,
     continuityVersion,
     createdAt: now,
     errorMessage: null,

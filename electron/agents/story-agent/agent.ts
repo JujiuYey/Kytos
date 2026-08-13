@@ -10,7 +10,11 @@ import {
   updateStoryDraft,
 } from '../../services/story';
 import { createChatLanguageModel, getChatProviderOptions } from '../../providers/chat-provider';
-import { buildStoryInstructions, type StoryShotDisplay } from './instructions';
+import {
+  buildStoryInstructions,
+  type StoryCharacterDisplay,
+  type StoryShotDisplay,
+} from './instructions';
 
 const draftFields = {
   conflict: z.string().max(20_000).optional(),
@@ -75,6 +79,7 @@ export function createStoryAgent(options: {
   apiKey: string;
   model: ChatModel;
   story: StoryProject;
+  characters: StoryCharacterDisplay[];
 }) {
   let currentDraft = options.story.draft;
   let currentShots = options.story.shots;
@@ -91,6 +96,7 @@ export function createStoryAgent(options: {
     ...(providerOptions ? { providerOptions } : {}),
     instructions: buildStoryInstructions({
       draft: currentDraft,
+      characters: options.characters,
       shots: currentShots.map<StoryShotDisplay>(({ versions, ...shot }) => ({
         ...shot,
         generatedVersionCount: versions.length,

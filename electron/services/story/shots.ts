@@ -13,11 +13,13 @@ import type {
   StoryboardUpdateResult,
   UpdateStoryShotRequest,
 } from '../../../shared/story';
+import type { IllustrationReference } from '../../../shared/illustration';
 import { MAX_TEXT_LENGTH, SHOT_FIELDS, VISUAL_SHOT_FIELDS } from './constants';
 import {
   hasActiveGeneration,
   isStoryboardComplete,
   normalizeShotOrder,
+  parseReferences,
   parseShotContent,
   requireShot,
   requireStory,
@@ -33,6 +35,7 @@ function createShot(content: StoryShotContent, order: number): StoryShot {
     imageStale: false,
     order,
     selectedVersionId: null,
+    references: [],
     versions: [],
   };
 }
@@ -84,7 +87,7 @@ export async function confirmStoryboard(storyId: string): Promise<StoryboardUpda
 export async function patchStoryShot(
   storyId: string,
   shotId: string,
-  patch: Partial<StoryShotContent>,
+  patch: Partial<StoryShotContent> & { references?: IllustrationReference[] },
 ): Promise<StoryShotUpdateResult> {
   const store = await loadStore();
   const story = requireStory(store, storyId);
@@ -94,7 +97,13 @@ export async function patchStoryShot(
   ) {
     throw new Error('这个分镜的图片生成完成后才能修改');
   }
-  const nextShot = { ...shot };
+  const nextShot = {
+    ...shot,
+    references: patch.references ? parseReferences(patch.references) : shot.references,
+  };
+  const referencesChanged =
+    patch.references !== undefined &&
+    JSON.stringify(nextShot.references) !== JSON.stringify(shot.references);
   let visualChanged = false;
   for (const field of SHOT_FIELDS) {
     const value = patch[field];
@@ -104,7 +113,8 @@ export async function patchStoryShot(
       nextShot[field] = nextValue;
     }
   }
-  nextShot.imageStale = Boolean(nextShot.selectedVersionId) && (shot.imageStale || visualChanged);
+  nextShot.imageStale =
+    Boolean(nextShot.selectedVersionId) && (shot.imageStale || visualChanged || referencesChanged);
   const shots = story.shots.map(item => (item.id === shotId ? nextShot : item));
   const updatedStory: StoryProject = {
     ...story,
@@ -141,7 +151,10 @@ export async function createStoryShot(request: CreateStoryShotRequest): Promise<
   if (story.shots.length >= STORY_SHOT_LIMITS.max) {
     throw new Error(`短篇故事最多保留 ${STORY_SHOT_LIMITS.max} 个分镜`);
   }
-  const shot = createShot(parseShotContent(request), story.shots.length + 1);
+  const shot = {
+    ...createShot(parseShotContent(request), story.shots.length + 1),
+    references: request.references ? parseReferences(request.references) : [],
+  };
   const shots = [...story.shots, shot];
   const updatedStory: StoryProject = {
     ...story,

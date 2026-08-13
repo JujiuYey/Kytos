@@ -7,6 +7,7 @@ import type {
   CharacterVisualTaskStatus,
 } from './character-visual';
 import type { IllustrationSize } from './illustration';
+import type { IllustrationReference } from './illustration';
 
 // 故事 Agent 端点
 export const STORY_AGENT_ENDPOINT = 'app://bundle/api/story-agent';
@@ -71,6 +72,8 @@ export interface StoryShotVersion {
   baseVersion: StoryVersionReference | null;
   // 角色视觉引用列表
   characterReferences: CharacterVisualAssetSelection[];
+  // 生成时实际使用的完整参考快照
+  references: IllustrationReference[];
   // 衔接版本
   continuityVersion: StoryVersionReference | null;
   // 创建时间
@@ -109,10 +112,14 @@ export interface StoryShot extends StoryShotContent {
   selectedVersionId: string | null;
   // 版本列表
   versions: StoryShotVersion[];
+  // 本镜覆盖参考；为空时继承故事级参考
+  references: IllustrationReference[];
 }
 
 // 故事项目
 export interface StoryProject {
+  // 参演角色ID
+  characterIds: string[];
   // 创建时间
   createdAt: string;
   // 故事草稿
@@ -139,6 +146,8 @@ export interface StoryProject {
   title: string;
   // 更新时间
   updatedAt: string;
+  // 故事级默认参考
+  references: IllustrationReference[];
 }
 
 // 故事工作区状态
@@ -211,8 +220,11 @@ type StoryAgentTools = {
 // 故事 Agent 会话消息
 export type StoryAgentMessage = UIMessage<unknown, never, StoryAgentTools>;
 
-// 创建故事请求（无需参数）
-export type CreateStoryRequest = Record<string, never>;
+// 创建故事请求
+export interface CreateStoryRequest {
+  // 参演角色ID
+  characterIds: string[];
+}
 
 // 删除故事请求
 export interface DeleteStoryRequest {
@@ -230,6 +242,8 @@ export interface SaveStoryConversationRequest {
 
 // 更新故事请求
 export interface UpdateStoryRequest {
+  // 参演角色ID
+  characterIds?: string[];
   // 是否确认分镜
   confirmStoryboard?: boolean;
   // 关键分镜ID
@@ -242,12 +256,15 @@ export interface UpdateStoryRequest {
   storyId: string;
   // 标题
   title?: string;
+  // 故事级默认参考
+  references?: IllustrationReference[];
 }
 
 // 创建分镜请求
 export interface CreateStoryShotRequest extends StoryShotContent {
   // 故事ID
   storyId: string;
+  references?: IllustrationReference[];
 }
 
 // 更新分镜请求
@@ -256,6 +273,8 @@ export interface UpdateStoryShotRequest extends Partial<StoryShotContent> {
   shotId: string;
   // 故事ID
   storyId: string;
+  // 本镜覆盖参考；为空表示继承故事级参考
+  references?: IllustrationReference[];
 }
 
 // 移动分镜请求
@@ -286,6 +305,8 @@ export interface GenerateStoryShotRequest {
   shotId: string;
   // 故事ID
   storyId: string;
+  // 可选的本次生成参考；未传时使用已保存的镜头/故事参考
+  references?: IllustrationReference[];
 }
 
 // 选中分镜版本请求

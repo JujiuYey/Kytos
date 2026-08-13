@@ -146,6 +146,7 @@ export type {
   SaveStoryConversationRequest,
   SelectStoryShotVersionRequest,
   StoryAgentMessage,
+  StoryApi,
   StoryDraft,
   StoryDraftUpdateResult,
   StoryProject,

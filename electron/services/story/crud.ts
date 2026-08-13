@@ -17,10 +17,25 @@ import {
   isResolution,
   isSize,
   isStoryboardComplete,
+  parseCharacterIds,
   parseMessages,
+  parseReferences,
   requireStory,
 } from './parsers';
 import { loadStore, replaceStory, saveStore } from './store';
+import { getCharacterLibrary } from '../character-library';
+
+async function validateCharacterIds(value: unknown): Promise<string[]> {
+  const characterIds = parseCharacterIds(value);
+  if (!characterIds.length || !Array.isArray(value) || characterIds.length !== value.length) {
+    throw new Error('故事角色选择无效');
+  }
+  const library = await getCharacterLibrary();
+  if (!characterIds.every(id => library.characters.some(character => character.id === id))) {
+    throw new Error('选择的角色已不存在');
+  }
+  return characterIds;
+}
 
 export async function getStoryWorkspace(): Promise<StoryWorkspaceState> {
   const store = await loadStore();
@@ -31,15 +46,21 @@ export async function getStory(storyId: string): Promise<StoryProject> {
   return requireStory(await loadStore(), storyId);
 }
 
-export async function createStory(_request: CreateStoryRequest): Promise<StoryProject> {
+export async function createStory(request: CreateStoryRequest): Promise<StoryProject> {
+  if (!isPlainObject(request) || !Array.isArray(request.characterIds)) {
+    throw new Error('请选择故事角色');
+  }
+  const characterIds = await validateCharacterIds(request.characterIds);
   const now = new Date().toISOString();
   const story: StoryProject = {
+    characterIds,
     createdAt: now,
     draft: createEmptyStoryDraft(),
     id: `story_${randomUUID()}`,
     keyShotId: null,
     messages: [],
     resolution: '1k',
+    references: [],
     shots: [],
     size: '16:9',
     storyboardReady: false,
@@ -73,14 +94,37 @@ export async function updateStory(request: UpdateStoryRequest): Promise<StoryPro
   if (request.confirmStoryboard !== undefined && typeof request.confirmStoryboard !== 'boolean') {
     throw new Error('分镜确认状态无效');
   }
+  const requestedCharacterIds =
+    request.characterIds !== undefined
+      ? await validateCharacterIds(request.characterIds)
+      : undefined;
+  if (
+    request.references !== undefined &&
+    (!Array.isArray(request.references) || request.references.length > 16)
+  ) {
+    throw new Error('故事参考图最多 16 张');
+  }
   const store = await loadStore();
   const story = requireStory(store, request.storyId);
+  const characterIds = requestedCharacterIds ?? story.characterIds;
+  const filterCharacterReferences = (references: StoryProject['references']) =>
+    references.filter(
+      reference =>
+        reference.kind === 'illustration' || characterIds.includes(reference.characterId),
+    );
+  const references = filterCharacterReferences(
+    request.references !== undefined ? parseReferences(request.references) : story.references,
+  );
   if (request.keyShotId !== undefined && !story.shots.some(shot => shot.id === request.keyShotId)) {
     throw new Error('关键帧选择无效');
   }
   const sizeChanged = request.size !== undefined && request.size !== story.size;
   const outputSettingsChanged =
     sizeChanged || (request.resolution !== undefined && request.resolution !== story.resolution);
+  const referencesChanged = JSON.stringify(references) !== JSON.stringify(story.references);
+  const characterIdsChanged =
+    requestedCharacterIds !== undefined &&
+    JSON.stringify(requestedCharacterIds) !== JSON.stringify(story.characterIds);
   if (request.confirmStoryboard && (!story.storyReady || !isStoryboardComplete(story.shots))) {
     throw new Error('故事和分镜完整后才能确认');
   }
@@ -88,11 +132,17 @@ export async function updateStory(request: UpdateStoryRequest): Promise<StoryPro
     shot => shot.id === story.keyShotId,
   )?.selectedVersionId;
   const keyShotChanged = request.keyShotId !== undefined && request.keyShotId !== story.keyShotId;
-  if ((outputSettingsChanged || keyShotChanged) && hasActiveGeneration(story)) {
-    throw new Error('分镜图片生成完成后才能调整关键帧或输出规格');
+  if (
+    (outputSettingsChanged || keyShotChanged || characterIdsChanged) &&
+    hasActiveGeneration(story)
+  ) {
+    throw new Error('分镜图片生成完成后才能调整角色、关键帧或输出规格');
   }
   const shots = story.shots.map(shot => {
     const selectedVersion = shot.versions.find(version => version.id === shot.selectedVersionId);
+    const shotReferences = filterCharacterReferences(shot.references);
+    const shotReferencesChanged =
+      JSON.stringify(shotReferences) !== JSON.stringify(shot.references);
     const dependsOnPreviousKey = Boolean(
       keyShotChanged &&
       previousKeyVersionId &&
@@ -101,17 +151,28 @@ export async function updateStory(request: UpdateStoryRequest): Promise<StoryPro
     return {
       ...shot,
       imageStale:
-        Boolean(shot.selectedVersionId) && (shot.imageStale || sizeChanged || dependsOnPreviousKey),
+        Boolean(shot.selectedVersionId) &&
+        (shot.imageStale ||
+          sizeChanged ||
+          referencesChanged ||
+          shotReferencesChanged ||
+          characterIdsChanged ||
+          dependsOnPreviousKey),
+      references: shotReferences,
     };
   });
   const updatedStory: StoryProject = {
     ...story,
+    characterIds,
     keyShotId: request.keyShotId ?? story.keyShotId,
     resolution: request.resolution ?? story.resolution,
     shots,
     size: request.size ?? story.size,
-    storyboardStale: request.confirmStoryboard ? false : story.storyboardStale,
+    storyboardStale: request.confirmStoryboard
+      ? false
+      : story.shots.length > 0 && (story.storyboardStale || characterIdsChanged),
     title: request.title?.trim() ?? story.title,
+    references,
     updatedAt: new Date().toISOString(),
   };
   await saveStore(replaceStory(store, updatedStory));

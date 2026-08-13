@@ -11,7 +11,7 @@ import {
   runDatabaseMigrations,
   runInTransaction,
 } from '../../storage/database';
-import { getAssetUrl, parseMessages } from './parsers';
+import { getAssetUrl, parseCharacterIds, parseMessages, parseReferences } from './parsers';
 import { STORY_MIGRATIONS } from './schema';
 import type { StoredStoryWorkspace } from './types';
 
@@ -62,6 +62,7 @@ function readStory(database: DatabaseSync, row: DatabaseRow): StoryProject {
     .prepare('SELECT * FROM story_shots WHERE story_id = ? ORDER BY position')
     .all(id) as DatabaseRow[];
   return {
+    characterIds: parseCharacterIds(parseJson(row.character_ids_json)),
     createdAt: readText(row.created_at),
     draft: {
       conflict: readText(row.draft_conflict),
@@ -84,6 +85,7 @@ function readStory(database: DatabaseSync, row: DatabaseRow): StoryProject {
     storyReady: readBoolean(row.story_ready),
     title: readText(row.title),
     updatedAt: readText(row.updated_at),
+    references: parseReferences(parseJson(row.references_json)),
   };
 }
 
@@ -110,6 +112,7 @@ function readShot(database: DatabaseSync, storyId: string, row: DatabaseRow): St
     scene: readText(row.scene),
     selectedVersionId: nullableText(row.selected_version_id),
     title: readText(row.title),
+    references: parseReferences(parseJson(row.references_json)),
     versions: versionRows.map(version => readVersion(database, storyId, id, version)),
   };
 }
@@ -156,6 +159,7 @@ function readVersion(
     progress: readNumber(row.progress),
     prompt: readText(row.prompt),
     resolution: readText(row.resolution) as StoryShotVersion['resolution'],
+    references: parseReferences(parseJson(row.references_json)),
     size: readText(row.size) as StoryShotVersion['size'],
     status: readText(row.status) as StoryShotVersion['status'],
     updatedAt: readText(row.updated_at),
@@ -177,15 +181,16 @@ function saveStory(database: DatabaseSync, story: StoryProject): void {
   database
     .prepare(
       `INSERT INTO stories (
-         id, title, key_shot_id, resolution, size, story_ready, storyboard_ready,
+         id, title, character_ids_json, key_shot_id, resolution, size, story_ready, storyboard_ready,
          storyboard_stale, messages_json, draft_conflict, draft_ending, draft_goal,
          draft_premise, draft_setting, draft_summary, draft_tone, draft_turning_point,
-         created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         created_at, updated_at, references_json
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       story.id,
       story.title,
+      JSON.stringify(story.characterIds),
       story.keyShotId,
       story.resolution,
       story.size,
@@ -203,6 +208,7 @@ function saveStory(database: DatabaseSync, story: StoryProject): void {
       story.draft.turningPoint,
       story.createdAt,
       story.updatedAt,
+      JSON.stringify(story.references),
     );
   for (const shot of story.shots) saveShot(database, story.id, shot);
 }
@@ -212,8 +218,8 @@ function saveShot(database: DatabaseSync, storyId: string, shot: StoryShot): voi
     .prepare(
       `INSERT INTO story_shots (
          story_id, id, position, selected_version_id, image_stale, action, composition,
-         continuity, emotion, final_prompt, narration, purpose, scene, title
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         continuity, emotion, final_prompt, narration, purpose, scene, title, references_json
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       storyId,
@@ -230,6 +236,7 @@ function saveShot(database: DatabaseSync, storyId: string, shot: StoryShot): voi
       shot.purpose,
       shot.scene,
       shot.title,
+      JSON.stringify(shot.references),
     );
   for (const version of shot.versions) saveVersion(database, storyId, shot.id, version);
 }
@@ -246,8 +253,8 @@ function saveVersion(
          story_id, shot_id, id, version_number,
          base_shot_id, base_version_id, base_file_name,
          continuity_shot_id, continuity_version_id, continuity_file_name,
-         prompt, resolution, size, status, progress, error_message, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         prompt, resolution, size, status, progress, error_message, created_at, updated_at, references_json
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       storyId,
@@ -268,6 +275,7 @@ function saveVersion(
       version.errorMessage,
       version.createdAt,
       version.updatedAt,
+      JSON.stringify(version.references),
     );
   const insertImage = database.prepare(
     `INSERT INTO story_shot_version_images (

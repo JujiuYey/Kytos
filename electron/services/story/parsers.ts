@@ -7,7 +7,7 @@ import type {
   CharacterVisualResolution,
   CharacterVisualAssetSelection,
 } from '../../../shared/character-visual';
-import type { IllustrationSize } from '../../../shared/illustration';
+import type { IllustrationReference, IllustrationSize } from '../../../shared/illustration';
 import { ILLUSTRATION_SIZES } from '../../../shared/illustration';
 import {
   STORY_SHOT_LIMITS,
@@ -40,6 +40,68 @@ export function isSize(value: unknown): value is IllustrationSize {
 
 export function isResolution(value: unknown): value is CharacterVisualResolution {
   return CHARACTER_VISUAL_RESOLUTIONS.includes(value as CharacterVisualResolution);
+}
+
+function parseReference(value: unknown): IllustrationReference | null {
+  if (
+    !isPlainObject(value) ||
+    typeof value.kind !== 'string' ||
+    typeof value.fileName !== 'string'
+  ) {
+    return null;
+  }
+  if (
+    value.kind === 'character-action' ||
+    value.kind === 'character-anchor' ||
+    value.kind === 'character-expression'
+  ) {
+    if (typeof value.characterId !== 'string' || typeof value.taskId !== 'string') return null;
+    return {
+      characterId: value.characterId,
+      fileName: path.basename(value.fileName),
+      kind: value.kind,
+      purpose: ['style', 'content', 'character'].includes(String(value.purpose))
+        ? (value.purpose as IllustrationReference['purpose'])
+        : 'character',
+      taskId: value.taskId,
+    };
+  }
+  if (
+    value.kind === 'illustration' &&
+    (value.source === 'uploaded' || value.source === 'generated')
+  ) {
+    return {
+      fileName: path.basename(value.fileName),
+      kind: 'illustration',
+      purpose: ['style', 'content', 'character'].includes(String(value.purpose))
+        ? (value.purpose as IllustrationReference['purpose'])
+        : 'content',
+      source: value.source,
+      topicId: typeof value.topicId === 'string' ? value.topicId : null,
+      uploadId: typeof value.uploadId === 'string' ? value.uploadId : null,
+      versionId: typeof value.versionId === 'string' ? value.versionId : null,
+    };
+  }
+  return null;
+}
+
+export function parseReferences(value: unknown): IllustrationReference[] {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Map(
+      value
+        .map(parseReference)
+        .filter((reference): reference is IllustrationReference => Boolean(reference))
+        .map(reference => [JSON.stringify(reference), reference]),
+    ).values(),
+  ].slice(0, 16);
+}
+
+export function parseCharacterIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(value.filter((id): id is string => typeof id === 'string' && ID_PATTERN.test(id))),
+  ].slice(0, 8);
 }
 
 // 重新导出，保持现有调用方从 './parsers' 拿类型守卫的便利
@@ -170,6 +232,7 @@ export function parseVersion(value: unknown): StoryShotVersion | null {
         ]),
       ).values(),
     ],
+    references: parseReferences(value.references),
     continuityVersion: parseVersionReference(value.continuityVersion),
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     errorMessage: typeof value.errorMessage === 'string' ? value.errorMessage : null,
@@ -218,6 +281,7 @@ export function parseShot(value: unknown, fallbackOrder: number): StoryShot | nu
     imageStale: value.imageStale === true && Boolean(selectedVersionId),
     order: value.order > 0 ? value.order : fallbackOrder,
     selectedVersionId,
+    references: parseReferences(value.references),
     versions,
   };
 }
@@ -272,6 +336,7 @@ export function parseStory(value: unknown, migrateResolutionStale: boolean): Sto
       ? value.keyShotId
       : (shots[0]?.id ?? null);
   return {
+    characterIds: parseCharacterIds(value.characterIds),
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
     draft: parseDraft(value.draft),
     id: value.id,
@@ -285,6 +350,7 @@ export function parseStory(value: unknown, migrateResolutionStale: boolean): Sto
     storyReady: value.storyReady === true,
     title: value.title.trim(),
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
+    references: parseReferences(value.references),
   };
 }
 

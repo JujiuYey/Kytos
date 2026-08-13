@@ -1,8 +1,13 @@
 import { createAgentUIStreamResponse } from 'ai';
-import { DEFAULT_CHAT_MODEL, getChatModelDefinition, isChatModel } from '../../../shared/chat-model';
+import {
+  DEFAULT_CHAT_MODEL,
+  getChatModelDefinition,
+  isChatModel,
+} from '../../../shared/chat-model';
 import type { ChatModel } from '../../../shared/chat-model';
 import { getCredentialValue } from '../../services/credentials';
 import { getStory } from '../../services/story';
+import { getCharacterLibrary } from '../../services/character-library';
 import { createStoryAgent } from './agent';
 import { isPlainObject } from 'es-toolkit';
 
@@ -63,14 +68,18 @@ export async function handleStoryAgentRequest(request: Request): Promise<Respons
     }
     const body = parseRequestBody(await request.json());
     const model = body.model ?? DEFAULT_CHAT_MODEL;
-    const [apiKey, story] = await Promise.all([
+    const [apiKey, story, library] = await Promise.all([
       getCredentialValue(getChatModelDefinition(model).provider),
       getStory(body.storyId),
+      getCharacterLibrary(),
     ]);
     const agent = createStoryAgent({
       apiKey,
       model,
       story,
+      characters: library.characters
+        .filter(character => story.characterIds.includes(character.id))
+        .map(character => ({ id: character.id, name: character.name })),
     });
     return await createAgentUIStreamResponse({
       agent,
