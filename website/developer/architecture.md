@@ -36,7 +36,7 @@ Vue 代码不直接导入 Electron、Node 文件系统或数据库模块。所�
 | `electron/preload.ts`         | 把允许的 IPC 调用按领域暴露为 `window.desktop`     |
 | `electron/ipc/`               | 校验和接收渲染端请求，转交领域服务                 |
 | `electron/services/`          | 角色、视觉、表情、插画、故事、工作区和凭据业务逻辑 |
-| `electron/agents/`            | 角色创建、插画和故事的受约束共创 Agent             |
+| `electron/agents/`            | 插画和故事的受约束共创 Agent                       |
 | `electron/storage/`           | 应用级与工作区 SQLite 连接、migration              |
 | `shared/`                     | 主进程、preload 和渲染端共享的类型与协议           |
 | `src/views/`                  | 按路由功能组织的 Vue 页面                          |

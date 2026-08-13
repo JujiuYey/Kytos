@@ -1,7 +1,7 @@
 ---
 layout: page
 title: Kytos
-description: 本地优先的 AI 角色与视觉内容创作工作台
+description: 把角色资产、插画和故事分镜放进同一个本地工作区
 sidebar: false
 aside: false
 outline: false

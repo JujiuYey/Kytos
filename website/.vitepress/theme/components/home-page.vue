@@ -8,20 +8,20 @@ import {
   Sparkles,
   UsersRound,
 } from '@lucide/vue';
-import chibiImage from '../../../../src/assets/character-styles/chibi-kawaii-male.png';
-import flatImage from '../../../../src/assets/character-styles/flat-editorial-male.png';
-import inkImage from '../../../../src/assets/character-styles/chinese-ink-male.png';
-import noirImage from '../../../../src/assets/character-styles/cinematic-noir-male.png';
+import characterCreateImage from '../../../../docs/screenshots/02-character-create.png';
+import characterAssetsImage from '../../../../docs/screenshots/04-character-assets.png';
+import illustrationImage from '../../../../docs/screenshots/05-illustration-create.png';
+import storyImage from '../../../../docs/screenshots/07-story-create.png';
 
 const capabilities = [
   {
-    description: '从角色设定、风格探索到正式视觉、动作和表情，保持同一角色的创作上下文。',
+    description: '从已有角色锚点开始，整理正式资产、动作图和表情，让后续创作有稳定的角色参考。',
     href: '/Kytos/guide/character',
     icon: UsersRound,
-    title: '建立角色',
+    title: '整理角色资产',
   },
   {
-    description: '组合角色视觉、表情和已有插画作为参考，通过对话整理主题并管理多个版本。',
+    description: '组合角色锚点、表情和已有插画作为参考，通过对话整理主题并管理多个版本。',
     href: '/Kytos/guide/illustration',
     icon: Images,
     title: '创作插画',
@@ -38,18 +38,18 @@ const capabilities = [
 <template>
   <main class="kytos-home">
     <section class="kytos-hero" aria-labelledby="kytos-home-title">
-      <div class="kytos-hero-gallery" aria-label="Kytos 内置角色视觉风格示例">
-        <img :src="flatImage" alt="平面撞色角色风格" />
-        <img :src="chibiImage" alt="软萌 Q 版角色风格" />
-        <img :src="inkImage" alt="新中式水墨角色风格" />
-        <img :src="noirImage" alt="写实电影角色风格" />
+      <div class="kytos-hero-gallery" aria-label="Kytos 角色、插画与故事工作区">
+        <img :src="characterCreateImage" alt="创建角色页面" />
+        <img :src="characterAssetsImage" alt="角色锚点与表情页面" />
+        <img :src="illustrationImage" alt="插画创作页面" />
+        <img :src="storyImage" alt="故事创作页面" />
       </div>
       <div class="kytos-hero-shade" aria-hidden="true" />
       <div class="kytos-hero-content">
-        <p class="kytos-eyebrow"><Sparkles aria-hidden="true" /> 本地优先的 AI 创作工作台</p>
+        <p class="kytos-eyebrow"><Sparkles aria-hidden="true" /> 本地优先的视觉创作工作台</p>
         <h1 id="kytos-home-title">Kytos</h1>
         <p class="kytos-hero-copy">
-          把角色、视觉资产、插画与故事放进同一个桌面工作区，让创作过程与作品文件都留在你的设备上。
+          把角色资产、插画与故事分镜放进同一个桌面工作区，让参考素材、生成版本与作品文件留在你的设备上。
         </p>
         <div class="kytos-hero-actions">
           <a class="kytos-action kytos-action-primary" href="/Kytos/getting-started/">
@@ -72,11 +72,11 @@ const capabilities = [
     <section class="kytos-intro" aria-labelledby="kytos-intro-title">
       <div>
         <p class="kytos-section-label">一个工作区，贯穿整个创作过程</p>
-        <h2 id="kytos-intro-title">先建立角色，再让视觉和故事持续生长。</h2>
+        <h2 id="kytos-intro-title">先整理角色资产，再让插画和故事持续生长。</h2>
       </div>
       <p>
         Kytos
-        不把每次生成当成孤立结果。正式角色视觉、表情、插画版本和故事分镜会成为后续创作可以继续引用的素材。
+        不把每次生成当成孤立结果。正式角色锚点、表情、插画版本和故事分镜会成为后续创作可以继续引用的素材。
       </p>
     </section>
 
