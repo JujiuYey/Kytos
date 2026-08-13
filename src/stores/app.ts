@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { computed, ref, toRaw } from 'vue';
 import type { AppSettings, DesktopSettings } from '@/types';
 import {
   DEFAULT_CHAT_MODEL,
@@ -33,7 +33,8 @@ export const useAppStore = defineStore('app', () => {
 
   const updateSettings = (partialSettings: Partial<AppSettings>) => {
     settings.value = { ...settings.value, ...partialSettings };
-    void window.desktop.settings.setAppSettings(settings.value).catch((error: unknown) => {
+    const plainSettings = toRaw(settings.value) as AppSettings;
+    void window.desktop.settings.setAppSettings(plainSettings).catch((error: unknown) => {
       initializationError.value = error instanceof Error ? error.message : String(error);
     });
   };

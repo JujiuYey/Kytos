@@ -1,27 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  Clapperboard,
-  Image as ImageIcon,
-  Images,
-  Link2,
-  Pencil,
-  Plus,
-  Settings2,
-  Sparkles,
-  Star,
-  Trash2,
-} from '@lucide/vue';
+import { Clapperboard, Image as ImageIcon, Images } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
-import {
-  GenerationPollingStatus,
-  type GenerationPollingStateMap,
-} from '@/components/sag/generation-polling-status';
+import type { GenerationPollingStateMap } from '@/components/sag/generation-polling-status';
 import { ImageViewer } from '@/components/sag/image-viewer';
-import { ImageOutputSettings } from '@/components/sag/image-output-settings';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type {
   CharacterVisualResolution,
   IllustrationSize,
@@ -37,18 +18,21 @@ import type {
   StoryShot,
   StoryShotVersion,
   StoryVersionReference,
+  IllustrationReference,
 } from '@/types';
-import { ILLUSTRATION_SIZES, STORY_SHOT_LIMITS } from '@/types';
+import type { ImageReferencePickerOption } from '@/components/sag/image-reference-picker-dialog';
+import StoryStoryboardCanvas from './story-storyboard-canvas.vue';
 
 const props = defineProps<{
   apimartConfigured: boolean;
   assetsReady: boolean;
   busy: boolean;
-  characterAssetsReady: boolean;
   pollingStates: GenerationPollingStateMap;
   story: StoryProject;
   submittingShotIds: string[];
   tab: 'story' | 'storyboard' | 'final';
+  referenceOptions: Array<ImageReferencePickerOption & { reference: IllustrationReference }>;
+  characterNames: string[];
 }>();
 
 const emit = defineEmits<{
@@ -61,6 +45,8 @@ const emit = defineEmits<{
   (event: 'generate-remaining'): void;
   (event: 'generate-shot', shot: StoryShot): void;
   (event: 'manage-assets'): void;
+  (event: 'manage-characters'): void;
+  (event: 'open-references', shot: StoryShot | null): void;
   (event: 'move-shot', payload: { direction: -1 | 1; shot: StoryShot }): void;
   (event: 'rename', title: string): void;
   (event: 'select-version', payload: { shot: StoryShot; version: StoryShotVersion }): void;
@@ -80,13 +66,6 @@ const draftFields = computed(() => [
   { label: '故事结尾', value: props.story.draft.ending },
   { label: '情绪基调', value: props.story.draft.tone },
 ]);
-const keyShot = computed(() => props.story.shots.find(shot => shot.id === props.story.keyShotId));
-const keyShotSelected = computed(() => Boolean(keyShot.value?.selectedVersionId));
-const remainingShots = computed(() =>
-  props.story.shots.filter(
-    shot => !shot.selectedVersionId && !shot.versions.some(version => isActive(version)),
-  ),
-);
 const finalShotCount = computed(() =>
   props.story.storyboardStale
     ? 0
@@ -94,23 +73,13 @@ const finalShotCount = computed(() =>
 );
 const structureLocked = computed(
   () =>
-    props.busy || props.story.shots.some(shot => shot.versions.some(version => isActive(version))),
+    props.busy ||
+    props.story.shots.some(shot =>
+      shot.versions.some(version =>
+        ['submitted', 'pending', 'processing'].includes(version.status),
+      ),
+    ),
 );
-const canGenerateRemaining = computed(
-  () =>
-    props.apimartConfigured &&
-    props.assetsReady &&
-    props.story.storyboardReady &&
-    !props.story.storyboardStale &&
-    keyShotSelected.value &&
-    remainingShots.value.length > 0 &&
-    !props.busy,
-);
-
-function isActive(version: StoryShotVersion): boolean {
-  return ['submitted', 'pending', 'processing'].includes(version.status);
-}
-
 function getSelectedVersion(shot: StoryShot): StoryShotVersion | null {
   return shot.versions.find(version => version.id === shot.selectedVersionId) ?? null;
 }
@@ -131,21 +100,6 @@ function getAspectClass(size: IllustrationSize): string {
     '16:9': 'aspect-video',
     '9:16': 'aspect-[9/16]',
   }[size];
-}
-
-function canGenerateShot(shot: StoryShot): boolean {
-  const keyReady = shot.id === props.story.keyShotId || keyShotSelected.value;
-  return (
-    props.apimartConfigured &&
-    props.assetsReady &&
-    props.story.storyboardReady &&
-    !props.story.storyboardStale &&
-    Boolean(shot.finalPrompt.trim()) &&
-    keyReady &&
-    !props.busy &&
-    !props.submittingShotIds.includes(shot.id) &&
-    !shot.versions.some(version => isActive(version))
-  );
 }
 
 function handleTitleChange(event: Event): void {
@@ -200,6 +154,43 @@ function handleTitleChange(event: Event): void {
               />
             </section>
 
+            <section class="border-y py-4" aria-labelledby="story-reference-heading">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h3 id="story-reference-heading" class="text-sm font-medium">故事默认参考</h3>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    新镜头默认继承；可在分镜画布里单独覆盖。
+                  </p>
+                </div>
+                <SagStatusBadge :tone="story.references.length ? 'success' : 'info'">
+                  {{ story.references.length ? `${story.references.length} 张` : '使用角色锚点' }}
+                </SagStatusBadge>
+              </div>
+              <Button
+                class="mt-3 w-full"
+                variant="outline"
+                size="sm"
+                @click="emit('open-references', null)"
+              >
+                <Images class="size-4" />
+                {{ story.references.length ? '管理默认参考' : '添加默认参考' }}
+              </Button>
+            </section>
+
+            <section class="border-b pb-4" aria-labelledby="story-characters-heading">
+              <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <h3 id="story-characters-heading" class="text-sm font-medium">参演角色</h3>
+                  <p class="mt-1 truncate text-xs text-muted-foreground">
+                    {{ characterNames.length ? characterNames.join('、') : '尚未选择角色' }}
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" @click="emit('manage-characters')">
+                  管理
+                </Button>
+              </div>
+            </section>
+
             <section aria-labelledby="story-summary-heading">
               <div class="mb-3 flex items-center justify-between gap-3">
                 <h3 id="story-summary-heading" class="text-sm font-medium">故事定稿</h3>
@@ -252,377 +243,31 @@ function handleTitleChange(event: Event): void {
         value="storyboard"
         class="mt-0 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
       >
-        <ScrollArea class="min-h-0 flex-1">
-          <div class="space-y-5 px-5 py-5">
-            <section aria-labelledby="story-output-heading">
-              <div class="mb-3 flex items-center justify-between gap-3">
-                <h3 id="story-output-heading" class="text-sm font-medium">统一输出</h3>
-                <SagStatusBadge :tone="apimartConfigured && assetsReady ? 'success' : 'error'">
-                  {{
-                    !apimartConfigured
-                      ? '缺少 API Key'
-                      : !characterAssetsReady
-                        ? '缺少角色参考'
-                        : '参考就绪'
-                  }}
-                </SagStatusBadge>
-              </div>
-              <ImageOutputSettings
-                id-prefix="story"
-                :disabled="structureLocked"
-                :resolution="story.resolution"
-                :size="story.size"
-                :size-options="ILLUSTRATION_SIZES"
-                @update:resolution="emit('update:resolution', $event)"
-                @update:size="emit('update:size', $event as IllustrationSize)"
-              />
-              <Button
-                v-if="!characterAssetsReady"
-                variant="outline"
-                size="sm"
-                class="mt-3 w-full"
-                @click="emit('manage-assets')"
-              >
-                <Images class="size-4" />
-                准备角色锚点
-              </Button>
-              <Button
-                v-if="!apimartConfigured"
-                variant="outline"
-                size="sm"
-                class="mt-3 w-full"
-                @click="emit('configure-service')"
-              >
-                <Settings2 class="size-4" />
-                配置图片生成服务
-              </Button>
-            </section>
-
-            <div
-              v-if="story.storyboardStale"
-              class="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-3"
-            >
-              <p class="text-sm font-medium text-destructive">故事已经变化，当前分镜需要重新检查</p>
-              <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                在左侧对话中让 Agent 根据新故事逐镜调整，确认前不会允许继续生图。
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                class="mt-3 w-full"
-                :disabled="structureLocked || !story.storyReady || !story.storyboardReady"
-                @click="emit('confirm-storyboard')"
-              >
-                <Check class="size-4" />
-                确认当前分镜
-              </Button>
-            </div>
-
-            <div v-if="story.shots.length" class="space-y-4">
-              <article
-                v-for="shot in story.shots"
-                :key="shot.id"
-                class="overflow-hidden rounded-md border"
-              >
-                <header class="flex items-center justify-between gap-3 border-b px-3 py-2">
-                  <div class="flex min-w-0 items-center gap-2">
-                    <span class="text-xs font-medium tabular-nums">{{ shot.order }}</span>
-                    <h3 class="truncate text-sm font-medium">{{ shot.title || '未命名分镜' }}</h3>
-                    <SagStatusBadge v-if="shot.id === story.keyShotId" tone="info">
-                      <Star class="size-3" />
-                      关键帧
-                    </SagStatusBadge>
-                    <SagStatusBadge v-if="shot.imageStale" tone="warning">
-                      画面待更新
-                    </SagStatusBadge>
-                  </div>
-                  <div class="flex shrink-0 items-center gap-0.5">
-                    <TooltipProvider :delay-duration="300">
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            class="size-7"
-                            :disabled="shot.order === 1 || structureLocked"
-                            aria-label="向前移动分镜"
-                            @click="emit('move-shot', { direction: -1, shot })"
-                          >
-                            <ArrowUp class="size-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>向前移动</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            class="size-7"
-                            :disabled="shot.order === story.shots.length || structureLocked"
-                            aria-label="向后移动分镜"
-                            @click="emit('move-shot', { direction: 1, shot })"
-                          >
-                            <ArrowDown class="size-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>向后移动</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            class="size-7"
-                            :disabled="shot.id === story.keyShotId || structureLocked"
-                            aria-label="设为关键帧"
-                            @click="emit('set-key-shot', shot)"
-                          >
-                            <Star class="size-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>设为关键帧</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            class="size-7"
-                            :disabled="structureLocked"
-                            aria-label="编辑分镜"
-                            @click="emit('edit-shot', shot)"
-                          >
-                            <Pencil class="size-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>编辑分镜</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            class="size-7 text-muted-foreground hover:text-destructive"
-                            :disabled="structureLocked"
-                            aria-label="删除分镜"
-                            @click="emit('delete-shot', shot)"
-                          >
-                            <Trash2 class="size-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>删除分镜</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </header>
-
-                <div class="space-y-3 px-3 py-3 text-sm">
-                  <p class="leading-6">{{ shot.scene || '场景尚未确定' }}</p>
-                  <dl class="grid gap-2 text-xs sm:grid-cols-2">
-                    <div>
-                      <dt class="text-muted-foreground">叙事作用</dt>
-                      <dd class="mt-1 leading-5">{{ shot.purpose || '尚未确定' }}</dd>
-                    </div>
-                    <div>
-                      <dt class="text-muted-foreground">动作与情绪</dt>
-                      <dd class="mt-1 leading-5">
-                        {{ [shot.action, shot.emotion].filter(Boolean).join('，') || '尚未确定' }}
-                      </dd>
-                    </div>
-                  </dl>
-                  <p
-                    v-if="shot.narration"
-                    class="border-l-2 pl-3 text-xs italic leading-5 text-muted-foreground"
-                  >
-                    {{ shot.narration }}
-                  </p>
-                </div>
-
-                <div v-if="shot.versions.length" class="border-t px-3 py-3">
-                  <div class="mb-2 flex items-center justify-between gap-3">
-                    <span class="text-xs text-muted-foreground">生成版本</span>
-                    <span class="text-xs tabular-nums text-muted-foreground">
-                      {{ shot.versions.length }} 个
-                    </span>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    <div
-                      v-for="version in shot.versions"
-                      :key="version.id"
-                      class="min-w-0 overflow-hidden rounded-md border"
-                    >
-                      <div
-                        v-if="isActive(version)"
-                        class="flex aspect-video items-center bg-muted/30 px-3"
-                      >
-                        <GenerationPollingStatus
-                          compact
-                          :phase="pollingStates[version.id]?.phase ?? 'waiting'"
-                          :progress="version.progress"
-                          :status="version.status"
-                        />
-                      </div>
-                      <div
-                        v-else-if="version.status === 'failed' || version.status === 'cancelled'"
-                        class="flex aspect-video flex-col items-center justify-center px-3 text-center"
-                      >
-                        <span class="text-xs text-destructive">生成未完成</span>
-                      </div>
-                      <ImageViewer
-                        v-else-if="version.images[0]"
-                        :alt="`${shot.title} V${version.versionNumber}`"
-                        :src="version.images[0].url"
-                        :title="`${shot.title} V${version.versionNumber}`"
-                        description="查看分镜大图，可缩放和拖拽"
-                      >
-                        <Button
-                          variant="ghost"
-                          class="block h-auto w-full rounded-none p-0 focus-visible:ring-inset"
-                          :aria-label="`查看${shot.title} V${version.versionNumber}`"
-                        >
-                          <AiImage
-                            :alt="`${shot.title} V${version.versionNumber}`"
-                            :src="version.images[0].url"
-                            :class="[
-                              getAspectClass(version.size),
-                              'w-full rounded-none bg-muted/20 object-contain',
-                            ]"
-                          />
-                        </Button>
-                      </ImageViewer>
-                      <div class="flex items-center justify-between gap-1 border-t px-2 py-1.5">
-                        <SagStatusBadge
-                          :tone="shot.selectedVersionId === version.id ? 'success' : 'neutral'"
-                        >
-                          V{{ version.versionNumber }}
-                          <Check v-if="shot.selectedVersionId === version.id" class="size-3" />
-                        </SagStatusBadge>
-                        <div class="flex items-center gap-0.5">
-                          <TooltipProvider :delay-duration="300">
-                            <Tooltip v-if="version.status === 'completed' && version.images[0]">
-                              <TooltipTrigger as-child>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  class="size-7"
-                                  :disabled="structureLocked"
-                                  aria-label="设为正式画面"
-                                  @click="emit('select-version', { shot, version })"
-                                >
-                                  <Check class="size-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>设为正式画面</TooltipContent>
-                            </Tooltip>
-                            <Tooltip v-if="version.status === 'completed' && version.images[0]">
-                              <TooltipTrigger as-child>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  class="size-7"
-                                  :disabled="busy"
-                                  aria-label="基于这个版本继续"
-                                  @click="
-                                    emit('set-base', {
-                                      reference: {
-                                        fileName: version.images[0].fileName,
-                                        shotId: shot.id,
-                                        versionId: version.id,
-                                      },
-                                      shot,
-                                    })
-                                  "
-                                >
-                                  <Link2 class="size-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>以此继续</TooltipContent>
-                            </Tooltip>
-                            <Tooltip v-if="!isActive(version)">
-                              <TooltipTrigger as-child>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  class="size-7 text-muted-foreground hover:text-destructive"
-                                  :disabled="structureLocked"
-                                  aria-label="删除分镜版本"
-                                  @click="emit('delete-version', { shot, version })"
-                                >
-                                  <Trash2 class="size-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>删除版本</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <footer
-                  class="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2"
-                >
-                  <span class="text-xs text-muted-foreground">
-                    {{
-                      shot.id !== story.keyShotId && !keyShotSelected
-                        ? '请先确认关键帧'
-                        : shot.selectedVersionId
-                          ? '已选正式画面'
-                          : '尚未选定画面'
-                    }}
-                  </span>
-                  <Button
-                    size="sm"
-                    :variant="shot.selectedVersionId ? 'outline' : 'default'"
-                    :disabled="!canGenerateShot(shot)"
-                    @click="emit('generate-shot', shot)"
-                  >
-                    <Sparkles class="size-4" />
-                    {{ shot.versions.length ? '生成新版本' : '生成这一镜' }}
-                  </Button>
-                </footer>
-              </article>
-            </div>
-
-            <div v-else class="rounded-md border border-dashed px-5 py-10 text-center">
-              <Clapperboard class="mx-auto size-5 text-muted-foreground" />
-              <p class="mt-3 text-sm font-medium">还没有文字分镜</p>
-              <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                先确认故事，再在左侧让 Agent 将它拆成 3 至 6 个连续画面。
-              </p>
-            </div>
-
-            <Button
-              variant="outline"
-              class="w-full"
-              :disabled="structureLocked || story.shots.length >= STORY_SHOT_LIMITS.max"
-              @click="emit('add-shot')"
-            >
-              <Plus class="size-4" />
-              新增分镜
-            </Button>
-          </div>
-        </ScrollArea>
-
-        <footer v-if="story.shots.length" class="shrink-0 border-t bg-background px-5 py-4">
-          <Button
-            class="w-full"
-            :disabled="!canGenerateRemaining"
-            @click="emit('generate-remaining')"
-          >
-            <Images class="size-4" />
-            {{
-              keyShotSelected
-                ? `生成剩余 ${remainingShots.length} 镜`
-                : `先生成关键帧「${keyShot?.title || '第 1 镜'}」`
-            }}
-          </Button>
-          <p class="mt-2 text-center text-xs text-muted-foreground">
-            使用 GPT-Image-2，每个分镜都会产生一次实际费用
-          </p>
-        </footer>
+        <StoryStoryboardCanvas
+          :apimart-configured="apimartConfigured"
+          :assets-ready="assetsReady"
+          :busy="busy"
+          :polling-states="pollingStates"
+          :reference-options="referenceOptions"
+          :story="story"
+          :submitting-shot-ids="submittingShotIds"
+          @add-shot="emit('add-shot')"
+          @configure-service="emit('configure-service')"
+          @confirm-storyboard="emit('confirm-storyboard')"
+          @delete-shot="emit('delete-shot', $event)"
+          @delete-version="emit('delete-version', $event)"
+          @edit-shot="emit('edit-shot', $event)"
+          @generate-remaining="emit('generate-remaining')"
+          @generate-shot="emit('generate-shot', $event)"
+          @manage-assets="emit('manage-assets')"
+          @move-shot="emit('move-shot', $event)"
+          @open-references="emit('open-references', $event)"
+          @select-version="emit('select-version', $event)"
+          @set-base="emit('set-base', $event)"
+          @set-key-shot="emit('set-key-shot', $event)"
+          @update:resolution="emit('update:resolution', $event)"
+          @update:size="emit('update:size', $event)"
+        />
       </TabsContent>
 
       <TabsContent value="final" class="mt-0 min-h-0 overflow-hidden">

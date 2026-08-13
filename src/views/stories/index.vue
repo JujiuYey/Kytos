@@ -24,6 +24,7 @@ import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
 import { SagStatusBadge } from '@/components/sag/status-badge';
+import { storyApi } from '@/lib/story-api';
 import type { CharacterVisualImage, StoryProject } from '@/types';
 
 type StoryStatusTone = 'error' | 'info' | 'neutral' | 'success' | 'warning';
@@ -110,9 +111,7 @@ async function loadWorkspace(): Promise<void> {
   loading.value = true;
   loadingError.value = '';
   try {
-    stories.value = await window.desktop.story
-      .getStoryWorkspace()
-      .then(workspace => workspace.stories);
+    stories.value = await storyApi.getStoryWorkspace().then(workspace => workspace.stories);
   } catch (error: unknown) {
     loadingError.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -130,8 +129,7 @@ async function createStory(): Promise<void> {
   }
   creating.value = true;
   try {
-    const story = await window.desktop.story.createStory({});
-    openStory(story);
+    void router.push({ name: 'story', query: { create: '1' } });
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : String(error));
   } finally {
@@ -146,7 +144,7 @@ async function confirmDelete(): Promise<void> {
   }
   deletingStoryId.value = target.id;
   try {
-    const workspace = await window.desktop.story.deleteStory({ storyId: target.id });
+    const workspace = await storyApi.deleteStory({ storyId: target.id });
     stories.value = workspace.stories;
     deleteTarget.value = null;
     toast.success('故事已删除');

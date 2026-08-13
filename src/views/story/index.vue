@@ -10,13 +10,23 @@ import type { GenerationPollingStateMap } from '@/components/sag/generation-poll
 import { SagConfirmDialog } from '@/components/sag/sag-confirm-dialog';
 import { SagErrorRetryAlert } from '@/components/sag/error-retry-alert';
 import { SagPage } from '@/components/sag/sag-page';
+import {
+  ImageReferencePickerDialog,
+  type ImageReferencePickerFilter,
+  type ImageReferencePickerOption,
+} from '@/components/sag/image-reference-picker-dialog';
 import { characterAnchorApi } from '@/lib/character-anchor-api';
+import { storyApi } from '@/lib/story-api';
 import { useAppStore } from '@/stores/app';
 import type {
   CharacterVisualResolution,
   CharacterAnchorWorkspaceState,
+  CharacterExpressionWorkspaceState,
+  CharacterLibraryCharacter,
   CredentialStatus,
   IllustrationSize,
+  IllustrationReference,
+  IllustrationWorkspaceState,
   StoryAgentMessage,
   StoryDraftUpdateResult,
   StoryProject,
@@ -27,15 +37,26 @@ import type {
   StoryVersionReference,
   StoryboardUpdateResult,
 } from '@/types';
-import { STORY_AGENT_ENDPOINT } from '@/types';
-import { cloneJsonData } from '@/utils/serialization';
+import { MAX_ILLUSTRATION_REFERENCE_IMAGES, STORY_AGENT_ENDPOINT } from '@/types';
 import { getChatModelDefinition } from '@/types';
 import type { FileUIPart } from 'ai';
 import StoryChatInput from './components/story-chat-input.vue';
 import StoryChatMessages from './components/story-chat-messages.vue';
+import StoryCharacterPickerDialog from './components/story-character-picker-dialog.vue';
 import StoryHeader from './components/story-header.vue';
 import StoryShotEditorDialog from './components/story-shot-editor-dialog.vue';
 import StoryWorkspacePanel from './components/story-workspace-panel.vue';
+
+interface StoryReferenceOption extends ImageReferencePickerOption {
+  reference: IllustrationReference;
+}
+
+interface CharacterReferenceWorkspace {
+  anchor: CharacterAnchorWorkspaceState;
+  characterId: string;
+  characterName: string;
+  expression: CharacterExpressionWorkspaceState;
+}
 
 const appStore = useAppStore();
 const route = useRoute();
@@ -45,7 +66,9 @@ const activeStoryId = ref('');
 const deepseekStatus = ref<CredentialStatus | null>(null);
 const minimaxStatus = ref<CredentialStatus | null>(null);
 const apimartStatus = ref<CredentialStatus | null>(null);
-const anchorWorkspace = ref<CharacterAnchorWorkspaceState | null>(null);
+const characters = ref<CharacterLibraryCharacter[]>([]);
+const characterReferenceWorkspaces = ref<CharacterReferenceWorkspace[]>([]);
+const illustrationWorkspace = ref<IllustrationWorkspaceState | null>(null);
 const initializationError = ref('');
 const operationError = ref('');
 const isInitializing = ref(true);
@@ -61,6 +84,10 @@ const mobilePane = ref<'chat' | 'workspace'>('chat');
 const workspaceTab = ref<'story' | 'storyboard' | 'final'>('story');
 const submittingShotIds = ref<string[]>([]);
 const baseReferences = ref<Record<string, StoryVersionReference | null>>({});
+const referenceDialogOpen = ref(false);
+const referenceShotId = ref<string | null>(null);
+const characterDialogOpen = ref(false);
+const characterDialogMode = ref<'create' | 'update'>('create');
 const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pollingStates = ref<GenerationPollingStateMap>({});
 let disposed = false;
@@ -77,8 +104,158 @@ const activeStory = computed(
   () => stories.value.find(story => story.id === activeStoryId.value) ?? null,
 );
 const apimartConfigured = computed(() => Boolean(apimartStatus.value?.configured));
-const characterAssetsReady = computed(() => Boolean(anchorWorkspace.value?.officialAssets.length));
+const selectedCharacterWorkspaces = computed(() => {
+  const selectedIds = new Set(activeStory.value?.characterIds ?? []);
+  return characterReferenceWorkspaces.value.filter(workspace =>
+    selectedIds.has(workspace.characterId),
+  );
+});
+const selectedCharacterNames = computed(() => {
+  const selectedIds = new Set(activeStory.value?.characterIds ?? []);
+  return characters.value
+    .filter(character => selectedIds.has(character.id))
+    .map(character => character.name);
+});
+const characterAssetsReady = computed(
+  () =>
+    selectedCharacterWorkspaces.value.length > 0 &&
+    selectedCharacterWorkspaces.value.every(
+      workspace => workspace.anchor.officialAssets.length > 0,
+    ),
+);
 const assetsReady = computed(() => characterAssetsReady.value);
+const referenceFilters: ImageReferencePickerFilter[] = [
+  { label: '角色锚点', value: 'character-anchor' },
+  { label: '角色表情', value: 'character-expression' },
+  { label: '角色动作', value: 'character-action' },
+  { label: '场景与风格', value: 'illustration' },
+];
+const referenceOptions = computed<StoryReferenceOption[]>(() => {
+  const characterOptions = selectedCharacterWorkspaces.value.flatMap(workspace => {
+    const anchors = workspace.anchor.officialAssets.flatMap(selection => {
+      const record = workspace.anchor.records.find(item => item.id === selection.taskId);
+      const image = record?.images.find(item => item.fileName === selection.fileName);
+      if (!record || !image || record.generationMode === 'action') return [];
+      const reference: IllustrationReference = {
+        characterId: workspace.characterId,
+        fileName: image.fileName,
+        kind: 'character-anchor',
+        purpose: 'character',
+        taskId: record.id,
+      };
+      return [
+        {
+          detail: `${workspace.characterName} · 正式角色锚点`,
+          image,
+          key: referenceKey(reference),
+          label: image.name || record.name,
+          reference,
+          source: 'character-anchor',
+        },
+      ];
+    });
+    const actions = workspace.anchor.records
+      .filter(record => record.status === 'completed' && record.generationMode === 'action')
+      .flatMap(record =>
+        record.images.map((image, index) => {
+          const reference: IllustrationReference = {
+            characterId: workspace.characterId,
+            fileName: image.fileName,
+            kind: 'character-action',
+            purpose: 'character',
+            taskId: record.id,
+          };
+          return {
+            detail: `${workspace.characterName} · 角色动作`,
+            image,
+            key: referenceKey(reference),
+            label: record.images.length > 1 ? `${record.name} ${index + 1}` : record.name,
+            reference,
+            source: 'character-action',
+          };
+        }),
+      );
+    const expressions = workspace.expression.records.flatMap(record =>
+      record.images.map((image, index) => {
+        const reference: IllustrationReference = {
+          characterId: workspace.characterId,
+          fileName: image.fileName,
+          kind: 'character-expression',
+          purpose: 'character',
+          taskId: record.id,
+        };
+        return {
+          detail: `${workspace.characterName} · 角色表情`,
+          image,
+          key: referenceKey(reference),
+          label: record.images.length > 1 ? `${record.name} ${index + 1}` : record.name,
+          reference,
+          source: 'character-expression',
+        };
+      }),
+    );
+    return [...anchors, ...expressions, ...actions];
+  });
+  const uploaded = (illustrationWorkspace.value?.uploads ?? []).map(upload => {
+    const reference: IllustrationReference = {
+      fileName: upload.fileName,
+      kind: 'illustration',
+      purpose: 'content',
+      source: 'uploaded',
+      topicId: null,
+      uploadId: upload.id,
+      versionId: null,
+    };
+    return {
+      detail: `场景/道具 · ${upload.originalName}`,
+      image: upload,
+      key: referenceKey(reference),
+      label: upload.originalName,
+      reference,
+      source: 'illustration',
+    };
+  });
+  const generated = (illustrationWorkspace.value?.topics ?? []).flatMap(topic =>
+    topic.versions.flatMap(version =>
+      version.status === 'completed'
+        ? version.images.map(image => {
+            const reference: IllustrationReference = {
+              fileName: image.fileName,
+              kind: 'illustration',
+              purpose: 'style',
+              source: 'generated',
+              topicId: topic.id,
+              uploadId: null,
+              versionId: version.id,
+            };
+            return {
+              detail: `风格 · ${topic.title} V${version.versionNumber}`,
+              image,
+              key: referenceKey(reference),
+              label: topic.title,
+              reference,
+              source: 'illustration',
+            };
+          })
+        : [],
+    ),
+  );
+  return [...characterOptions, ...uploaded, ...generated];
+});
+const selectedReferenceKeys = computed(() => {
+  const story = activeStory.value;
+  if (!story) return [];
+  const shot = referenceShotId.value
+    ? story.shots.find(item => item.id === referenceShotId.value)
+    : null;
+  return (shot?.references.length ? shot.references : story.references).map(referenceKey);
+});
+
+function referenceKey(reference: IllustrationReference): string {
+  return reference.kind === 'illustration'
+    ? `illustration:${reference.source}:${reference.uploadId ?? ''}:${reference.topicId ?? ''}:${reference.versionId ?? ''}:${reference.fileName}`
+    : `${reference.kind}:${reference.characterId}:${reference.taskId}:${reference.fileName}`;
+}
 
 const transport = new DefaultChatTransport<StoryAgentMessage>({
   api: STORY_AGENT_ENDPOINT,
@@ -117,6 +294,7 @@ const inputDisabled = computed(
   () =>
     isInitializing.value ||
     !activeStory.value ||
+    !activeStory.value.characterIds.length ||
     !chatProviderConfigured.value ||
     hasActiveGeneration.value ||
     isSavingConversation.value ||
@@ -274,29 +452,57 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   initializationError.value = '';
   try {
-    const [workspace, deepseek, minimax, apimart, anchors] = await Promise.all([
-      window.desktop.story.getStoryWorkspace(),
+    const [workspace, deepseek, minimax, apimart, library, illustration] = await Promise.all([
+      storyApi.getStoryWorkspace(),
       window.desktop.settings.getCredentialStatus('deepseek'),
       window.desktop.settings.getCredentialStatus('minimax'),
       window.desktop.settings.getCredentialStatus('apimart'),
-      characterAnchorApi.getWorkspace(),
+      window.desktop.character.library.getCharacterLibrary(),
+      window.desktop.illustration.getIllustrationWorkspace(),
     ]);
     stories.value = workspace.stories;
     deepseekStatus.value = deepseek;
     minimaxStatus.value = minimax;
     apimartStatus.value = apimart;
-    anchorWorkspace.value = anchors;
+    characters.value = library.characters;
+    illustrationWorkspace.value = illustration;
+    characterReferenceWorkspaces.value = await Promise.all(
+      library.characters.map(async (character: CharacterLibraryCharacter) => {
+        const [anchor, expression] = await Promise.all([
+          characterAnchorApi.getWorkspace({ characterId: character.id }),
+          window.desktop.character.expression.getCharacterExpressionWorkspace({
+            characterId: character.id,
+          }),
+        ]);
+        return {
+          anchor,
+          characterId: character.id,
+          characterName: character.name,
+          expression,
+        };
+      }),
+    );
 
     const requestedStoryId =
       typeof route.query.storyId === 'string' ? route.query.storyId : undefined;
+    if (route.query.create === '1') {
+      characterDialogMode.value = 'create';
+      characterDialogOpen.value = true;
+      return;
+    }
     let story = stories.value.find(item => item.id === requestedStoryId) ?? stories.value[0];
     if (!story) {
-      story = await window.desktop.story.createStory({});
-      stories.value = [story];
+      characterDialogMode.value = 'create';
+      characterDialogOpen.value = true;
+      return;
     }
     applyStory(story);
+    if (!story.characterIds.length) {
+      characterDialogMode.value = 'update';
+      characterDialogOpen.value = true;
+    }
     if (route.query.storyId !== story.id) {
-      await router.replace({ query: { ...route.query, storyId: story.id } });
+      await router.replace({ query: { storyId: story.id } });
     }
     for (const item of stories.value) {
       for (const version of item.shots.flatMap(shot => shot.versions)) {
@@ -325,8 +531,8 @@ async function persistFinishedConversation(): Promise<void> {
   }
   try {
     replaceStory(
-      await window.desktop.story.saveStoryConversation({
-        messages: cloneJsonData(messages.value),
+      await storyApi.saveStoryConversation({
+        messages: messages.value,
         storyId,
       }),
     );
@@ -357,17 +563,49 @@ async function retry(): Promise<void> {
   await regenerate({ body: { model: model.value, storyId: story.id } });
 }
 
-async function createStory(): Promise<void> {
+function createStory(): void {
   if (navigationBusy.value) {
     return;
   }
+  characterDialogMode.value = 'create';
+  characterDialogOpen.value = true;
+}
+
+function manageStoryCharacters(): void {
+  if (!activeStory.value || navigationBusy.value) return;
+  characterDialogMode.value = 'update';
+  characterDialogOpen.value = true;
+}
+
+function setCharacterDialogOpen(open: boolean): void {
+  characterDialogOpen.value = open;
+  if (!open && !activeStory.value) {
+    void router.replace('/stories');
+  }
+}
+
+async function confirmStoryCharacters(characterIds: string[]): Promise<void> {
+  if (isMutating.value) return;
+  isMutating.value = true;
   try {
-    const story = await window.desktop.story.createStory({});
-    replaceStory(story);
-    applyStory(story);
-    await router.replace({ query: { ...route.query, storyId: story.id } });
+    if (characterDialogMode.value === 'create') {
+      const story = await storyApi.createStory({ characterIds });
+      replaceStory(story);
+      applyStory(story);
+      await router.replace({ query: { storyId: story.id } });
+    } else if (activeStory.value) {
+      replaceStory(
+        await storyApi.updateStory({
+          characterIds,
+          storyId: activeStory.value.id,
+        }),
+      );
+    }
+    characterDialogOpen.value = false;
   } catch (createError: unknown) {
     toast.error(createError instanceof Error ? createError.message : String(createError));
+  } finally {
+    isMutating.value = false;
   }
 }
 
@@ -377,7 +615,7 @@ function selectStory(storyId: string): void {
     return;
   }
   applyStory(story);
-  void router.replace({ query: { ...route.query, storyId: story.id } });
+  void router.replace({ query: { storyId: story.id } });
 }
 
 async function updateProject(
@@ -395,7 +633,7 @@ async function updateProject(
   }
   isMutating.value = true;
   try {
-    replaceStory(await window.desktop.story.updateStory({ ...patch, storyId: story.id }));
+    replaceStory(await storyApi.updateStory({ ...patch, storyId: story.id }));
   } catch (updateError: unknown) {
     toast.error(updateError instanceof Error ? updateError.message : String(updateError));
   } finally {
@@ -421,14 +659,14 @@ async function saveShot(content: StoryShotContent): Promise<void> {
   isMutating.value = true;
   try {
     if (editorTarget.value) {
-      const result = await window.desktop.story.updateStoryShot({
+      const result = await storyApi.updateStoryShot({
         ...content,
         shotId: editorTarget.value.id,
         storyId: story.id,
       });
       replaceShot(result.shot, result.storyboardReady);
     } else {
-      replaceStory(await window.desktop.story.createStoryShot({ ...content, storyId: story.id }));
+      replaceStory(await storyApi.createStoryShot({ ...content, storyId: story.id }));
     }
     editorOpen.value = false;
   } catch (saveError: unknown) {
@@ -446,7 +684,7 @@ async function moveShot(payload: { direction: -1 | 1; shot: StoryShot }): Promis
   isMutating.value = true;
   try {
     replaceStory(
-      await window.desktop.story.moveStoryShot({
+      await storyApi.moveStoryShot({
         direction: payload.direction,
         shotId: payload.shot.id,
         storyId: story.id,
@@ -485,7 +723,7 @@ async function pollTask(taskId: string): Promise<void> {
     [taskId]: { phase: 'requesting' },
   };
   try {
-    const version = await window.desktop.story.getStoryShotTask(taskId);
+    const version = await storyApi.getStoryShotTask(taskId);
     const shot = replaceVersion(version);
     operationError.value = '';
     if (['submitted', 'pending', 'processing'].includes(version.status)) {
@@ -521,9 +759,10 @@ async function submitShotGeneration(shot: StoryShot): Promise<void> {
   submittingShotIds.value = [...submittingShotIds.value, shot.id];
   operationError.value = '';
   try {
-    const version = await window.desktop.story.generateStoryShot({
+    const version = await storyApi.generateStoryShot({
       baseVersion: baseReferences.value[shot.id] ?? null,
       prompt: shot.finalPrompt,
+      references: shot.references.length ? shot.references : story.references,
       shotId: shot.id,
       storyId: story.id,
     });
@@ -547,6 +786,37 @@ async function submitShotGeneration(shot: StoryShot): Promise<void> {
       generateError instanceof Error ? generateError.message : String(generateError);
   } finally {
     submittingShotIds.value = submittingShotIds.value.filter(id => id !== shot.id);
+  }
+}
+
+function openReferences(shot: StoryShot | null): void {
+  referenceShotId.value = shot?.id ?? null;
+  referenceDialogOpen.value = true;
+}
+
+async function confirmReferences(keys: string[]): Promise<void> {
+  const story = activeStory.value;
+  if (!story || isMutating.value) return;
+  const references = keys.flatMap(key => {
+    const option = referenceOptions.value.find(item => item.key === key);
+    return option ? [option.reference] : [];
+  });
+  isMutating.value = true;
+  try {
+    if (referenceShotId.value) {
+      const result = await storyApi.updateStoryShot({
+        references,
+        shotId: referenceShotId.value,
+        storyId: story.id,
+      });
+      replaceShot(result.shot, result.storyboardReady);
+    } else {
+      replaceStory(await storyApi.updateStory({ references, storyId: story.id }));
+    }
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    isMutating.value = false;
   }
 }
 
@@ -581,7 +851,7 @@ async function selectVersion(payload: {
   isMutating.value = true;
   try {
     replaceStory(
-      await window.desktop.story.selectStoryShotVersion({
+      await storyApi.selectStoryShotVersion({
         shotId: payload.shot.id,
         storyId: story.id,
         versionId: payload.version.id,
@@ -613,16 +883,20 @@ async function confirmDeleteStory(): Promise<void> {
   }
   isDeleting.value = true;
   try {
-    const workspace = await window.desktop.story.deleteStory({ storyId: story.id });
+    const workspace = await storyApi.deleteStory({ storyId: story.id });
     stories.value = workspace.stories;
     deleteStoryDialogOpen.value = false;
     let nextStory = stories.value[0];
     if (!nextStory) {
-      nextStory = await window.desktop.story.createStory({});
-      stories.value = [nextStory];
+      activeStoryId.value = '';
+      messages.value = [];
+      await router.replace({ query: {} });
+      characterDialogMode.value = 'create';
+      characterDialogOpen.value = true;
+      return;
     }
     applyStory(nextStory);
-    await router.replace({ query: { ...route.query, storyId: nextStory.id } });
+    await router.replace({ query: { storyId: nextStory.id } });
   } catch (deleteError: unknown) {
     toast.error(deleteError instanceof Error ? deleteError.message : String(deleteError));
   } finally {
@@ -638,9 +912,7 @@ async function confirmDeleteShot(): Promise<void> {
   }
   isDeleting.value = true;
   try {
-    replaceStory(
-      await window.desktop.story.deleteStoryShot({ shotId: shot.id, storyId: story.id }),
-    );
+    replaceStory(await storyApi.deleteStoryShot({ shotId: shot.id, storyId: story.id }));
     deleteShotTarget.value = null;
   } catch (deleteError: unknown) {
     toast.error(deleteError instanceof Error ? deleteError.message : String(deleteError));
@@ -658,7 +930,7 @@ async function confirmDeleteVersion(): Promise<void> {
   isDeleting.value = true;
   try {
     replaceStory(
-      await window.desktop.story.deleteStoryShotVersion({
+      await storyApi.deleteStoryShotVersion({
         shotId: target.shot.id,
         storyId: story.id,
         versionId: target.version.id,
@@ -717,11 +989,17 @@ onBeforeUnmount(() => {
 
     <div
       v-if="activeStory"
-      class="grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,4fr)_minmax(440px,3fr)]"
+      :class="[
+        'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
+        workspaceTab === 'storyboard'
+          ? 'lg:grid-cols-1'
+          : 'lg:grid-cols-[minmax(0,4fr)_minmax(440px,3fr)]',
+      ]"
     >
       <section
         :class="[
-          'min-h-0 min-w-0 flex-col overflow-hidden lg:flex',
+          'min-h-0 min-w-0 flex-col overflow-hidden',
+          workspaceTab === 'storyboard' ? 'lg:hidden' : 'lg:flex',
           mobilePane === 'chat' ? 'flex' : 'hidden',
         ]"
         aria-label="故事共创对话"
@@ -748,10 +1026,11 @@ onBeforeUnmount(() => {
           :apimart-configured="apimartConfigured"
           :assets-ready="assetsReady"
           :busy="navigationBusy"
-          :character-assets-ready="characterAssetsReady"
           :polling-states="pollingStates"
           :story="activeStory"
           :submitting-shot-ids="submittingShotIds"
+          :reference-options="referenceOptions"
+          :character-names="selectedCharacterNames"
           class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
           @add-shot="openAddShot"
           @confirm-storyboard="updateProject({ confirmStoryboard: true })"
@@ -762,6 +1041,8 @@ onBeforeUnmount(() => {
           @generate-remaining="generateRemaining"
           @generate-shot="submitShotGeneration"
           @manage-assets="manageAssets"
+          @manage-characters="manageStoryCharacters"
+          @open-references="openReferences"
           @move-shot="moveShot"
           @rename="updateProject({ title: $event })"
           @select-version="selectVersion"
@@ -772,6 +1053,29 @@ onBeforeUnmount(() => {
         />
       </aside>
     </div>
+
+    <ImageReferencePickerDialog
+      v-model:open="referenceDialogOpen"
+      :busy="isMutating"
+      description="选择角色锚点、表情、场景和风格素材；生成版本会保存这次选择。"
+      :filters="referenceFilters"
+      :max-selection="MAX_ILLUSTRATION_REFERENCE_IMAGES"
+      :options="referenceOptions"
+      :selected-keys="selectedReferenceKeys"
+      title="选择故事参考图"
+      @confirm="confirmReferences"
+    />
+
+    <StoryCharacterPickerDialog
+      :open="characterDialogOpen"
+      :busy="isMutating"
+      :characters="characters"
+      :mode="characterDialogMode"
+      :selected-ids="activeStory?.characterIds ?? []"
+      @confirm="confirmStoryCharacters"
+      @manage-characters="router.push('/character')"
+      @update:open="setCharacterDialogOpen"
+    />
 
     <StoryShotEditorDialog
       v-model:open="editorOpen"
