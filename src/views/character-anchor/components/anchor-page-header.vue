@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PersonStanding, Upload } from '@lucide/vue';
+import { PanelsTopLeft, PersonStanding, Upload } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -11,6 +11,7 @@ import {
 import type { CharacterLibraryCharacter } from '@/types';
 
 defineProps<{
+  actionPage: boolean;
   generatorOpen: boolean;
   characters: CharacterLibraryCharacter[];
   characterSelectionDisabled: boolean;
@@ -20,6 +21,7 @@ defineProps<{
 
 const emit = defineEmits<{
   (event: 'ai-create'): void;
+  (event: 'anchor-create'): void;
   (event: 'upload'): void;
   (event: 'update:selectedCharacterId', value: string): void;
 }>();
@@ -47,6 +49,18 @@ const emit = defineEmits<{
   </Button>
 
   <Button
+    v-if="!actionPage"
+    size="sm"
+    :variant="generatorOpen ? 'secondary' : 'default'"
+    :disabled="operationDisabled"
+    @click="emit('anchor-create')"
+  >
+    <PanelsTopLeft class="size-4" />
+    生成角色锚点
+  </Button>
+
+  <Button
+    v-if="actionPage"
     size="sm"
     :variant="generatorOpen ? 'secondary' : 'default'"
     :disabled="operationDisabled"

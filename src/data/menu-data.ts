@@ -6,6 +6,7 @@ import {
   ImagePlus,
   Images,
   Laugh,
+  PersonStanding,
   Sparkles,
   UsersRound,
 } from '@lucide/vue';
@@ -43,6 +44,12 @@ export const menuGroups: MenuGroup[] = [
         key: 'character-anchor',
         icon: Camera,
         path: '/character-anchor',
+      },
+      {
+        title: '角色动作',
+        key: 'character-action',
+        icon: PersonStanding,
+        path: '/character-action',
       },
       {
         title: '表情管理',

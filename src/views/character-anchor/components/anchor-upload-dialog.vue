@@ -24,13 +24,13 @@ const emit = defineEmits<{
 }>();
 
 const uploadKey = ref(0);
-const name = ref('角色锚点');
+const name = ref('标准参考图');
 const normalizedName = computed(() => name.value.trim());
 
 watch(open, value => {
   if (value) {
     uploadKey.value += 1;
-    name.value = '角色锚点';
+    name.value = '标准参考图';
   }
 });
 
@@ -57,7 +57,7 @@ function handleUploaded(result: SavedFileResult): void {
       <DialogHeader>
         <DialogTitle>上传角色锚点图片</DialogTitle>
         <DialogDescription>
-          填写图片名称后上传。上传完成后可按需要设为正式资产。
+          上传一张人物标准图，后续可从它生成角色转面图和其他身份锚点。
         </DialogDescription>
       </DialogHeader>
       <div class="space-y-2">
@@ -69,7 +69,7 @@ function handleUploaded(result: SavedFileResult): void {
           id="anchor-asset-name"
           v-model="name"
           maxlength="80"
-          placeholder="例如：基础形象、冬季造型、挥手动作"
+          placeholder="例如：标准参考图、冬季造型"
         />
       </div>
       <FileUpload

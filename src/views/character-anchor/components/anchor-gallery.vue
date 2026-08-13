@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { GenerationTaskPollingState } from '@/components/sag/generation-polling-status';
 import type {
+  CharacterAnchorBinding,
   CharacterAnchorRecord,
   CharacterAnchorSelection,
   CharacterVisualImage,
@@ -31,6 +32,7 @@ type GalleryEntry = GalleryImageEntry | GalleryTaskEntry;
 
 const props = defineProps<{
   deletingFileName: string;
+  anchorBindings: CharacterAnchorBinding[];
   officialAssets: CharacterAnchorSelection[];
   pollingState: GenerationTaskPollingState;
   records: CharacterAnchorRecord[];
@@ -46,6 +48,12 @@ const emit = defineEmits<{
     record: CharacterAnchorRecord,
     image: CharacterVisualImage,
     official: boolean,
+  ): void;
+  (
+    event: 'role',
+    record: CharacterAnchorRecord,
+    image: CharacterVisualImage,
+    role: CharacterAnchorBinding['role'],
   ): void;
   (event: 'rename', record: CharacterAnchorRecord, image: CharacterVisualImage): void;
 }>();
@@ -92,6 +100,14 @@ function isSelected(entry: GalleryEntry): boolean {
     asset => asset.taskId === entry.record.id && asset.fileName === entry.image?.fileName,
   );
 }
+
+function getAnchorRole(entry: GalleryImageEntry): CharacterAnchorBinding['role'] {
+  return (
+    props.anchorBindings.find(
+      binding => binding.taskId === entry.record.id && binding.fileName === entry.image.fileName,
+    )?.role ?? 'unassigned'
+  );
+}
 </script>
 
 <template>
@@ -117,6 +133,7 @@ function isSelected(entry: GalleryEntry): boolean {
           <AnchorImageCard
             v-else
             :deleting-file-name="deletingFileName"
+            :anchor-role="getAnchorRole(entry)"
             :image="entry.image"
             :image-index="entry.imageIndex"
             :is-selected="isSelected(entry)"
@@ -126,6 +143,7 @@ function isSelected(entry: GalleryEntry): boolean {
             @delete="emit('delete', entry.record, entry.image)"
             @edit="emit('edit', entry.record, entry.image)"
             @official="official => emit('official', entry.record, entry.image, official)"
+            @role="role => emit('role', entry.record, entry.image, role)"
             @rename="emit('rename', entry.record, entry.image)"
           />
         </article>

@@ -26,6 +26,9 @@ const currentKey = computed(() => {
   if (rootKey === 'character-visual' || rootKey === 'character-portrait') {
     return 'character-anchor';
   }
+  if (rootKey === 'character-action') {
+    return 'character-action';
+  }
   if (rootKey === 'character-expression') {
     return rootKey;
   }

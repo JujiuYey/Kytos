@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { AlertCircle, Camera } from '@lucide/vue';
+import { AlertCircle, Camera, PanelsTopLeft } from '@lucide/vue';
 import { toast } from 'vue-sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import { useAppStore } from '@/stores/app';
 import { useCharacterLibraryStore } from '@/stores/character-library';
 import type {
   CharacterAnchorRecord,
+  CharacterAnchorBinding,
   CharacterAnchorSelection,
   CharacterVisualImage,
   CharacterVisualResolution,
@@ -31,6 +32,8 @@ import { useCharacterAnchorUpload } from './composables/useCharacterAnchorUpload
 import { useCharacterAnchorRename } from './composables/useCharacterAnchorRename';
 import { useCharacterAnchorGenerator } from './composables/useCharacterAnchorGenerator';
 import CharacterActionGeneratorPanel from './components/character-action-generator-panel.vue';
+import CharacterAnchorGeneratorPanel from './components/character-anchor-generator-panel.vue';
+import type { GeneratedAnchorRole } from './components/character-anchor-generator-panel.vue';
 import AnchorGallery from './components/anchor-gallery.vue';
 import AnchorPageHeader from './components/anchor-page-header.vue';
 import AnchorAssetRenameDialog from './components/anchor-asset-rename-dialog.vue';
@@ -44,6 +47,14 @@ const appStore = useAppStore();
 const characterLibraryStore = useCharacterLibraryStore();
 const route = useRoute();
 const router = useRouter();
+const actionPage = computed(() => route.name === 'character-action');
+watch(actionPage, value => {
+  if (value) {
+    anchorGeneratorOpen.value = false;
+  } else {
+    closeGenerator();
+  }
+});
 
 // 角色选择
 const selectedCharacterId = ref('');
@@ -52,6 +63,7 @@ const characters = computed(() => characterLibraryStore.characters);
 // 角色锚点工作区
 const records = ref<CharacterAnchorRecord[]>([]);
 const officialAssets = ref<CharacterAnchorSelection[]>([]);
+const anchorBindings = ref<CharacterAnchorBinding[]>([]);
 const errorMessage = ref('');
 const isInitializing = ref(true);
 
@@ -59,8 +71,29 @@ const activeStatuses = ['submitted', 'pending', 'processing'];
 const activeRecord = computed(() =>
   records.value.find(record => activeStatuses.includes(record.status)),
 );
+const displayedRecords = computed(() =>
+  records.value.filter(record =>
+    actionPage.value ? record.generationMode === 'action' : record.generationMode !== 'action',
+  ),
+);
 const assetCount = computed(() =>
-  records.value.reduce((total, record) => total + record.images.length, 0),
+  displayedRecords.value.reduce((total, record) => total + record.images.length, 0),
+);
+const anchorRoleLabels = {
+  standard: '标准参考图',
+  turnaround: '角色转面图',
+  face: '脸部与发型',
+  'full-body': '全身与服装',
+  'three-quarter': '四分之三视角',
+  side: '侧面视角',
+  back: '背面视角',
+} as const;
+const anchorCoverage = computed(() =>
+  (Object.keys(anchorRoleLabels) as Array<keyof typeof anchorRoleLabels>).map(role => ({
+    label: anchorRoleLabels[role],
+    role,
+    filled: anchorBindings.value.some(binding => binding.role === role),
+  })),
 );
 
 // 参考资产
@@ -71,21 +104,40 @@ function referenceAssetKey(selection: CharacterAnchorSelection): string {
 }
 
 const referenceOptions = computed<ActionReferenceOption[]>(() =>
-  officialAssets.value.flatMap(selection => {
-    const record = records.value.find(item => item.id === selection.taskId);
-    const image = record?.images.find(item => item.fileName === selection.fileName);
-    if (!record || !image) return [];
-    return [
-      {
-        detail: `${record.source === 'uploaded' ? '已上传' : '已生成'} · 正式锚点`,
-        image,
-        key: referenceAssetKey(selection),
-        label: image.name || record.name || '角色锚点',
-        selection,
-        source: 'visual',
-      },
-    ];
-  }),
+  [...officialAssets.value]
+    .filter(selection => {
+      const record = records.value.find(item => item.id === selection.taskId);
+      return record?.generationMode !== 'action';
+    })
+    .sort((left, right) => {
+      const priority = (selection: CharacterAnchorSelection): number => {
+        const role = anchorBindings.value.find(
+          binding => binding.taskId === selection.taskId && binding.fileName === selection.fileName,
+        )?.role;
+        return role === 'full-body' ? 0 : role === 'face' ? 1 : role === 'three-quarter' ? 2 : 3;
+      };
+      return priority(left) - priority(right);
+    })
+    .flatMap(selection => {
+      const record = records.value.find(item => item.id === selection.taskId);
+      const image = record?.images.find(item => item.fileName === selection.fileName);
+      if (!record || !image) return [];
+      return [
+        {
+          detail: `${record.source === 'uploaded' ? '已上传' : '已生成'} · ${
+            anchorBindings.value.find(
+              binding =>
+                binding.taskId === selection.taskId && binding.fileName === selection.fileName,
+            )?.role ?? '未指定职责'
+          }`,
+          image,
+          key: referenceAssetKey(selection),
+          label: image.name || record.name || '角色锚点',
+          selection,
+          source: 'visual',
+        },
+      ];
+    }),
 );
 const selectedReferenceKeys = computed(() =>
   selectedReferenceAsset.value ? [referenceAssetKey(selectedReferenceAsset.value)] : [],
@@ -95,6 +147,17 @@ const selectedReferenceOptions = computed(() => {
   return selectedKey ? referenceOptions.value.filter(option => option.key === selectedKey) : [];
 });
 const hasOfficialReference = computed(() => referenceOptions.value.length > 0);
+const standardReference = computed(
+  () =>
+    referenceOptions.value.find(option =>
+      anchorBindings.value.some(
+        binding =>
+          binding.role === 'standard' &&
+          binding.taskId === option.selection.taskId &&
+          binding.fileName === option.selection.fileName,
+      ),
+    ) ?? referenceOptions.value[0],
+);
 
 function syncSelectedReference(preferred?: CharacterAnchorSelection | null): void {
   const availableKeys = new Set(referenceOptions.value.map(option => option.key));
@@ -162,11 +225,19 @@ async function pollAnchorTask(taskId: string): Promise<void> {
       schedulePoll(taskId);
       return;
     }
-    resetPollingState();
     if (record.status === 'completed') {
       toast.success(`“${record.name}”已生成并保存到角色锚点`);
+      await refreshAnchorWorkspace();
     } else {
       errorMessage.value = record.errorMessage || '角色锚点生成任务未完成';
+    }
+    const nextRecord = records.value.find(
+      item => item.id !== taskId && activeStatuses.includes(item.status),
+    );
+    if (nextRecord) {
+      schedulePoll(nextRecord.id);
+    } else {
+      resetPollingState();
     }
   } catch (pollError: unknown) {
     pollingState.value = { ...pollingState.value, phase: 'paused' };
@@ -190,6 +261,9 @@ const imageName = ref('挥手');
 const size = ref<CharacterVisualSize>('2:3');
 const resolution = ref<CharacterVisualResolution>('1k');
 const count = ref(2);
+const anchorGeneratorOpen = ref(false);
+const anchorResolution = ref<CharacterVisualResolution>('1k');
+const selectedAnchorRoles = ref<GeneratedAnchorRole[]>([]);
 const isSubmitting = ref(false);
 const isGeneratingPrompt = ref(false);
 
@@ -219,7 +293,10 @@ async function generateActions(): Promise<void> {
       action: action.value.trim(),
       count: count.value,
       name: imageName.value.trim(),
-      referenceAsset: { ...referenceAsset },
+      referenceAsset: {
+        fileName: referenceAsset.fileName,
+        taskId: referenceAsset.taskId,
+      },
       resolution: resolution.value,
       size: size.value,
     });
@@ -301,11 +378,115 @@ const isGenerateDisabled = computed(
     !action.value.trim() ||
     action.value.length > MAX_CHARACTER_ACTION_LENGTH,
 );
+const isAnchorGenerateDisabled = computed(
+  () =>
+    isInitializing.value ||
+    isBusy.value ||
+    !selectedCharacterId.value ||
+    !keyConfigured.value ||
+    !standardReference.value ||
+    selectedAnchorRoles.value.length === 0,
+);
+
+const generatedAnchorPresets: Record<
+  GeneratedAnchorRole,
+  { name: string; prompt: string; size: CharacterVisualSize }
+> = {
+  turnaround: {
+    name: '角色转面图',
+    prompt:
+      '基于标准参考图生成一张角色标准转面参考板：同一角色的正面全身、左侧三分之四视角、背面全身、右侧面部特写，四个视图整齐并列。严格保持脸部结构、五官、年龄感、发型、身体比例、服装、鞋子、配饰、线条和配色一致。白色纯净背景，无文字、无水印、无 Logo。',
+    size: '16:9',
+  },
+  face: {
+    name: '脸部与发型',
+    prompt:
+      '复制标准参考图中的角色身份，生成正面头肩特写。严格锁定脸型、五官比例、年龄感、肤色、发型轮廓、发色、耳部与头部配饰、服装领口、画风、线条和配色；使用中性表情和平视镜头，只展示头部与肩部。不得改变身份特征。白色纯净背景，无文字、无水印、无 Logo。',
+    size: '1:1',
+  },
+  'full-body': {
+    name: '全身与服装',
+    prompt:
+      '复制标准参考图中的角色身份，生成正面自然站立的完整全身设定图，从头顶到鞋底全部入镜。严格锁定脸部、年龄感、发型、身体比例、服装结构、鞋子、配饰、画风、线条和配色；双臂自然放松，不持有物品。白色纯净背景，无文字、无水印、无 Logo。',
+    size: '2:3',
+  },
+  'three-quarter': {
+    name: '四分之三视角',
+    prompt:
+      '复制标准参考图中的角色身份，生成左侧四分之三视角的完整全身设定图。严格锁定脸型、五官、年龄感、发型、身体比例、服装、鞋子、配饰、画风、线条和配色；只改变镜头视角，保持自然站立和中性表情。白色纯净背景，无文字、无水印、无 Logo。',
+    size: '2:3',
+  },
+  side: {
+    name: '侧面视角',
+    prompt:
+      '复制标准参考图中的角色身份，生成严格左侧面的完整全身设定图。锁定鼻梁、嘴唇、下颌、头骨、发型几何、年龄感、身体比例、服装、鞋子、配饰、画风、线条和配色；只改变视角，保持自然站立。白色纯净背景，无文字、无水印、无 Logo。',
+    size: '2:3',
+  },
+  back: {
+    name: '背面视角',
+    prompt:
+      '复制标准参考图中的角色身份，生成严格背面的完整全身设定图。准确延续后脑发型几何、发色、身体比例、服装背面结构、鞋子、配饰、画风、线条和配色；不出现正脸，不增加新设计。白色纯净背景，无文字、无水印、无 Logo。',
+    size: '2:3',
+  },
+};
+
+function getMissingAnchorRoles(): GeneratedAnchorRole[] {
+  return (Object.keys(generatedAnchorPresets) as GeneratedAnchorRole[]).filter(
+    role => !anchorBindings.value.some(binding => binding.role === role),
+  );
+}
 
 const { closeGenerator, generatorOpen, openGenerator } = useCharacterAnchorGenerator({
   disabled: operationDisabled,
   onOpen: refreshAnchorWorkspace,
 });
+
+function openAnchorGenerator(): void {
+  if (operationDisabled.value || actionPage.value) return;
+  closeGenerator();
+  selectedAnchorRoles.value = getMissingAnchorRoles();
+  anchorGeneratorOpen.value = true;
+}
+
+function closeAnchorGenerator(): void {
+  anchorGeneratorOpen.value = false;
+}
+
+async function generateAnchorBoard(): Promise<void> {
+  const reference = standardReference.value;
+  if (isAnchorGenerateDisabled.value || !reference) return;
+  const generatedRecords: CharacterAnchorRecord[] = [];
+  isSubmitting.value = true;
+  errorMessage.value = '';
+  try {
+    const referenceAsset = {
+      fileName: reference.selection.fileName,
+      taskId: reference.selection.taskId,
+    };
+    for (const role of selectedAnchorRoles.value) {
+      const preset = generatedAnchorPresets[role];
+      const record = await characterAnchorApi.generateReferenceBoard({
+        anchorRole: role,
+        name: preset.name,
+        prompt: preset.prompt,
+        referenceAssets: [referenceAsset],
+        resolution: anchorResolution.value,
+        size: preset.size,
+      });
+      generatedRecords.push(record);
+      records.value = replaceRecord(records.value, record);
+    }
+  } catch (error: unknown) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    isSubmitting.value = false;
+  }
+  const firstRecord = generatedRecords[0];
+  if (!firstRecord) return;
+  closeAnchorGenerator();
+  toast.success(`已提交 ${generatedRecords.length} 个角色锚点任务`);
+  await pollAnchorTask(firstRecord.id);
+}
 
 // 工作区加载
 function replaceRecord<TRecord extends CharacterAnchorRecord>(
@@ -322,6 +503,7 @@ function applyWorkspace(
   preferredReference?: CharacterAnchorSelection | null,
 ): void {
   officialAssets.value = workspace.officialAssets;
+  anchorBindings.value = workspace.anchorBindings;
   records.value = workspace.records;
   syncSelectedReference(preferredReference);
 }
@@ -354,6 +536,7 @@ async function loadCharacterWorkspace(characterId: string): Promise<void> {
   errorMessage.value = '';
   records.value = [];
   officialAssets.value = [];
+  anchorBindings.value = [];
   selectedReferenceAsset.value = null;
   try {
     const anchorWorkspace = await characterAnchorApi.getWorkspace({
@@ -431,6 +614,29 @@ async function selectAsset(
     toast.success(official ? '已设为正式资产' : '已移出正式资产');
   } catch (selectionError: unknown) {
     toast.error(selectionError instanceof Error ? selectionError.message : String(selectionError));
+  } finally {
+    selectingFileName.value = '';
+  }
+}
+
+async function setAnchorRole(
+  record: CharacterAnchorRecord,
+  image: CharacterVisualImage,
+  role: CharacterAnchorBinding['role'],
+): Promise<void> {
+  if (selectingFileName.value || deletingFileName.value) return;
+  selectingFileName.value = image.fileName;
+  try {
+    const workspace = await characterAnchorApi.setOfficial({
+      fileName: image.fileName,
+      official: true,
+      role,
+      taskId: record.id,
+    });
+    applyWorkspace(workspace);
+    toast.success('身份锚点职责已更新');
+  } catch (error: unknown) {
+    toast.error(error instanceof Error ? error.message : String(error));
   } finally {
     selectingFileName.value = '';
   }
@@ -547,7 +753,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <SagPage title="角色锚点资产" description="基于正式锚点生成和管理角色动作" :icon="Camera">
+  <SagPage
+    :title="actionPage ? '角色动作' : '角色锚点'"
+    :description="
+      actionPage ? '基于正式角色锚点生成和管理动作资产' : '从标准参考图生成可复用的角色身份锚点'
+    "
+    :icon="actionPage ? Camera : PanelsTopLeft"
+  >
     <template #header-leading>
       <Badge variant="secondary" class="shrink-0 tabular-nums">{{ assetCount }}</Badge>
     </template>
@@ -555,24 +767,61 @@ onBeforeUnmount(() => {
     <template #header-actions>
       <AnchorPageHeader
         :characters="characters"
+        :action-page="actionPage"
         :character-selection-disabled="characterSelectionDisabled"
         :generator-open="generatorOpen"
         :operation-disabled="operationDisabled"
         :selected-character-id="selectedCharacterId"
         @ai-create="openGenerator"
+        @anchor-create="openAnchorGenerator"
         @upload="openUpload"
         @update:selected-character-id="selectCharacter"
       />
     </template>
 
+    <section
+      v-if="!actionPage"
+      class="mx-4 mt-3 shrink-0 rounded-md border bg-background px-4 py-3 sm:mx-5"
+      aria-label="核心锚点覆盖"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="text-sm font-medium">核心身份锚点</h2>
+          <p class="mt-1 text-xs text-muted-foreground">
+            正式图片可以指定唯一职责；动作和表情不会自动改写身份锚点。
+          </p>
+        </div>
+        <span class="text-xs tabular-nums text-muted-foreground">
+          {{ anchorCoverage.filter(item => item.filled).length }} /
+          {{ anchorCoverage.length }} 已覆盖
+        </span>
+      </div>
+      <div class="mt-3 grid grid-cols-2 gap-2 md:grid-cols-7">
+        <div
+          v-for="item in anchorCoverage"
+          :key="item.role"
+          class="flex items-center gap-2 rounded-sm border px-2.5 py-2 text-xs"
+          :class="
+            item.filled ? 'border-primary/30 bg-primary/5' : 'border-dashed text-muted-foreground'
+          "
+        >
+          <span
+            class="size-1.5 rounded-full"
+            :class="item.filled ? 'bg-primary' : 'bg-muted-foreground/40'"
+          />
+          {{ item.label }}
+        </div>
+      </div>
+    </section>
+
     <Alert
-      v-if="!isInitializing && !hasOfficialReference"
+      v-if="actionPage && !isInitializing && !hasOfficialReference"
       class="mx-4 mt-3 w-auto shrink-0 sm:mx-5"
     >
       <AlertCircle class="size-4" />
       <AlertTitle>生成动作需要正式角色锚点</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>请先上传角色图片，或将图库中的一张图片设为正式资产。</span>
+        <span>请先在角色锚点中上传标准参考图，或将锚点参考板设为正式资产。</span>
         <Button size="sm" variant="outline" @click="openUpload">上传角色锚点</Button>
       </AlertDescription>
     </Alert>
@@ -588,7 +837,7 @@ onBeforeUnmount(() => {
 
     <Alert v-if="errorMessage" variant="destructive" class="mx-4 mt-3 w-auto shrink-0 sm:mx-5">
       <AlertCircle class="size-4" />
-      <AlertTitle>角色动作生成暂时中断</AlertTitle>
+      <AlertTitle>{{ actionPage ? '角色动作' : '角色锚点' }}生成暂时中断</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
         <span>{{ errorMessage }}</span>
         <Button v-if="activeRecord && !isPolling" size="sm" variant="outline" @click="retryPolling">
@@ -600,25 +849,45 @@ onBeforeUnmount(() => {
     <div
       :class="[
         'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
-        generatorOpen && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
+        (generatorOpen || anchorGeneratorOpen) && 'lg:grid-cols-[minmax(0,5fr)_minmax(340px,2fr)]',
       ]"
     >
       <div class="flex min-h-0 min-w-0 lg:flex">
         <AnchorGallery
           :deleting-file-name="deletingFileName"
+          :anchor-bindings="anchorBindings"
           :official-assets="officialAssets"
           :polling-state="pollingState"
-          :records="records"
+          :records="displayedRecords"
           :renaming-file-name="renamingFileName"
           :selecting-file-name="selectingFileName"
           class="min-h-0 min-w-0 flex-1"
           @delete="requestDelete"
           @edit="editImage"
           @official="selectAsset"
+          @role="setAnchorRole"
           @rename="requestRename"
         />
       </div>
-      <div v-if="generatorOpen" class="flex min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5">
+      <div v-if="anchorGeneratorOpen" class="flex min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5">
+        <CharacterAnchorGeneratorPanel
+          :busy="isSubmitting"
+          :disabled="isAnchorGenerateDisabled"
+          :filled-roles="anchorBindings.map(binding => binding.role)"
+          :reference="standardReference"
+          :resolution="anchorResolution"
+          :selected-roles="selectedAnchorRoles"
+          class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-background shadow-sm"
+          @close="closeAnchorGenerator"
+          @generate="generateAnchorBoard"
+          @update:resolution="anchorResolution = $event"
+          @update:selected-roles="selectedAnchorRoles = $event"
+        />
+      </div>
+      <div
+        v-else-if="actionPage && generatorOpen"
+        class="flex min-h-0 min-w-0 p-3 sm:p-4 lg:flex lg:p-5"
+      >
         <CharacterActionGeneratorPanel
           v-model:action="action"
           v-model:count="count"

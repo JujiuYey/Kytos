@@ -5,16 +5,24 @@ import { Check, Clock3, Crop, Pencil, Trash2 } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ImageViewer } from '@/components/sag/image-viewer';
 import { SagStatusBadge } from '@/components/sag/status-badge';
-import type { CharacterAnchorRecord, CharacterVisualImage } from '@/types';
+import type { CharacterAnchorBinding, CharacterAnchorRecord, CharacterVisualImage } from '@/types';
 
 const props = defineProps<{
   deletingFileName: string;
   image: CharacterVisualImage;
   imageIndex: number;
   isSelected: boolean;
+  anchorRole: CharacterAnchorBinding['role'];
   record: CharacterAnchorRecord;
   renamingFileName: string;
   selectingFileName: string;
@@ -24,6 +32,7 @@ const emit = defineEmits<{
   (event: 'delete'): void;
   (event: 'edit'): void;
   (event: 'official', official: boolean): void;
+  (event: 'role', role: CharacterAnchorBinding['role']): void;
   (event: 'rename'): void;
 }>();
 
@@ -49,6 +58,16 @@ const isDeleteDisabled = computed(
   () => props.isSelected || Boolean(props.deletingFileName) || Boolean(props.selectingFileName),
 );
 const isOfficialSaving = computed(() => props.selectingFileName === props.image.fileName);
+const anchorRoleOptions = [
+  { label: '不指定职责', value: 'unassigned' },
+  { label: '标准参考图', value: 'standard' },
+  { label: '角色转面图', value: 'turnaround' },
+  { label: '脸部与发型', value: 'face' },
+  { label: '全身与服装', value: 'full-body' },
+  { label: '四分之三视角', value: 'three-quarter' },
+  { label: '侧面视角', value: 'side' },
+  { label: '背面视角', value: 'back' },
+] as const;
 
 function getAspectClass(size: CharacterAnchorRecord['size']): string {
   return aspectClasses[size];
@@ -173,6 +192,24 @@ function formatDate(value: string): string {
           </Tooltip>
         </TooltipProvider>
       </div>
+    </div>
+
+    <div v-if="props.isSelected" class="space-y-1.5">
+      <p class="text-xs text-muted-foreground">身份锚点职责</p>
+      <Select
+        :model-value="props.anchorRole"
+        :disabled="isOfficialToggleDisabled"
+        @update:model-value="emit('role', String($event) as CharacterAnchorBinding['role'])"
+      >
+        <SelectTrigger class="h-8 w-full text-xs" aria-label="选择身份锚点职责">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem v-for="option in anchorRoleOptions" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   </div>
 </template>
