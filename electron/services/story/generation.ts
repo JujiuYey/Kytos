@@ -47,6 +47,14 @@ function buildPrompt(story: StoryProject, shot: StoryShot, prompt: string): stri
 
 function buildReferenceInstructions(references: IllustrationReference[]): string[] {
   const instructions: string[] = [];
+  const styleReferenceCount = references.filter(reference => reference.purpose === 'style').length;
+  if (styleReferenceCount) {
+    instructions.push(
+      `参考图列表最前面的 ${styleReferenceCount} 张是故事风格基准。它们是媒介、线条、笔触、色彩范围、明暗方式、背景处理和整体美学的最高优先级依据。`,
+      '必须复现风格基准的视觉语言；不得擅自改成写实摄影、影视动画、3D 渲染、厚涂或高饱和全彩风格。',
+      '角色锚点、动作、表情、内容参考、上一镜连续性画面和修改底图都不能覆盖风格基准。发生冲突时始终以风格基准为准。',
+    );
+  }
   if (references.some(reference => reference.kind === 'character-action')) {
     instructions.push('角色动作参考图只用于锁定姿势、肢体关系和动作节奏。');
   }
@@ -54,6 +62,24 @@ function buildReferenceInstructions(references: IllustrationReference[]): string
     instructions.push('角色表情参考图只用于锁定眉眼、视线、嘴型和面部情绪。');
   }
   return instructions;
+}
+
+function referenceKey(reference: IllustrationReference): string {
+  return reference.kind === 'illustration'
+    ? `illustration:${reference.source}:${reference.uploadId ?? ''}:${reference.topicId ?? ''}:${reference.versionId ?? ''}:${reference.fileName}`
+    : `${reference.kind}:${reference.characterId}:${reference.taskId}:${reference.fileName}`;
+}
+
+function sortReferences(references: IllustrationReference[]): IllustrationReference[] {
+  const priority = (reference: IllustrationReference): number => {
+    if (reference.purpose === 'style') return 0;
+    if (reference.kind === 'character-anchor') return 1;
+    if (reference.kind === 'character-expression' || reference.kind === 'character-action') {
+      return 2;
+    }
+    return 3;
+  };
+  return [...references].sort((left, right) => priority(left) - priority(right));
 }
 
 function getSelectedVersionReference(shot: StoryShot): StoryVersionReference | null {
@@ -119,9 +145,29 @@ export async function generateStoryShot(
     throw new Error('这个分镜已有图片正在生成');
   }
 
-  const requestedReferences = parseReferences(
+  const parsedSelectedReferences = parseReferences(
     request.references ?? (shot.references.length ? shot.references : story.references),
   );
+  const storyStyleReferences = story.references.filter(reference => reference.purpose === 'style');
+  if (storyStyleReferences.length !== 1) {
+    throw new Error('请先在故事默认参考中设置且只保留一张“风格基准”图片');
+  }
+  const storyStyleReference = storyStyleReferences[0];
+  const selectedReferences = parsedSelectedReferences.map(reference =>
+    reference.purpose === 'style' &&
+    storyStyleReference &&
+    referenceKey(reference) !== referenceKey(storyStyleReference)
+      ? { ...reference, purpose: 'content' as const }
+      : reference,
+  );
+  const requestedReferences = [
+    ...new Map(
+      [...selectedReferences, ...storyStyleReferences].map(reference => [
+        referenceKey(reference),
+        reference,
+      ]),
+    ).values(),
+  ];
   if (!story.characterIds.length) {
     throw new Error('请先为故事选择参演角色');
   }
@@ -163,14 +209,14 @@ export async function generateStoryShot(
       taskId: reference.selection.taskId,
     }));
   });
-  const references: IllustrationReference[] = [
+  const references: IllustrationReference[] = sortReferences([
     ...new Map(
       [...automaticCharacterReferences, ...requestedReferences].map(reference => [
-        JSON.stringify(reference),
+        referenceKey(reference),
         reference,
       ]),
     ).values(),
-  ];
+  ]);
   if (references.length > MAX_ILLUSTRATION_REFERENCE_IMAGES) {
     throw new Error(`故事参考图最多 ${MAX_ILLUSTRATION_REFERENCE_IMAGES} 张`);
   }

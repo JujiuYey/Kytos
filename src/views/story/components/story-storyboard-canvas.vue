@@ -73,6 +73,7 @@ const emit = defineEmits<{
   (event: 'manage-assets'): void;
   (event: 'move-shot', payload: { direction: -1 | 1; shot: StoryShot }): void;
   (event: 'open-references', shot: StoryShot): void;
+  (event: 'open-story-references'): void;
   (event: 'select-version', payload: { shot: StoryShot; version: StoryShotVersion }): void;
   (event: 'set-base', payload: { reference: StoryVersionReference; shot: StoryShot }): void;
   (event: 'set-key-shot', shot: StoryShot): void;
@@ -89,16 +90,37 @@ const activeShot = computed(
 const activeIndex = computed(() =>
   activeShot.value ? props.story.shots.findIndex(shot => shot.id === activeShot.value?.id) : -1,
 );
-const activeReferences = computed(() =>
-  activeShot.value?.references.length ? activeShot.value.references : props.story.references,
+const storyStyleReferences = computed(() =>
+  props.story.references.filter(reference => reference.purpose === 'style'),
 );
+const styleReferenceReady = computed(() => storyStyleReferences.value.length === 1);
+const activeReferences = computed(() => {
+  const selected = activeShot.value?.references.length
+    ? activeShot.value.references
+    : props.story.references;
+  return [
+    ...new Map(
+      [...selected, ...storyStyleReferences.value].map(reference => [
+        referenceKey(reference),
+        reference,
+      ]),
+    ).values(),
+  ];
+});
 const referenceOptionMap = computed(
   () => new Map(props.referenceOptions.map(option => [referenceKey(option.reference), option])),
 );
 const referencePreviews = computed(() =>
   activeReferences.value.flatMap(reference => {
     const option = referenceOptionMap.value.get(referenceKey(reference));
-    return option ? [option] : [];
+    if (!option) return [];
+    const purposeLabel =
+      reference.purpose === 'style'
+        ? '风格基准'
+        : reference.purpose === 'character'
+          ? '角色参考'
+          : '内容参考';
+    return [{ ...option, detail: `${purposeLabel} · ${option.detail}` }];
   }),
 );
 const previousShot = computed(() =>
@@ -133,6 +155,7 @@ const canGenerateRemaining = computed(
   () =>
     props.apimartConfigured &&
     props.assetsReady &&
+    styleReferenceReady.value &&
     props.story.storyboardReady &&
     !props.story.storyboardStale &&
     keyShotSelected.value &&
@@ -148,6 +171,7 @@ const canGenerate = computed(() => {
   return (
     props.apimartConfigured &&
     props.assetsReady &&
+    styleReferenceReady.value &&
     props.story.storyboardReady &&
     !props.story.storyboardStale &&
     Boolean(draftPrompt.value.trim()) &&
@@ -508,6 +532,15 @@ function setBase(version: StoryShotVersion): void {
             @update:resolution="emit('update:resolution', $event)"
             @update:size="emit('update:size', $event as IllustrationSize)"
           />
+          <Button
+            v-if="!styleReferenceReady"
+            class="w-full"
+            size="sm"
+            variant="outline"
+            @click="emit('open-story-references')"
+          >
+            <Images class="size-4" />设置故事风格基准
+          </Button>
           <Button
             v-if="!assetsReady"
             class="w-full"

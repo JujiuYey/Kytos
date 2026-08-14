@@ -12,29 +12,45 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { IllustrationReferencePurpose } from '@/types';
 import type { ImageReferencePickerFilter, ImageReferencePickerOption } from './types';
 
 const props = withDefaults(
   defineProps<{
     busy: boolean;
+    closeOnConfirm?: boolean;
     description: string;
     emptyDescription?: string;
     filters: ImageReferencePickerFilter[];
     maxSelection: number;
     open: boolean;
     options: ImageReferencePickerOption[];
+    purposeByKey?: Record<string, IllustrationReferencePurpose>;
+    allowPurposeSelection?: boolean;
     selectedKeys: string[];
     title: string;
   }>(),
   {
     emptyDescription: '当前分类中还没有已完成的图片。',
+    allowPurposeSelection: false,
+    closeOnConfirm: true,
+    purposeByKey: () => ({}),
   },
 );
 
 const emit = defineEmits<{
   (event: 'confirm', keys: string[]): void;
+  (event: 'purpose-change', payload: { key: string; purpose: IllustrationReferencePurpose }): void;
+  (event: 'selection-change', keys: string[]): void;
   (event: 'update:open', value: boolean): void;
 }>();
 
@@ -53,12 +69,23 @@ function sourceCount(source: string): number {
 function toggleOption(option: ImageReferencePickerOption): void {
   if (draftKeys.value.includes(option.key)) {
     draftKeys.value = draftKeys.value.filter(key => key !== option.key);
+    emit('selection-change', draftKeys.value);
     return;
   }
   if (draftKeys.value.length >= props.maxSelection) {
     return;
   }
   draftKeys.value = [...draftKeys.value, option.key];
+  emit('selection-change', draftKeys.value);
+}
+
+function optionPurpose(option: ImageReferencePickerOption): IllustrationReferencePurpose {
+  return props.purposeByKey[option.key] ?? option.purpose ?? 'content';
+}
+
+function updatePurpose(option: ImageReferencePickerOption, purpose: string): void {
+  if (purpose !== 'style' && purpose !== 'content' && purpose !== 'character') return;
+  emit('purpose-change', { key: option.key, purpose });
 }
 
 function confirmSelection(): void {
@@ -67,7 +94,7 @@ function confirmSelection(): void {
     'confirm',
     draftKeys.value.filter(key => availableKeys.has(key)).slice(0, props.maxSelection),
   );
-  emit('update:open', false);
+  if (props.closeOnConfirm) emit('update:open', false);
 }
 
 watch(
@@ -138,9 +165,34 @@ watch(
               >
                 <Check class="size-3.5" />
               </span>
+              <Badge
+                v-if="
+                  allowPurposeSelection &&
+                  draftKeys.includes(option.key) &&
+                  optionPurpose(option) === 'style'
+                "
+                class="absolute left-2 top-2"
+              >
+                风格基准
+              </Badge>
             </Button>
             <h3 class="mt-2 truncate text-sm font-medium">{{ option.label }}</h3>
             <p class="mt-0.5 truncate text-xs text-muted-foreground">{{ option.detail }}</p>
+            <Select
+              v-if="allowPurposeSelection && draftKeys.includes(option.key)"
+              :model-value="optionPurpose(option)"
+              :disabled="option.source !== 'illustration'"
+              @update:model-value="updatePurpose(option, String($event))"
+            >
+              <SelectTrigger class="mt-2 h-7 text-[11px]" aria-label="选择参考职责">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="style">风格基准</SelectItem>
+                <SelectItem value="content">内容参考</SelectItem>
+                <SelectItem value="character" disabled>角色参考</SelectItem>
+              </SelectContent>
+            </Select>
           </article>
         </div>
 

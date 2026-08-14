@@ -71,6 +71,9 @@ const finalShotCount = computed(() =>
     ? 0
     : props.story.shots.filter(shot => shot.selectedVersionId && !shot.imageStale).length,
 );
+const styleReferenceCount = computed(
+  () => props.story.references.filter(reference => reference.purpose === 'style').length,
+);
 const structureLocked = computed(
   () =>
     props.busy ||
@@ -158,12 +161,16 @@ function handleTitleChange(event: Event): void {
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <h3 id="story-reference-heading" class="text-sm font-medium">故事默认参考</h3>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    新镜头默认继承；可在分镜画布里单独覆盖。
-                  </p>
+                  <p class="mt-1 text-xs text-muted-foreground">风格基准与默认内容参考</p>
                 </div>
-                <SagStatusBadge :tone="story.references.length ? 'success' : 'info'">
-                  {{ story.references.length ? `${story.references.length} 张` : '使用角色锚点' }}
+                <SagStatusBadge :tone="styleReferenceCount === 1 ? 'success' : 'warning'">
+                  {{
+                    styleReferenceCount === 1
+                      ? '风格基准已设置'
+                      : styleReferenceCount
+                        ? '只保留 1 张风格基准'
+                        : '未设置风格基准'
+                  }}
                 </SagStatusBadge>
               </div>
               <Button
@@ -173,7 +180,7 @@ function handleTitleChange(event: Event): void {
                 @click="emit('open-references', null)"
               >
                 <Images class="size-4" />
-                {{ story.references.length ? '管理默认参考' : '添加默认参考' }}
+                {{ story.references.length ? '管理风格与默认参考' : '设置风格基准' }}
               </Button>
             </section>
 
@@ -262,6 +269,7 @@ function handleTitleChange(event: Event): void {
           @manage-assets="emit('manage-assets')"
           @move-shot="emit('move-shot', $event)"
           @open-references="emit('open-references', $event)"
+          @open-story-references="emit('open-references', null)"
           @select-version="emit('select-version', $event)"
           @set-base="emit('set-base', $event)"
           @set-key-shot="emit('set-key-shot', $event)"

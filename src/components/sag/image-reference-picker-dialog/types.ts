@@ -1,4 +1,5 @@
 import type { CharacterVisualImage } from '@/types';
+import type { IllustrationReferencePurpose } from '@/types';
 
 export interface ImageReferencePickerFilter {
   label: string;
@@ -10,5 +11,6 @@ export interface ImageReferencePickerOption {
   image: CharacterVisualImage;
   key: string;
   label: string;
+  purpose?: IllustrationReferencePurpose;
   source: string;
 }

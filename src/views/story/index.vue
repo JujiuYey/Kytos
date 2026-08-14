@@ -26,6 +26,7 @@ import type {
   CredentialStatus,
   IllustrationSize,
   IllustrationReference,
+  IllustrationReferencePurpose,
   IllustrationWorkspaceState,
   StoryAgentMessage,
   StoryDraftUpdateResult,
@@ -86,6 +87,7 @@ const submittingShotIds = ref<string[]>([]);
 const baseReferences = ref<Record<string, StoryVersionReference | null>>({});
 const referenceDialogOpen = ref(false);
 const referenceShotId = ref<string | null>(null);
+const referencePurposeByKey = ref<Record<string, IllustrationReferencePurpose>>({});
 const characterDialogOpen = ref(false);
 const characterDialogMode = ref<'create' | 'update'>('create');
 const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -119,9 +121,16 @@ const selectedCharacterNames = computed(() => {
 const characterAssetsReady = computed(
   () =>
     selectedCharacterWorkspaces.value.length > 0 &&
-    selectedCharacterWorkspaces.value.every(
-      workspace => workspace.anchor.officialAssets.length > 0,
-    ),
+    selectedCharacterWorkspaces.value.every(workspace => {
+      const actionRecordIds = new Set(
+        workspace.anchor.records
+          .filter(record => record.generationMode === 'action')
+          .map(record => record.id),
+      );
+      return workspace.anchor.officialAssets.some(
+        selection => !actionRecordIds.has(selection.taskId),
+      );
+    }),
 );
 const assetsReady = computed(() => characterAssetsReady.value);
 const referenceFilters: ImageReferencePickerFilter[] = [
@@ -149,6 +158,7 @@ const referenceOptions = computed<StoryReferenceOption[]>(() => {
           image,
           key: referenceKey(reference),
           label: image.name || record.name,
+          purpose: reference.purpose,
           reference,
           source: 'character-anchor',
         },
@@ -170,6 +180,7 @@ const referenceOptions = computed<StoryReferenceOption[]>(() => {
             image,
             key: referenceKey(reference),
             label: record.images.length > 1 ? `${record.name} ${index + 1}` : record.name,
+            purpose: reference.purpose,
             reference,
             source: 'character-action',
           };
@@ -189,6 +200,7 @@ const referenceOptions = computed<StoryReferenceOption[]>(() => {
           image,
           key: referenceKey(reference),
           label: record.images.length > 1 ? `${record.name} ${index + 1}` : record.name,
+          purpose: reference.purpose,
           reference,
           source: 'character-expression',
         };
@@ -207,10 +219,11 @@ const referenceOptions = computed<StoryReferenceOption[]>(() => {
       versionId: null,
     };
     return {
-      detail: `场景/道具 · ${upload.originalName}`,
+      detail: `上传图片 · ${upload.originalName}`,
       image: upload,
       key: referenceKey(reference),
       label: upload.originalName,
+      purpose: reference.purpose,
       reference,
       source: 'illustration',
     };
@@ -222,17 +235,18 @@ const referenceOptions = computed<StoryReferenceOption[]>(() => {
             const reference: IllustrationReference = {
               fileName: image.fileName,
               kind: 'illustration',
-              purpose: 'style',
+              purpose: 'content',
               source: 'generated',
               topicId: topic.id,
               uploadId: null,
               versionId: version.id,
             };
             return {
-              detail: `风格 · ${topic.title} V${version.versionNumber}`,
+              detail: `已有创作 · ${topic.title} V${version.versionNumber}`,
               image,
               key: referenceKey(reference),
               label: topic.title,
+              purpose: reference.purpose,
               reference,
               source: 'illustration',
             };
@@ -791,16 +805,90 @@ async function submitShotGeneration(shot: StoryShot): Promise<void> {
 
 function openReferences(shot: StoryShot | null): void {
   referenceShotId.value = shot?.id ?? null;
+  const currentReferences = shot?.references.length
+    ? shot.references
+    : (activeStory.value?.references ?? []);
+  referencePurposeByKey.value = Object.fromEntries(
+    currentReferences.map(reference => [
+      referenceKey(reference),
+      reference.purpose ?? (reference.kind === 'illustration' ? 'content' : 'character'),
+    ]),
+  );
+  if (!shot) assignOnlyIllustrationAsStyle(currentReferences.map(referenceKey));
   referenceDialogOpen.value = true;
+}
+
+function assignOnlyIllustrationAsStyle(keys: string[]): void {
+  if (referenceShotId.value) return;
+  const selectedOptions = keys.flatMap(key => {
+    const option = referenceOptions.value.find(item => item.key === key);
+    return option ? [option] : [];
+  });
+  const illustrationOptions = selectedOptions.filter(
+    option => option.reference.kind === 'illustration',
+  );
+  const hasStyle = selectedOptions.some(
+    option => (referencePurposeByKey.value[option.key] ?? option.reference.purpose) === 'style',
+  );
+  if (illustrationOptions.length !== 1 || hasStyle) return;
+  const styleOption = illustrationOptions[0];
+  if (!styleOption) return;
+  referencePurposeByKey.value = {
+    ...referencePurposeByKey.value,
+    [styleOption.key]: 'style',
+  };
+}
+
+function updateReferencePurpose(payload: {
+  key: string;
+  purpose: IllustrationReferencePurpose;
+}): void {
+  const nextPurposes = { ...referencePurposeByKey.value };
+  if (payload.purpose === 'style') {
+    Object.entries(nextPurposes).forEach(([key, purpose]) => {
+      if (key !== payload.key && purpose === 'style') nextPurposes[key] = 'content';
+    });
+  }
+  nextPurposes[payload.key] = payload.purpose;
+  referencePurposeByKey.value = nextPurposes;
 }
 
 async function confirmReferences(keys: string[]): Promise<void> {
   const story = activeStory.value;
   if (!story || isMutating.value) return;
-  const references = keys.flatMap(key => {
+  assignOnlyIllustrationAsStyle(keys);
+  let references = keys.flatMap(key => {
     const option = referenceOptions.value.find(item => item.key === key);
-    return option ? [option.reference] : [];
+    if (!option) return [];
+    const purpose =
+      referencePurposeByKey.value[key] ??
+      option.reference.purpose ??
+      (option.reference.kind === 'illustration' ? 'content' : 'character');
+    return [
+      {
+        ...option.reference,
+        purpose: referenceShotId.value && purpose === 'style' ? 'content' : purpose,
+      },
+    ];
   });
+  const illustrationReferences = references.filter(reference => reference.kind === 'illustration');
+  if (
+    !referenceShotId.value &&
+    illustrationReferences.length === 1 &&
+    !references.some(reference => reference.purpose === 'style')
+  ) {
+    const onlyIllustration = illustrationReferences[0];
+    references = references.map(reference =>
+      reference === onlyIllustration ? { ...reference, purpose: 'style' as const } : reference,
+    );
+  }
+  if (
+    !referenceShotId.value &&
+    references.filter(reference => reference.purpose === 'style').length !== 1
+  ) {
+    toast.error('故事默认参考必须设置且只保留一张风格基准');
+    return;
+  }
   isMutating.value = true;
   try {
     if (referenceShotId.value) {
@@ -813,6 +901,7 @@ async function confirmReferences(keys: string[]): Promise<void> {
     } else {
       replaceStory(await storyApi.updateStory({ references, storyId: story.id }));
     }
+    referenceDialogOpen.value = false;
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : String(error));
   } finally {
@@ -1057,13 +1146,18 @@ onBeforeUnmount(() => {
     <ImageReferencePickerDialog
       v-model:open="referenceDialogOpen"
       :busy="isMutating"
-      description="选择角色锚点、表情、场景和风格素材；生成版本会保存这次选择。"
+      :close-on-confirm="false"
+      description="选择参考图，并将其中一张上传或创作图片设为风格基准。"
       :filters="referenceFilters"
       :max-selection="MAX_ILLUSTRATION_REFERENCE_IMAGES"
       :options="referenceOptions"
+      :allow-purpose-selection="referenceShotId === null"
+      :purpose-by-key="referencePurposeByKey"
       :selected-keys="selectedReferenceKeys"
       title="选择故事参考图"
       @confirm="confirmReferences"
+      @purpose-change="updateReferencePurpose"
+      @selection-change="assignOnlyIllustrationAsStyle"
     />
 
     <StoryCharacterPickerDialog
