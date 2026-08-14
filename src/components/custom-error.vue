@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button';
+
 defineProps<{
   code: number;
   subtitle: string;
@@ -21,12 +23,8 @@ defineProps<{
     <footer class="mt-8">
       <slot>
         <div class="flex justify-center gap-2">
-          <Button variant="outline" @click="$router.back()">
-            返回上一页
-          </Button>
-          <Button @click="$router.push('/')">
-            返回首页
-          </Button>
+          <Button variant="outline" @click="$router.back()"> 返回上一页 </Button>
+          <Button @click="$router.push('/')"> 返回首页 </Button>
         </div>
       </slot>
     </footer>

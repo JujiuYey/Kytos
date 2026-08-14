@@ -39,6 +39,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '角色锚点' },
       },
       {
+        path: '/character-action',
+        name: 'character-action',
+        component: () => import('@/views/character-action/index.vue'),
+        meta: { title: '角色动作' },
+      },
+      {
         path: '/character-expression',
         name: 'character-expression',
         component: () => import('@/views/character-expression/index.vue'),

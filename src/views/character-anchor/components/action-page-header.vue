@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PanelsTopLeft, Upload } from '@lucide/vue';
+import { PersonStanding, Upload } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -19,7 +19,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: 'anchor-create'): void;
+  (event: 'ai-create'): void;
   (event: 'upload'): void;
   (event: 'update:selectedCharacterId', value: string): void;
 }>();
@@ -50,9 +50,9 @@ const emit = defineEmits<{
     size="sm"
     :variant="generatorOpen ? 'secondary' : 'default'"
     :disabled="operationDisabled"
-    @click="emit('anchor-create')"
+    @click="emit('ai-create')"
   >
-    <PanelsTopLeft class="size-4" />
-    生成角色锚点
+    <PersonStanding class="size-4" />
+    生成动作
   </Button>
 </template>
