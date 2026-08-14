@@ -7,6 +7,8 @@ export const DEFAULT_DEEPSEEK_MODEL: DeepSeekModel = 'deepseek-v4-pro';
 export const MINIMAX_MODELS = ['MiniMax-M3'] as const;
 export type MiniMaxModel = (typeof MINIMAX_MODELS)[number];
 
+export const DEFAULT_MINIMAX_MODEL: MiniMaxModel = 'MiniMax-M3';
+
 export const CHAT_MODELS = [...DEEPSEEK_MODELS, ...MINIMAX_MODELS] as const;
 export type ChatModel = (typeof CHAT_MODELS)[number];
 export type ChatModelProvider = 'deepseek' | 'minimax';
@@ -39,7 +41,7 @@ export const CHAT_MODEL_DEFINITIONS: Record<ChatModel, ChatModelDefinition> = {
   },
 };
 
-export const DEFAULT_CHAT_MODEL: ChatModel = DEFAULT_DEEPSEEK_MODEL;
+export const DEFAULT_CHAT_MODEL: ChatModel = DEFAULT_MINIMAX_MODEL;
 
 export function isDeepSeekModel(value: unknown): value is DeepSeekModel {
   return typeof value === 'string' && DEEPSEEK_MODELS.includes(value as DeepSeekModel);
