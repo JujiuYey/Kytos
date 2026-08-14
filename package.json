@@ -2,7 +2,7 @@
   "name": "kytos",
   "private": true,
   "version": "0.1.0",
-  "description": "Desktop workspace for collaborative character creation",
+  "description": "Local-first image-IP workspace for individual creators (MIT)",
   "main": ".vite/build/main.js",
   "scripts": {
     "dev": "electron-forge start",

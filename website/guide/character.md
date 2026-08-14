@@ -17,7 +17,7 @@ description: 从角色创建到正式锚点、动作和表情管理。
 
 上传的图片会直接保存为角色的正式锚点资产。
 
-![创建角色页面](../../docs/screenshots/02-character-create.png)
+![创建角色页面](../public/docs/screenshots/02-character-create.png)
 
 ## 管理多个角色
 
@@ -30,7 +30,7 @@ description: 从角色创建到正式锚点、动作和表情管理。
 
 移除角色时，角色会从管理列表中删除。为了避免破坏旧作品，已经生成的图片文件会保留在工作区。
 
-![角色管理页面](../../docs/screenshots/03-character-library.png)
+![角色管理页面](../public/docs/screenshots/03-character-library.png)
 
 ## 管理正式锚点
 
@@ -44,7 +44,7 @@ description: 从角色创建到正式锚点、动作和表情管理。
 
 正式资产是后续创作的优先角色参考。准备插画参考图时，Kytos 会从正式锚点中提供可选素材。
 
-![角色锚点与表情页面](../../docs/screenshots/04-character-assets.png)
+![角色锚点与表情页面](../public/docs/screenshots/04-character-assets.png)
 
 ::: tip 正式资产是一条明确边界
 不是每张生成结果都会自动代表角色。先挑选并设为正式资产，再把它用于后续插画，可以减少角色外观漂移。

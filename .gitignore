@@ -13,6 +13,7 @@ dist-ssr
 .vite
 website/.vitepress/cache
 website/.vitepress/dist
+website/public/docs/screenshots
 out
 *.local
 

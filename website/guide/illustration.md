@@ -18,7 +18,7 @@ description: 使用角色参考和版本管理完成插画创作。
 
 通用模型负责共创对话，生图模型负责最终图片任务。两者可能依赖不同厂商的 API Key。
 
-![插画创作页面](../../docs/screenshots/05-illustration-create.png)
+![插画创作页面](../public/docs/screenshots/05-illustration-create.png)
 
 ## 组合参考素材
 
@@ -48,7 +48,7 @@ description: 使用角色参考和版本管理完成插画创作。
 
 “插画管理”用于集中查看工作区内的插画资源，包括生成结果和手动上传内容。这里适合执行上传、浏览、整理和删除操作；具体主题的对话与版本演进仍在“插画创作”中完成。
 
-![插画管理页面](../../docs/screenshots/06-illustration-library.png)
+![插画管理页面](../public/docs/screenshots/06-illustration-library.png)
 
 ## 画布工作流 Beta
 

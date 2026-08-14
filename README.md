@@ -1,12 +1,16 @@
 # Kytos
 
-Kytos 是一个本地优先的 AI 角色与视觉内容创作工作台。
+为个人创作者打造的形象 IP 创作工作台，统一管理角色锚点、持续生图、组织故事分镜。
 
-它把角色资料、角色锚点、动作与表情资产、插画和故事分镜放进同一个桌面工作区。你可以使用已有角色图片建立角色，再让这些经过确认的素材持续参与后续创作。作品数据留在你选择的本地目录，模型凭据由操作系统安全存储保护。
+围绕一个或多个「形象 IP」展开创作：上传已有锚点，把它沉淀为正式角色资产；用同一组锚点持续做插画和故事分镜，保持角色一致性。所有素材与生成记录留在你选择的本地目录，模型凭据由 Electron 安全存储加密。MIT 协议开源，本地优先。
 
 [完整文档](https://jujiuyey.github.io/Kytos/) · [快速开始](https://jujiuyey.github.io/Kytos/getting-started/) · [开发架构](https://jujiuyey.github.io/Kytos/developer/architecture)
 
 > 项目状态：持续开发中。界面、数据结构和 AI 工作流可能继续调整。
+
+## 下载
+
+最新版本 [v0.1.0（Pre-release）](https://github.com/JujiuYey/Kytos/releases/latest)，仅提供 macOS Apple Silicon 构建。下载 `.zip` 后解压，将 `Kytos.app` 拖入 `/Applications`，首次启动需在「系统设置 → 隐私与安全性 → 仍要打开」放行（应用未签名）。
 
 ## 产品工作流
 
@@ -20,7 +24,7 @@ Kytos 的核心不是一次性生成一张图片，而是让素材在一个工�
 
 ## 功能
 
-### 角色资产
+### 沉淀形象 IP
 
 - 创建角色：填写角色名称并上传已有角色锚点。
 - 角色管理：创建、选择、重命名和删除角色。
@@ -34,17 +38,20 @@ Kytos 的核心不是一次性生成一张图片，而是让素材在一个工�
 
 ![角色锚点与表情页面](docs/screenshots/04-character-assets.png)
 
-### 内容创作
+### 一致性生图
 
 - 插画创作：通过 AI 共创对话整理主题，选择参考图，生成并管理插画版本。
 - 插画创作 Beta：体验基于节点画布的实验性插画流程。
 - 插画管理：集中查看、上传、删除和整理插画资产。
-- 故事管理：创建、打开、搜索和删除故事项目。
-- 故事创作：整理故事、编排分镜，生成并选择镜头画面版本。
 
 ![插画创作页面](docs/screenshots/05-illustration-create.png)
 
 ![插画管理页面](docs/screenshots/06-illustration-library.png)
+
+### 故事与作品流
+
+- 故事管理：创建、打开、搜索和删除故事项目。
+- 故事创作：整理故事、编排分镜，生成并选择镜头画面版本。
 
 ![故事创作页面](docs/screenshots/07-story-create.png)
 

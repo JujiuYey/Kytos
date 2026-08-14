@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BookMarked,
   Code2,
+  Download,
   HardDrive,
   Images,
   Sparkles,
@@ -15,22 +16,22 @@ import storyImage from '../../../../docs/screenshots/07-story-create.png';
 
 const capabilities = [
   {
-    description: '从已有角色锚点开始，整理正式资产、动作图和表情，让后续创作有稳定的角色参考。',
+    description: '从一组角色锚点开始，整理正式资产、动作图与表情，让后续创作有稳定的角色参考。',
     href: '/Kytos/guide/character',
     icon: UsersRound,
-    title: '整理角色资产',
+    title: '沉淀形象 IP',
   },
   {
-    description: '组合角色锚点、表情和已有插画作为参考，通过对话整理主题并管理多个版本。',
+    description: '把同一角色在不同场景中持续生图，让角色可识别、可复用。',
     href: '/Kytos/guide/illustration',
     icon: Images,
-    title: '创作插画',
+    title: '一致性生图',
   },
   {
-    description: '从故事草稿推进到分镜，逐镜头维护内容、画面版本和连续性。',
+    description: '把多个角色组织成分镜，逐步累积到一份完整作品。',
     href: '/Kytos/guide/story',
     icon: BookMarked,
-    title: '编排故事',
+    title: '故事与作品流',
   },
 ];
 </script>
@@ -46,15 +47,26 @@ const capabilities = [
       </div>
       <div class="kytos-hero-shade" aria-hidden="true" />
       <div class="kytos-hero-content">
-        <p class="kytos-eyebrow"><Sparkles aria-hidden="true" /> 本地优先的视觉创作工作台</p>
+        <p class="kytos-eyebrow">
+          <Sparkles aria-hidden="true" /> 形象 IP 创作工作台 · MIT 开源 · 本地优先
+        </p>
         <h1 id="kytos-home-title">Kytos</h1>
         <p class="kytos-hero-copy">
-          把角色资产、插画与故事分镜放进同一个桌面工作区，让参考素材、生成版本与作品文件留在你的设备上。
+          为个人创作者维护一张可复用的角色资产表：以同一组形象锚点持续做插画、故事分镜和作品积累，所有素材与生成记录留在你的设备上。
         </p>
         <div class="kytos-hero-actions">
           <a class="kytos-action kytos-action-primary" href="/Kytos/getting-started/">
             开始使用
             <ArrowRight aria-hidden="true" />
+          </a>
+          <a
+            class="kytos-action kytos-action-secondary"
+            href="https://github.com/JujiuYey/Kytos/releases/latest"
+            rel="noreferrer"
+            target="_blank"
+          >
+            <Download aria-hidden="true" />
+            下载 v0.1.0
           </a>
           <a
             class="kytos-action kytos-action-secondary"
@@ -94,6 +106,33 @@ const capabilities = [
         </div>
         <ArrowRight class="kytos-capability-arrow" aria-hidden="true" />
       </a>
+    </section>
+
+    <section class="kytos-why" aria-labelledby="kytos-why-title">
+      <header class="kytos-why-heading">
+        <p class="kytos-section-label">为什么用 Kytos</p>
+        <h2 id="kytos-why-title">不让"角色一致性"卡在脑内。</h2>
+      </header>
+      <div class="kytos-why-grid">
+        <article class="kytos-why-col kytos-why-pain">
+          <h3>散装方案的痛</h3>
+          <ul>
+            <li>角色设定写在文档或脑内，生图时手动复制粘贴</li>
+            <li>参考图、生成记录、作品分布在多个工具之间</li>
+            <li>同一个角色十次出图，十个长相，全靠记忆对齐</li>
+            <li>版权敏感的 IP 资产不便放心放在云上</li>
+          </ul>
+        </article>
+        <article class="kytos-why-col kytos-why-fix">
+          <h3>Kytos 的做法</h3>
+          <ul>
+            <li>形象锚点、表情、动作挂在角色本身，AI 出图自动引用</li>
+            <li>参考素材、生成版本、作品统一在本地工作区</li>
+            <li>同一组锚点持续生图，角色长相、风格、调性自然一致</li>
+            <li>作品与 API Key 留在你的设备上，MIT 协议开源</li>
+          </ul>
+        </article>
+      </div>
     </section>
 
     <section class="kytos-local" aria-labelledby="kytos-local-title">

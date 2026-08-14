@@ -317,6 +317,70 @@ html {
   padding: 48px clamp(24px, 5vw, 72px);
 }
 
+.kytos-why {
+  border-top: 1px solid var(--vp-c-divider);
+  padding: 88px clamp(0px, 5vw, 72px);
+}
+
+.kytos-why-heading {
+  margin-bottom: 48px;
+  max-width: 760px;
+}
+
+.kytos-why-heading h2 {
+  color: var(--vp-c-text-1);
+  font-size: 32px;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.kytos-why-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.kytos-why-col {
+  background: var(--vp-c-bg-alt);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  padding: 28px 32px;
+}
+
+.kytos-why-col h3 {
+  color: var(--vp-c-text-1);
+  font-size: 17px;
+  font-weight: 650;
+  margin: 0 0 18px;
+}
+
+.kytos-why-col ul {
+  color: var(--vp-c-text-2);
+  font-size: 15px;
+  line-height: 1.8;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kytos-why-col li {
+  padding: 5px 0 5px 18px;
+  position: relative;
+}
+
+.kytos-why-col li::before {
+  color: var(--vp-c-text-3);
+  content: '·';
+  font-weight: 700;
+  left: 4px;
+  position: absolute;
+  top: 4px;
+}
+
+.kytos-why-fix {
+  border-color: var(--vp-c-brand-1);
+}
+
 .kytos-local-heading {
   align-items: flex-start;
   display: flex;
@@ -428,6 +492,18 @@ html {
     gap: 16px;
     grid-template-columns: 28px minmax(0, 1fr) 18px;
     padding: 28px 8px;
+  }
+
+  .kytos-why {
+    padding: 56px 8px;
+  }
+
+  .kytos-why-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kytos-why-heading h2 {
+    font-size: 26px;
   }
 
   .kytos-local {

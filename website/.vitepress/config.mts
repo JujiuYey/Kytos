@@ -46,7 +46,7 @@ export default defineConfig({
     nav: [
       { link: '/getting-started/', text: '快速开始' },
       { link: '/guide/character', text: '使用指南' },
-      { link: '/developer/architecture', text: '开发' },
+      { link: '/developer/development', text: '开发指南' },
     ],
     outline: {
       label: '本页内容',
@@ -99,10 +99,13 @@ export default defineConfig({
       },
       {
         items: [
-          { link: '/developer/architecture', text: '项目架构' },
           { link: '/developer/development', text: '本地开发' },
+          { link: '/developer/architecture', text: '项目架构' },
+          { link: '/developer/database', text: '数据库与迁移' },
+          { link: '/developer/ai-models', text: 'AI 与模型集成' },
+          { link: '/developer/release', text: '构建与发布' },
         ],
-        text: '开发者',
+        text: '开发指南',
       },
     ],
     sidebarMenuLabel: '文档导航',

@@ -1,7 +1,7 @@
 ---
 layout: page
 title: Kytos
-description: 把角色资产、插画和故事分镜放进同一个本地工作区
+description: 为个人创作者打造的形象 IP 工作台，统一管理角色资产、持续创作一致性的插画与故事分镜。MIT 协议，本地优先。
 sidebar: false
 aside: false
 outline: false
