@@ -9,6 +9,10 @@ import {
   Sparkles,
   UsersRound,
 } from '@lucide/vue';
+import characterCreate from '../../../images/screenshots/02-character-create.png';
+import characterAssets from '../../../images/screenshots/04-character-assets.png';
+import illustrationCreate from '../../../images/screenshots/05-illustration-create.png';
+import storyCreate from '../../../images/screenshots/07-story-create.png';
 
 const capabilities = [
   {
@@ -32,10 +36,10 @@ const capabilities = [
 ];
 
 const screenshots = {
-  characterCreate: '/Kytos/docs/screenshots/02-character-create.png',
-  characterAssets: '/Kytos/docs/screenshots/04-character-assets.png',
-  illustration: '/Kytos/docs/screenshots/05-illustration-create.png',
-  story: '/Kytos/docs/screenshots/07-story-create.png',
+  characterCreate,
+  characterAssets,
+  illustration: illustrationCreate,
+  story: storyCreate,
 };
 </script>
 
