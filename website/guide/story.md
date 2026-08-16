@@ -7,7 +7,7 @@ description: 管理故事草稿、分镜内容和画面版本。
 
 故事功能把文本共创、结构化草稿、分镜顺序和镜头画面版本组织在同一个项目中。
 
-![故事创作页面](/docs/screenshots/07-story-create.png)
+![故事创作页面](../images/screenshots/07-story-create.png)
 
 ## 创建故事项目
 
