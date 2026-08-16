@@ -9,10 +9,6 @@ import {
   Sparkles,
   UsersRound,
 } from '@lucide/vue';
-import characterCreateImage from '../../../../docs/screenshots/02-character-create.png';
-import characterAssetsImage from '../../../../docs/screenshots/04-character-assets.png';
-import illustrationImage from '../../../../docs/screenshots/05-illustration-create.png';
-import storyImage from '../../../../docs/screenshots/07-story-create.png';
 
 const capabilities = [
   {
@@ -34,16 +30,23 @@ const capabilities = [
     title: '故事与作品流',
   },
 ];
+
+const screenshots = {
+  characterCreate: '/Kytos/docs/screenshots/02-character-create.png',
+  characterAssets: '/Kytos/docs/screenshots/04-character-assets.png',
+  illustration: '/Kytos/docs/screenshots/05-illustration-create.png',
+  story: '/Kytos/docs/screenshots/07-story-create.png',
+};
 </script>
 
 <template>
   <main class="kytos-home">
     <section class="kytos-hero" aria-labelledby="kytos-home-title">
       <div class="kytos-hero-gallery" aria-label="Kytos 角色、插画与故事工作区">
-        <img :src="characterCreateImage" alt="创建角色页面" />
-        <img :src="characterAssetsImage" alt="角色锚点与表情页面" />
-        <img :src="illustrationImage" alt="插画创作页面" />
-        <img :src="storyImage" alt="故事创作页面" />
+        <img :src="screenshots.characterCreate" alt="创建角色页面" />
+        <img :src="screenshots.characterAssets" alt="角色锚点与表情页面" />
+        <img :src="screenshots.illustration" alt="插画创作页面" />
+        <img :src="screenshots.story" alt="故事创作页面" />
       </div>
       <div class="kytos-hero-shade" aria-hidden="true" />
       <div class="kytos-hero-content">
