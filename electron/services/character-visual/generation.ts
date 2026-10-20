@@ -1,7 +1,6 @@
 // 角色视觉的生成操作：动作、参考板、聊天模型提示词、任务轮询
 import { generateText } from 'ai';
 import { isPlainObject } from 'es-toolkit';
-import { getChatModelDefinition } from '../../../shared/chat-model';
 import type {
   CharacterVisualAssetRecord,
   CharacterVisualAssetSelection,
@@ -293,7 +292,8 @@ export async function generateCharacterActionPrompt(
     throw new Error('请先填写有效的动作名称');
   }
   const model = resolveChatModel(request.model);
-  const apiKey = await getCredentialValue(getChatModelDefinition(model).provider);
+  // 聊天模型现统一走 DeepSeek
+  const apiKey = await getCredentialValue('deepseek');
   const providerOptions = getChatProviderOptions(model);
   const { text } = await generateText({
     maxOutputTokens: 600,

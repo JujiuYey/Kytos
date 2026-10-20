@@ -47,7 +47,6 @@ export interface UseCharacterWorkspace {
   credentialStatus: Ref<CredentialStatus | null>;
   keyConfigured: ComputedRef<boolean>;
   deepseekStatus: Ref<CredentialStatus | null>;
-  minimaxStatus: Ref<CredentialStatus | null>;
   selectedReferenceAsset: Ref<CharacterAnchorSelection | null>;
   referenceOptions: ComputedRef<CharacterWorkspaceReferenceOption[]>;
   selectedReferenceKeys: ComputedRef<string[]>;
@@ -127,7 +126,6 @@ export function useCharacterWorkspace(
 
   const credentialStatus = ref<CredentialStatus | null>(null);
   const deepseekStatus = ref<CredentialStatus | null>(null);
-  const minimaxStatus = ref<CredentialStatus | null>(null);
   const keyConfigured = computed(() => Boolean(credentialStatus.value?.configured));
 
   const selectedReferenceAsset = ref<CharacterAnchorSelection | null>(null);
@@ -369,14 +367,12 @@ export function useCharacterWorkspace(
     errorMessage.value = '';
     try {
       await characterLibraryStore.initialize();
-      const [status, deepseek, minimax] = await Promise.all([
+      const [status, deepseek] = await Promise.all([
         window.desktop.settings.getCredentialStatus('apimart'),
         window.desktop.settings.getCredentialStatus('deepseek'),
-        window.desktop.settings.getCredentialStatus('minimax'),
       ]);
       credentialStatus.value = status;
       deepseekStatus.value = deepseek;
-      minimaxStatus.value = minimax;
       const requestedCharacterId =
         typeof route.query.characterId === 'string' ? route.query.characterId : '';
       const initialCharacterId =
@@ -553,7 +549,6 @@ export function useCharacterWorkspace(
     credentialStatus,
     keyConfigured,
     deepseekStatus,
-    minimaxStatus,
     selectedReferenceAsset,
     referenceOptions,
     selectedReferenceKeys,

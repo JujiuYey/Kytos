@@ -19,7 +19,7 @@ import type {
   CharacterVisualResolution,
   CharacterVisualSize,
 } from '@/types';
-import { getChatModelDefinition, MAX_CHARACTER_ACTION_LENGTH } from '@/types';
+import { MAX_CHARACTER_ACTION_LENGTH } from '@/types';
 import { useCharacterAnchorGenerator } from '../character-anchor/composables/useCharacterAnchorGenerator';
 import { useCharacterWorkspace } from '../character-anchor/composables/useCharacterWorkspace';
 import AnchorGallery from '../character-anchor/components/anchor-gallery.vue';
@@ -56,7 +56,6 @@ const {
   isInitializing,
   isPolling,
   keyConfigured,
-  minimaxStatus,
   officialAssets,
   openUpload,
   operationDisabled,
@@ -104,14 +103,7 @@ const { closeGenerator, generatorOpen, openGenerator } = useCharacterAnchorGener
   },
 });
 
-const fastModelProvider = computed(
-  () => getChatModelDefinition(appStore.settings.fastModel).provider,
-);
-const promptGenerationAvailable = computed(() =>
-  fastModelProvider.value === 'minimax'
-    ? Boolean(minimaxStatus.value?.configured)
-    : Boolean(deepseekStatus.value?.configured),
-);
+const promptGenerationAvailable = computed(() => Boolean(deepseekStatus.value?.configured));
 
 const actionRecords = computed<CharacterAnchorRecord[]>(() =>
   records.value.filter(record => record.generationMode === 'action'),

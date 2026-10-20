@@ -25,7 +25,7 @@ import type {
   CharacterVisualResolution,
   CharacterAnchorWorkspaceState,
 } from '@/types';
-import { getChatModelDefinition, MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
+import { MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES } from '@/types';
 import ExpressionEmptyState from './components/expression-empty-state.vue';
 import ExpressionGeneratorPanel from './components/expression-generator-panel.vue';
 import ExpressionPageHeader from './components/expression-page-header.vue';
@@ -53,7 +53,6 @@ const { referenceDialogOpen, openReferenceDialog } = useReferenceDialog();
 const {
   apimartConfigured,
   deepseekConfigured,
-  minimaxConfigured,
   refresh: refreshCredentialStatus,
 } = useCredentialStatus();
 
@@ -237,12 +236,7 @@ const count = ref(1);
 const isSubmitting = ref(false);
 const isGeneratingPrompt = ref(false);
 const keyConfigured = apimartConfigured;
-const fastModelProvider = computed(
-  () => getChatModelDefinition(appStore.settings.fastModel).provider,
-);
-const promptGenerationAvailable = computed(() =>
-  fastModelProvider.value === 'minimax' ? minimaxConfigured.value : deepseekConfigured.value,
-);
+const promptGenerationAvailable = computed(() => deepseekConfigured.value);
 const isBusy = computed(() => isSubmitting.value || Boolean(activeTask.value));
 const isGenerateDisabled = computed(
   () =>

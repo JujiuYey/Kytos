@@ -83,7 +83,6 @@ const transientChatReferences = ref<IllustrationReference[]>([]);
 const {
   apimartConfigured,
   deepseekConfigured,
-  minimaxConfigured,
   refresh: refreshCredentialStatus,
 } = useCredentialStatus();
 
@@ -121,10 +120,7 @@ const { pollingStates, schedulePoll } = useGenerationPolling<IllustrationVersion
 });
 
 const model = computed(() => appStore.settings.generalModel);
-const chatProvider = computed(() => getChatModelDefinition(model.value).provider);
-const chatProviderConfigured = computed(() =>
-  chatProvider.value === 'minimax' ? minimaxConfigured.value : deepseekConfigured.value,
-);
+const chatProviderConfigured = computed(() => deepseekConfigured.value);
 const supportsImageInput = computed(() => getChatModelDefinition(model.value).supportsImageInput);
 const activeTopic = computed(
   () => topics.value.find(topic => topic.id === activeTopicId.value) ?? null,
@@ -930,7 +926,7 @@ onMounted(() => {
         <IllustrationChatInput
           :adjustment-base="adjustmentBasePreview"
           :disabled="inputDisabled"
-          :provider-name="chatProvider === 'minimax' ? 'MiniMax' : 'DeepSeek'"
+          provider-name="DeepSeek"
           :references="referencePreviews"
           :supports-image-input="supportsImageInput"
           :status="chatStatus"

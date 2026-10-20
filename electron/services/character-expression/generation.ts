@@ -1,7 +1,6 @@
 // 角色表情的生成操作：生成表情 / 任务轮询 / 聊天模型提示词
 import { generateText } from 'ai';
 import { z } from 'zod';
-import { getChatModelDefinition } from '../../../shared/chat-model';
 import {
   CHARACTER_EXPRESSION_SIZES,
   MAX_CHARACTER_EXPRESSION_REFERENCE_IMAGES,
@@ -226,7 +225,8 @@ export async function generateCharacterExpressionPrompt(
 ): Promise<string> {
   const { name } = parseRequest(request, generatePromptRequestSchema);
   const model = resolveChatModel(request.model);
-  const apiKey = await getCredentialValue(getChatModelDefinition(model).provider);
+  // 聊天模型现统一走 DeepSeek
+  const apiKey = await getCredentialValue('deepseek');
   const providerOptions = getChatProviderOptions(model);
   const { text } = await generateText({
     maxOutputTokens: 600,

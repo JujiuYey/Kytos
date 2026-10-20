@@ -1,9 +1,5 @@
 import { createAgentUIStreamResponse } from 'ai';
-import {
-  DEFAULT_CHAT_MODEL,
-  getChatModelDefinition,
-  isChatModel,
-} from '../../../shared/chat-model';
+import { DEFAULT_CHAT_MODEL, isChatModel } from '../../../shared/chat-model';
 import type { ChatModel } from '../../../shared/chat-model';
 import { getCredentialValue } from '../../services/credentials';
 import { getStory } from '../../services/story';
@@ -69,7 +65,8 @@ export async function handleStoryAgentRequest(request: Request): Promise<Respons
     const body = parseRequestBody(await request.json());
     const model = body.model ?? DEFAULT_CHAT_MODEL;
     const [apiKey, story, library] = await Promise.all([
-      getCredentialValue(getChatModelDefinition(model).provider),
+      // 聊天模型现统一走 DeepSeek
+      getCredentialValue('deepseek'),
       getStory(body.storyId),
       getCharacterLibrary(),
     ]);

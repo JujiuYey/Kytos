@@ -137,7 +137,8 @@ export async function handleIllustrationAgentRequest(request: Request): Promise<
     const model = body.model ?? DEFAULT_CHAT_MODEL;
     const modelDefinition = getChatModelDefinition(model);
     const [apiKey, topic] = await Promise.all([
-      getCredentialValue(modelDefinition.provider),
+      // 聊天模型现统一走 DeepSeek
+      getCredentialValue('deepseek'),
       getIllustrationTopic(body.topicId),
     ]);
     const revisionBase = body.revisionBase

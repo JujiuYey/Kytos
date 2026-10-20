@@ -65,7 +65,6 @@ const router = useRouter();
 const stories = ref<StoryProject[]>([]);
 const activeStoryId = ref('');
 const deepseekStatus = ref<CredentialStatus | null>(null);
-const minimaxStatus = ref<CredentialStatus | null>(null);
 const apimartStatus = ref<CredentialStatus | null>(null);
 const characters = ref<CharacterLibraryCharacter[]>([]);
 const characterReferenceWorkspaces = ref<CharacterReferenceWorkspace[]>([]);
@@ -95,12 +94,7 @@ const pollingStates = ref<GenerationPollingStateMap>({});
 let disposed = false;
 
 const model = computed(() => appStore.settings.generalModel);
-const chatProvider = computed(() => getChatModelDefinition(model.value).provider);
-const chatProviderConfigured = computed(() =>
-  chatProvider.value === 'minimax'
-    ? Boolean(minimaxStatus.value?.configured)
-    : Boolean(deepseekStatus.value?.configured),
-);
+const chatProviderConfigured = computed(() => Boolean(deepseekStatus.value?.configured));
 const supportsImageInput = computed(() => getChatModelDefinition(model.value).supportsImageInput);
 const activeStory = computed(
   () => stories.value.find(story => story.id === activeStoryId.value) ?? null,
@@ -466,17 +460,15 @@ async function initialize(): Promise<void> {
   isInitializing.value = true;
   initializationError.value = '';
   try {
-    const [workspace, deepseek, minimax, apimart, library, illustration] = await Promise.all([
+    const [workspace, deepseek, apimart, library, illustration] = await Promise.all([
       storyApi.getStoryWorkspace(),
       window.desktop.settings.getCredentialStatus('deepseek'),
-      window.desktop.settings.getCredentialStatus('minimax'),
       window.desktop.settings.getCredentialStatus('apimart'),
       window.desktop.character.library.getCharacterLibrary(),
       window.desktop.illustration.getIllustrationWorkspace(),
     ]);
     stories.value = workspace.stories;
     deepseekStatus.value = deepseek;
-    minimaxStatus.value = minimax;
     apimartStatus.value = apimart;
     characters.value = library.characters;
     illustrationWorkspace.value = illustration;
@@ -1096,7 +1088,7 @@ onBeforeUnmount(() => {
         <StoryChatMessages :messages="messages" :status="chatStatus" @suggest="send" />
         <StoryChatInput
           :disabled="inputDisabled"
-          :provider-name="chatProvider === 'minimax' ? 'MiniMax' : 'DeepSeek'"
+          provider-name="DeepSeek"
           :supports-image-input="supportsImageInput"
           :status="chatStatus"
           @send="send"

@@ -1,5 +1,5 @@
 import { createAgentUIStreamResponse } from 'ai';
-import { DEFAULT_CHAT_MODEL, getChatModelDefinition, isChatModel } from '../../../shared/chat-model';
+import { DEFAULT_CHAT_MODEL, isChatModel } from '../../../shared/chat-model';
 import type { ChatModel } from '../../../shared/chat-model';
 import type { CharacterCreateDraft } from '../../../shared/character-create';
 import { getCredentialValue } from '../../services/credentials';
@@ -56,7 +56,8 @@ export async function handleCharacterCreateAgentRequest(request: Request): Promi
     const body = parseBody(await request.json());
     const model = body.model ?? DEFAULT_CHAT_MODEL;
     const agent = createCharacterCreateAgent({
-      apiKey: await getCredentialValue(getChatModelDefinition(model).provider),
+      // 聊天模型现统一走 DeepSeek
+      apiKey: await getCredentialValue('deepseek'),
       draft: body.draft,
       hasReferenceImage: body.hasReferenceImage,
       model,
