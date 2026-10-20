@@ -5,6 +5,14 @@ export type {
   DesktopSettings,
   ExportFileRequest,
   ExportFileResult,
+  ProviderAccountState,
+  ProviderBalance,
+  ProviderBalanceResult,
+  ProviderModelsResult,
+  ProviderUsageBreakdown,
+  ProviderUsageDay,
+  ProviderUsageResult,
+  ProviderUsageSummary,
   SavedFileResult,
   SaveFileRequest,
   SetCredentialRequest,
@@ -84,19 +92,12 @@ export {
   DEFAULT_CHAT_MODEL,
   DEEPSEEK_MODELS,
   DEFAULT_DEEPSEEK_MODEL,
-  MINIMAX_MODELS,
   chatModelSupportsImageInput,
   getChatModelDefinition,
   isChatModel,
   isDeepSeekModel,
 } from '../../shared/chat-model';
-export type {
-  ChatModel,
-  ChatModelDefinition,
-  ChatModelProvider,
-  DeepSeekModel,
-  MiniMaxModel,
-} from '../../shared/chat-model';
+export type { ChatModel, ChatModelDefinition, DeepSeekModel } from '../../shared/chat-model';
 export { DEFAULT_IMAGE_MODEL, IMAGE_MODELS, isImageModel } from '../../shared/image-model';
 export type { ImageModel } from '../../shared/image-model';
 export {

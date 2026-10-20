@@ -21,6 +21,16 @@ import type {
   AppSettings,
   SettingsApi,
 } from './settings';
+import type {
+  ProviderAccountState,
+  ProviderBalance,
+  ProviderBalanceResult,
+  ProviderModelsResult,
+  ProviderUsageBreakdown,
+  ProviderUsageDay,
+  ProviderUsageResult,
+  ProviderUsageSummary,
+} from './provider-account';
 
 export type {
   StoryApi,
@@ -41,6 +51,14 @@ export type {
   DesktopTheme,
   AppSettings,
   SettingsApi,
+  ProviderAccountState,
+  ProviderBalance,
+  ProviderBalanceResult,
+  ProviderModelsResult,
+  ProviderUsageBreakdown,
+  ProviderUsageDay,
+  ProviderUsageResult,
+  ProviderUsageSummary,
 };
 
 // 桌面端 API 命名空间

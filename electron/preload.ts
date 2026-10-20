@@ -136,6 +136,12 @@ const expressionApi: CharacterExpressionApi = {
 const settingsApi: SettingsApi = {
   // 删除凭据
   deleteCredential: service => ipcRenderer.invoke('credential:delete', service),
+  // 查询厂商余额快照
+  getProviderBalance: service => ipcRenderer.invoke('provider-account:get-balance', service),
+  // 查询厂商可用模型快照
+  getProviderModels: service => ipcRenderer.invoke('provider-account:get-models', service),
+  // 查询厂商消费用量快照
+  getProviderUsage: service => ipcRenderer.invoke('provider-account:get-usage', service),
   // 查询凭据状态
   getCredentialStatus: service => ipcRenderer.invoke('credential:get-status', service),
   // 查询桌面设置
@@ -148,6 +154,13 @@ const settingsApi: SettingsApi = {
   setCredential: request => ipcRenderer.invoke('credential:set', request),
   // 保存应用模型与界面设置
   setAppSettings: settings => ipcRenderer.invoke('settings:set-app', settings),
+  // 重新拉取厂商余额
+  refreshProviderBalance: service =>
+    ipcRenderer.invoke('provider-account:refresh-balance', service),
+  // 重新拉取厂商可用模型
+  refreshProviderModels: service => ipcRenderer.invoke('provider-account:refresh-models', service),
+  // 重新拉取厂商消费用量
+  refreshProviderUsage: service => ipcRenderer.invoke('provider-account:refresh-usage', service),
   // 设置主题
   setTheme: theme => ipcRenderer.invoke('settings:set-theme', theme),
   // 设置工作区目录

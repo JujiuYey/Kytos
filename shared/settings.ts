@@ -1,9 +1,14 @@
 // 桌面凭据、主题与工作区设置类型
 import type { ChatModel, DeepSeekModel } from './chat-model';
 import type { ImageModel } from './image-model';
+import type {
+  ProviderBalanceResult,
+  ProviderModelsResult,
+  ProviderUsageResult,
+} from './provider-account';
 
 // 凭据服务类型
-export type CredentialService = 'apimart' | 'deepseek' | 'minimax';
+export type CredentialService = 'apimart' | 'deepseek';
 // 桌面主题
 export type DesktopTheme = 'dark' | 'light' | 'system';
 
@@ -48,6 +53,12 @@ export interface SetCredentialRequest {
 export interface SettingsApi {
   // 删除凭据
   deleteCredential: (service: CredentialService) => Promise<CredentialStatus>;
+  // 查询厂商余额快照
+  getProviderBalance: (service: CredentialService) => Promise<ProviderBalanceResult>;
+  // 查询厂商可用模型快照
+  getProviderModels: (service: CredentialService) => Promise<ProviderModelsResult>;
+  // 查询厂商消费用量快照
+  getProviderUsage: (service: CredentialService) => Promise<ProviderUsageResult>;
   // 查询凭据状态
   getCredentialStatus: (service: CredentialService) => Promise<CredentialStatus>;
   // 查询桌面设置
@@ -60,6 +71,12 @@ export interface SettingsApi {
   setCredential: (request: SetCredentialRequest) => Promise<CredentialStatus>;
   // 保存应用模型与界面设置
   setAppSettings: (settings: AppSettings) => Promise<AppSettings>;
+  // 重新拉取厂商余额
+  refreshProviderBalance: (service: CredentialService) => Promise<ProviderBalanceResult>;
+  // 重新拉取厂商可用模型
+  refreshProviderModels: (service: CredentialService) => Promise<ProviderModelsResult>;
+  // 重新拉取厂商消费用量
+  refreshProviderUsage: (service: CredentialService) => Promise<ProviderUsageResult>;
   // 设置主题
   setTheme: (theme: DesktopTheme) => Promise<void>;
   // 设置工作区目录

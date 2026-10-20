@@ -8,12 +8,11 @@ import type {
 } from '../../shared/desktop';
 import { getApplicationDatabase } from '../storage/app-database';
 
-const credentialServices: CredentialService[] = ['apimart', 'deepseek', 'minimax'];
+const credentialServices: CredentialService[] = ['apimart', 'deepseek'];
 
 const credentialServiceLabels: Record<CredentialService, string> = {
   apimart: 'APIMart',
   deepseek: 'DeepSeek',
-  minimax: 'MiniMax',
 };
 
 function getEncryptedCredential(service: CredentialService): string | null {
@@ -81,5 +80,9 @@ export async function setCredential(request: SetCredentialRequest): Promise<Cred
 
 export async function deleteCredential(service: CredentialService): Promise<CredentialStatus> {
   getApplicationDatabase().prepare('DELETE FROM credentials WHERE service = ?').run(service);
+  // 凭据没了，缓存的余额与模型也一并作废
+  getApplicationDatabase()
+    .prepare('DELETE FROM provider_account_snapshots WHERE service = ?')
+    .run(service);
   return getCredentialStatus(service);
 }

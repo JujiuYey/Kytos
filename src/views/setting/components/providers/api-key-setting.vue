@@ -29,14 +29,21 @@ import type { CredentialService, CredentialStatus } from '@/types';
 import { toErrorMessage } from '@/utils/helpers';
 
 interface Props {
+  category?: string;
   description: string;
   docsUrl: string;
+  icon?: string;
   placeholder: string;
   service: CredentialService;
   title: string;
 }
 
 const props = defineProps<Props>();
+
+const emit = defineEmits<{
+  // 凭据写入或清除后通知父组件刷新账户信息
+  updated: [];
+}>();
 
 const apiKey = ref('');
 const errorMessage = ref('');
@@ -77,6 +84,7 @@ async function saveCredential() {
     });
     apiKey.value = '';
     isVisible.value = false;
+    emit('updated');
     toast.success(`${props.title} 已安全保存`);
   } catch (error: unknown) {
     errorMessage.value = toErrorMessage(error);
@@ -91,6 +99,7 @@ async function clearCredential() {
   try {
     status.value = await window.desktop.settings.deleteCredential(props.service);
     isClearDialogOpen.value = false;
+    emit('updated');
     toast.success(`${props.title} 已清除`);
   } catch (error: unknown) {
     errorMessage.value = toErrorMessage(error);
@@ -109,8 +118,16 @@ onMounted(() => {
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
-          <KeyRound class="size-4 text-muted-foreground" />
+          <img
+            v-if="icon"
+            alt=""
+            aria-hidden="true"
+            class="size-5 shrink-0 dark:invert"
+            :src="icon"
+          />
+          <KeyRound v-else class="size-4 text-muted-foreground" />
           <h3 class="text-sm font-medium">{{ title }}</h3>
+          <span v-if="category" class="text-xs text-muted-foreground">{{ category }}</span>
           <SagStatusBadge v-if="isLoading" tone="info">读取中</SagStatusBadge>
           <SagStatusBadge v-else-if="status?.configured" tone="success">
             <CheckCircle2 class="size-3" />

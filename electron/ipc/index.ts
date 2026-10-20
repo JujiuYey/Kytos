@@ -7,6 +7,7 @@ import { registerCharacterVisualIpc } from './character-visual';
 import { registerCredentialsIpc } from './credentials';
 import { registerFilesIpc } from './files';
 import { registerIllustrationIpc } from './illustration';
+import { registerProviderAccountIpc } from './provider-account';
 import { registerSettingsIpc } from './settings';
 import { registerStoryIpc } from './story';
 import { createTrustedSenderGuard } from './trusted-sender';
@@ -27,6 +28,8 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): 
   registerSettingsIpc(assertTrustedSender);
   // 凭据
   registerCredentialsIpc(assertTrustedSender);
+  // 厂商账户信息
+  registerProviderAccountIpc(assertTrustedSender);
   // 文件保存
   registerFilesIpc(assertTrustedSender);
   // 插画
