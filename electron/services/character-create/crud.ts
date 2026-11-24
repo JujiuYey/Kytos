@@ -4,13 +4,8 @@ import { readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { isPlainObject } from 'es-toolkit';
 import { ID_PATTERN, MAX_PROMPT_LENGTH, WORKSPACE_ASSETS_SUBDIRECTORY } from '../../constants';
-import {
-  buildGptImage2RequestBody,
-  isTaskStatus,
-  pollImageTask,
-  submitImageTask,
-} from '../../utils';
-import type { GptImage2Resolution } from '../../utils';
+import { isTaskStatus, pollImageTask, prepareImageRequestBody, submitImageTask } from '../../utils';
+import type { ImageResolution } from '../../utils';
 import type {
   CharacterVisualGeneration,
   GenerateCharacterVisualRequest,
@@ -23,7 +18,7 @@ import type { SaveFileRequest } from '../../../shared/desktop';
 import { getCharacterLibrary, prepareCharacterVisualSave } from '../character-library';
 import { saveOfficialCharacterVisual } from '../character-visual';
 import { getCredentialValue } from '../credentials';
-import { getWorkspaceDirectory } from '../workspace';
+import { getImageModel, getWorkspaceDirectory } from '../workspace';
 import { ASSET_DIRECTORY } from './constants';
 import { downloadImage, validateReferenceImage } from './assets';
 import { getImageUrls, validateGenerationOptions, validateImageUrls } from './request';
@@ -45,14 +40,19 @@ export async function generateCharacterVisual(
   validateImageUrls(request.imageUrls);
   const imageUrls = getImageUrls(request);
   const { n, size, resolution } = validateGenerationOptions(request);
-  const body = buildGptImage2RequestBody({
-    imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-    n,
-    prompt: request.prompt.trim(),
-    resolution: resolution as GptImage2Resolution,
-    size,
-  });
-  const taskId = await submitImageTask(body, await getCredentialValue('apimart'));
+  const apiKey = await getCredentialValue('apimart');
+  const body = await prepareImageRequestBody(
+    {
+      imageUrls,
+      model: getImageModel(),
+      n,
+      prompt: request.prompt.trim(),
+      resolution: resolution as ImageResolution,
+      size,
+    },
+    apiKey,
+  );
+  const taskId = await submitImageTask(body, apiKey);
   const now = new Date().toISOString();
   const generation: StoredGeneration = {
     createdAt: now,

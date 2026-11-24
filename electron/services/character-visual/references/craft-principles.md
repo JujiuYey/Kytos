@@ -34,7 +34,7 @@
 
 ## 4. Edit Endpoint 不变量 = 动作生成的核心约束
 
-gpt-image-2 处理 `image_urls` 多参考图的逻辑等价于 OpenAI 的 edit endpoint：保留身份 / 构图 / 位置 / 可读性，只改变指定范围。本项目动作生成的"指定范围"= 8 槽内容。
+生图模型处理 `image_urls` 多参考图的逻辑等价于 OpenAI 的 edit endpoint：保留身份 / 构图 / 位置 / 可读性，只改变指定范围。本项目动作生成的"指定范围"= 8 槽内容。
 
 不变量清单（不可改）：
 

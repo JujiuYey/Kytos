@@ -7,9 +7,9 @@ Kytos 把 AI 分成两类能力：聊天模型负责理解需求、补全结构�
 | 能力 | 当前模型                                             | 入口                    |
 | ---- | ---------------------------------------------------- | ----------------------- |
 | 聊天 | `deepseek-v4-flash`、`deepseek-v4-pro`、`MiniMax-M3` | `shared/chat-model.ts`  |
-| 图片 | `gpt-image-2`                                        | `shared/image-model.ts` |
+| 图片 | `gpt-image-2.6-flare`、`gpt-image-2.6-sunburst`、`gemini-nano-banana-2.1`、`seedream-5-5`、`minimax-h3-image` | `shared/image-model.ts` |
 
-默认聊天模型是 `MiniMax-M3`，默认图片模型是 `gpt-image-2`。模型定义还声明是否支持图片输入，页面和服务应使用这个能力字段，不要根据模型名称猜测。
+默认聊天模型是 `MiniMax-M3`，默认图片模型是 `gpt-image-2.6-sunburst`。模型定义还声明是否支持图片输入，页面和服务应使用这个能力字段，不要根据模型名称猜测。
 
 ## 请求分流
 

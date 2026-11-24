@@ -8,18 +8,14 @@ import { useAppStore } from '@/stores/app';
 import {
   CHAT_MODELS,
   CHAT_MODEL_DEFINITIONS,
+  IMAGE_MODEL_DEFINITIONS,
   IMAGE_MODELS,
   isChatModel,
   isDeepSeekModel,
   isImageModel,
 } from '@/types';
-import type { ImageModel } from '@/types';
 
 const appStore = useAppStore();
-
-const imageModelLabels: Record<ImageModel, string> = {
-  'gpt-image-2': 'GPT-Image-2',
-};
 
 const imageModel = computed({
   get: () => appStore.settings.imageModel,
@@ -29,6 +25,7 @@ const imageModel = computed({
     }
   },
 });
+const imageModelDefinition = computed(() => IMAGE_MODEL_DEFINITIONS[imageModel.value]);
 
 const generalModel = computed({
   get: () => appStore.settings.generalModel,
@@ -68,7 +65,7 @@ const fastModelDefinition = computed(() => CHAT_MODEL_DEFINITIONS[fastModel.valu
           <div>
             <h3 class="text-sm font-medium">生图模型</h3>
             <p class="mt-1.5 text-sm leading-5 text-muted-foreground">
-              用于角色锚点、表情和插画生成。
+              用于角色锚点、表情和插画生成。GPT-Image-2.6 里 Sunburst 偏细节与一致性，Flare 偏速度。
             </p>
           </div>
         </div>
@@ -76,11 +73,11 @@ const fastModelDefinition = computed(() => CHAT_MODEL_DEFINITIONS[fastModel.valu
           <Label for="image-model">模型</Label>
           <Select v-model="imageModel">
             <SelectTrigger id="image-model" class="w-full">
-              <span class="truncate">{{ imageModelLabels[imageModel] }}</span>
+              <span class="truncate">{{ imageModelDefinition.label }}</span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="model in IMAGE_MODELS" :key="model" :value="model">
-                {{ imageModelLabels[model] }}
+                {{ IMAGE_MODEL_DEFINITIONS[model].label }}
               </SelectItem>
             </SelectContent>
           </Select>

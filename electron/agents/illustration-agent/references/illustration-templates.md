@@ -90,7 +90,7 @@ finalPrompt 中只写该角色在本次画面中的具体表现。
 
 ## 5. finalPrompt 长度
 
-`buildIllustrationPrompt` 把 finalPrompt 嵌入 gpt-image-2 prompt。APIMart 端 max 总长度有上限。本项目 `MAX_PROMPT_LENGTH` 约为 20,000 字符，因此 finalPrompt 控制在 200~~500 词（中文约 400~~1000 字）最稳。超过 800 字往往会触发模型裁剪。
+`buildIllustrationPrompt` 把 finalPrompt 嵌入生图模型的 prompt。APIMart 端 max 总长度有上限。本项目 `MAX_PROMPT_LENGTH` 约为 20,000 字符，因此 finalPrompt 控制在 200~~500 词（中文约 400~~1000 字）最稳。超过 800 字往往会触发模型裁剪。
 
 ## 6. 何时升级为高质量
 

@@ -11,6 +11,7 @@ import {
   isDeepSeekModel,
 } from '../../../shared/chat-model';
 import { DEFAULT_IMAGE_MODEL, isImageModel } from '../../../shared/image-model';
+import type { ImageModel } from '../../../shared/image-model';
 import type { AppSettings, DesktopSettings } from '../../../shared/settings';
 import { getApplicationDatabase } from '../../storage/app-database';
 
@@ -84,6 +85,11 @@ export async function setWorkspaceDirectory(workspacePath: string): Promise<Desk
     .prepare('UPDATE application_settings SET workspace_path = ? WHERE id = 1')
     .run(normalizedPath);
   return getDesktopSettings();
+}
+
+/** 读取应用设置里选定的生图模型，提交生图任务时使用。 */
+export function getImageModel(): ImageModel {
+  return loadStoredSettings().appSettings.imageModel;
 }
 
 export async function getWorkspaceDirectory(): Promise<string> {

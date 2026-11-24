@@ -50,8 +50,8 @@ export interface GenerationPollingBundle<TTarget extends GenerationPollingTarget
 /** 轮询中的有效阶段；没有对应状态记录时视为 idle。 */
 type GenerationPollingPhase = 'waiting' | 'requesting' | 'paused';
 
-/** 默认每 2.5 秒查询一次任务状态。 */
-const DEFAULT_INTERVAL_MS = 2500;
+/** 默认每 3 秒查询一次任务状态，落在各生图模型文档建议的轮询间隔内（2–5 秒、3–5 秒）。 */
+const DEFAULT_INTERVAL_MS = 3000;
 
 /** 管理一个或多个生成任务的轮询状态、定时器和生命周期清理。 */
 export function useGenerationPolling<TVersion, TTarget extends GenerationPollingTarget = string>(

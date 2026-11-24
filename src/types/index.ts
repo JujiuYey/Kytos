@@ -100,8 +100,13 @@ export {
   isDeepSeekModel,
 } from '../../shared/chat-model';
 export type { ChatModel, ChatModelDefinition, DeepSeekModel } from '../../shared/chat-model';
-export { DEFAULT_IMAGE_MODEL, IMAGE_MODELS, isImageModel } from '../../shared/image-model';
-export type { ImageModel } from '../../shared/image-model';
+export {
+  DEFAULT_IMAGE_MODEL,
+  IMAGE_MODEL_DEFINITIONS,
+  IMAGE_MODELS,
+  isImageModel,
+} from '../../shared/image-model';
+export type { ImageModel, ImageModelDefinition } from '../../shared/image-model';
 export {
   CHARACTER_ANCHOR_ROLES,
   CHARACTER_VISUAL_RESOLUTIONS,

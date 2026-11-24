@@ -7,7 +7,8 @@
 ```text
 validate request
   -> resolve explicitly selected references
-  -> build gpt-image-2 request
+  -> prepare references for the selected image model
+  -> build image generation request
   -> submitImageTask
   -> save submitted task id
   -> pollImageTask
@@ -26,7 +27,7 @@ validate request
 | 角色表情      | `electron/services/character-expression/generation.ts` |
 | 故事分镜      | `electron/services/story/generation.ts`                |
 
-图片服务当前使用 APIMart 凭据和 `gpt-image-2` 请求格式。参考图必须从当前工作区和明确选择的角色/版本引用解析，不能回退到全局选中状态。
+图片服务当前使用 APIMart 凭据，可选模型为 GPT-Image-2.6（两个型号）、Nano Banana 2.1、Seedream 5.5 和 MiniMax H3 Image，定义在 `shared/image-model.ts`。各模型的出图张数、参考图张数和清晰度上限不同，提交前由 `prepareImageRequestBody` 统一校验。GPT-Image-2.6 的参考图先经 APIMart 上传接口换成公网 URL 再提交；其余三个模型直接传 data URI。参考图必须从当前工作区和明确选择的角色/版本引用解析，不能回退到全局选中状态。
 
 ## 任务问题排查
 

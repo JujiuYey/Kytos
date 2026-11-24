@@ -93,7 +93,7 @@ moderate 强度的高兴表情。眉部放松，参考图风格保持一致。�
 
 ## 4. 长度的硬约束
 
-`buildExpressionPrompt` 把这段描述作为 `[EXPRESSION DETAILS]` 嵌入 gpt-image-2 prompt，APIMart 端 max 总长度有上限。本项目 `MAX_PROMPT_LENGTH` 约为 20,000 字符，因此 `[EXPRESSION DETAILS]` 控制在 80~180 中文字符最稳。超过 250 字符往往会触发模型裁剪或忽略。
+`buildExpressionPrompt` 把这段描述作为 `[EXPRESSION DETAILS]` 嵌入生图模型的 prompt，APIMart 端 max 总长度有上限。本项目 `MAX_PROMPT_LENGTH` 约为 20,000 字符，因此 `[EXPRESSION DETAILS]` 控制在 80~180 中文字符最稳。超过 250 字符往往会触发模型裁剪或忽略。
 
 ## 5. 何时使用 strong
 

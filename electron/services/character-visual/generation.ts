@@ -16,19 +16,15 @@ import {
 } from '../../../shared/character-visual';
 import { createChatLanguageModel, getChatProviderOptions } from '../../providers/chat-provider';
 import { getCredentialValue } from '../credentials';
+import { getImageModel } from '../workspace';
 import {
   LEGACY_ACTION_ASSET_DIRECTORY,
   LEGACY_REFERENCE_BOARD_ASSET_DIRECTORY,
   MAX_NAME_LENGTH,
 } from './constants';
 import { ID_PATTERN, MAX_PROMPT_LENGTH } from '../../constants';
-import {
-  buildGptImage2RequestBody,
-  isTaskStatus,
-  pollImageTask,
-  submitImageTask,
-} from '../../utils';
-import type { GptImage2Resolution } from '../../utils';
+import { isTaskStatus, pollImageTask, prepareImageRequestBody, submitImageTask } from '../../utils';
+import type { ImageResolution } from '../../utils';
 import {
   isCharacterAnchorRole,
   isVisualResolution,
@@ -91,13 +87,17 @@ export async function generateCharacterAction(
   const { directoryName, image } = reference;
   const referenceDataUrl = await readVisualReferenceImage(directoryName, image);
   const apiKey = await getCredentialValue('apimart');
-  const body = buildGptImage2RequestBody({
-    imageUrls: [referenceDataUrl],
-    n: request.count,
-    prompt: buildCharacterActionPrompt(request.action),
-    resolution: request.resolution as GptImage2Resolution,
-    size: request.size,
-  });
+  const body = await prepareImageRequestBody(
+    {
+      imageUrls: [referenceDataUrl],
+      model: getImageModel(),
+      n: request.count,
+      prompt: buildCharacterActionPrompt(request.action),
+      resolution: request.resolution as ImageResolution,
+      size: request.size,
+    },
+    apiKey,
+  );
   const taskId = await submitImageTask(body, apiKey);
 
   const now = new Date().toISOString();
@@ -274,13 +274,17 @@ export async function generateCharacterReferenceBoard(
     ? `\n\n以第一张图片为上一版，按以下意见重新生成，并保留未要求修改的角色特征：\n${feedback.text.trim()}`
     : '';
   const prompt = request.prompt.trim().slice(0, MAX_PROMPT_LENGTH - adjustment.length) + adjustment;
-  const body = buildGptImage2RequestBody({
-    imageUrls: referenceImageUrls,
-    n: 1,
-    prompt,
-    resolution: request.resolution as GptImage2Resolution,
-    size: request.size ?? CHARACTER_REFERENCE_BOARD_SIZE,
-  });
+  const body = await prepareImageRequestBody(
+    {
+      imageUrls: referenceImageUrls,
+      model: getImageModel(),
+      n: 1,
+      prompt,
+      resolution: request.resolution as ImageResolution,
+      size: request.size ?? CHARACTER_REFERENCE_BOARD_SIZE,
+    },
+    apiKey,
+  );
   const taskId = await submitImageTask(body, apiKey);
 
   const now = new Date().toISOString();

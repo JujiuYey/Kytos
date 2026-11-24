@@ -5,6 +5,7 @@ import {
   getCharacterVisualWorkspace,
 } from '../character-visual';
 import { getCredentialValue } from '../credentials';
+import { getImageModel } from '../workspace';
 import type {
   GenerateStoryShotRequest,
   StoryProject,
@@ -18,13 +19,8 @@ import { parseReferences } from './parsers';
 import { resolveIllustrationReferences } from '../illustration/reference-images';
 import { getCharacterLibrary } from '../character-library';
 import { ID_PATTERN, MAX_TEXT_LENGTH } from '../../constants';
-import {
-  buildGptImage2RequestBody,
-  isTaskStatus,
-  pollImageTask,
-  submitImageTask,
-} from '../../utils';
-import type { GptImage2Resolution } from '../../utils';
+import { isTaskStatus, pollImageTask, prepareImageRequestBody, submitImageTask } from '../../utils';
+import type { ImageResolution } from '../../utils';
 import { ASSET_DIRECTORY, isActiveGenerationStatus } from './constants';
 import { downloadTaskImages, readReferenceImage } from './assets';
 import { parseVersionReference, requireShot, requireStory } from './parsers';
@@ -254,13 +250,17 @@ export async function generateStoryShot(
     ...buildReferenceInstructions(references),
   ].join('\n');
   const apiKey = await getCredentialValue('apimart');
-  const body = buildGptImage2RequestBody({
-    imageUrls: referenceImages,
-    n: 1,
-    prompt,
-    resolution: story.resolution as GptImage2Resolution,
-    size: story.size,
-  });
+  const body = await prepareImageRequestBody(
+    {
+      imageUrls: referenceImages,
+      model: getImageModel(),
+      n: 1,
+      prompt,
+      resolution: story.resolution as ImageResolution,
+      size: story.size,
+    },
+    apiKey,
+  );
   const taskId = await submitImageTask(body, apiKey);
 
   const now = new Date().toISOString();

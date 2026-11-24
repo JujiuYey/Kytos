@@ -31,7 +31,7 @@ MiniMax M3 当前标记为支持图片输入；DeepSeek V4 Flash 和 DeepSeek V4
 
 ### 生图模型
 
-当前生图模型为 GPT-Image-2，通过 APIMart 发起图片生成任务。生成是明确的人工操作，页面会显示提交、等待、处理中、完成或失败状态。
+生图模型通过 APIMart 发起图片生成任务：默认是 GPT-Image-2.6（Sunburst，可切换为 Flare），也可以选择 Nano Banana 2.1、Seedream 5.5 或 MiniMax H3 Image。Seedream 5.5 每次只出 1 张，最多 10 张参考图，清晰度最高 2K。MiniMax H3 Image 会先自动扩写提示词再出图，输出为 JPEG。生成是明确的人工操作，页面会显示提交、等待、处理中、完成或失败状态。
 
 ## 凭据如何保存
 

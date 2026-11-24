@@ -22,6 +22,7 @@ import {
   getCharacterVisualWorkspace,
   getOfficialCharacterVisualReferences,
 } from '../character-visual';
+import { getImageModel } from '../workspace';
 import { downloadTaskImages, getReferenceData } from './assets';
 import { EXPRESSION_ASSET_DIRECTORY } from './constants';
 import { parseReferenceSelection, selectionKey } from './parsers';
@@ -36,15 +37,15 @@ import {
   saveExpressionTask,
 } from './repository';
 import {
-  buildGptImage2RequestBody,
   idSchema,
   isTaskStatus,
   nameSchema,
   parseRequest,
   pollImageTask,
+  prepareImageRequestBody,
   submitImageTask,
 } from '../../utils';
-import type { GptImage2Resolution } from '../../utils';
+import type { ImageResolution } from '../../utils';
 import type { ExpressionReferenceData } from './types';
 
 const generateRequestSchema = z.object({
@@ -135,13 +136,17 @@ export async function generateCharacterExpression(
     ),
   );
   const apiKey = await getCredentialValue('apimart');
-  const body = buildGptImage2RequestBody({
-    imageUrls,
-    n: request.count,
-    prompt: buildExpressionPrompt(request),
-    resolution: request.resolution as GptImage2Resolution,
-    size: request.size,
-  });
+  const body = await prepareImageRequestBody(
+    {
+      imageUrls,
+      model: getImageModel(),
+      n: request.count,
+      prompt: buildExpressionPrompt(request),
+      resolution: request.resolution as ImageResolution,
+      size: request.size,
+    },
+    apiKey,
+  );
   const taskId = await submitImageTask(body, apiKey);
 
   const now = new Date().toISOString();

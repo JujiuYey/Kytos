@@ -1,6 +1,7 @@
 // workspace 服务对外 API 桶出口
 export {
   getDesktopSettings,
+  getImageModel,
   getSuggestedWorkspacePath,
   getWorkspaceDirectory,
   openWorkspaceDirectory,

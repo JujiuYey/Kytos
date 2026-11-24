@@ -115,7 +115,7 @@
 
 ## 4. 长度的硬约束
 
-`buildCharacterActionPrompt` 把这段描述作为 `[TARGET ACTION]` 嵌入 gpt-image-2 prompt。APIMart 端 max 总长度有上限。本项目 `MAX_CHARACTER_ACTION_LENGTH` 约为 2000 字符，因此 `[TARGET ACTION]` 控制在 80~180 中文字符最稳。超过 250 字符往往会触发模型裁剪或忽略。
+`buildCharacterActionPrompt` 把这段描述作为 `[TARGET ACTION]` 嵌入生图模型的 prompt。APIMart 端 max 总长度有上限。本项目 `MAX_CHARACTER_ACTION_LENGTH` 约为 2000 字符，因此 `[TARGET ACTION]` 控制在 80~180 中文字符最稳。超过 250 字符往往会触发模型裁剪或忽略。
 
 ## 5. 何时增加细节
 

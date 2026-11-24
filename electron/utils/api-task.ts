@@ -1,6 +1,6 @@
 // apimart 任务接口：HTTP 请求封装 + 任务状态字段解析
-// 文档：https://docs.apimart.ai/cn/api-reference/model/gpt-image-2/image-generation
-//       https://docs.apimart.ai/cn/api-reference/model/gpt-image-2/task-status
+// 文档：https://docs.apimart.ai/cn/api-reference/images/gpt-image-2.6/generation
+//       https://docs.apimart.ai/cn/api-reference/tasks/status
 import { isPlainObject } from 'es-toolkit';
 import { API_BASE_URL } from '../constants/api';
 import { ID_PATTERN } from '../constants/text';

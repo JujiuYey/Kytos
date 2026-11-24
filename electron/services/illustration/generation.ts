@@ -10,14 +10,10 @@ import type {
   IllustrationVersionReference,
 } from '../../../shared/illustration';
 import { ID_PATTERN } from '../../constants';
-import {
-  buildGptImage2RequestBody,
-  isTaskStatus,
-  pollImageTask,
-  submitImageTask,
-} from '../../utils';
-import type { GptImage2Resolution } from '../../utils';
+import { isTaskStatus, pollImageTask, prepareImageRequestBody, submitImageTask } from '../../utils';
+import type { ImageResolution } from '../../utils';
 import { getCredentialValue } from '../credentials';
+import { getImageModel } from '../workspace';
 import { downloadTaskImages, safeUnlinkAssetFiles } from './assets';
 import { illustrationReferenceKey, parseIllustrationReference } from './parsers';
 import { buildIllustrationPrompt, validateGenerateRequest } from './prompts';
@@ -86,13 +82,17 @@ export async function generateIllustration(
     request.revisionPrompt?.trim() ?? '',
   );
   const apiKey = await getCredentialValue('apimart');
-  const body = buildGptImage2RequestBody({
-    imageUrls: referenceImages.length > 0 ? referenceImages : undefined,
-    n: 1,
-    prompt,
-    resolution: request.resolution as GptImage2Resolution,
-    size: request.size,
-  });
+  const body = await prepareImageRequestBody(
+    {
+      imageUrls: referenceImages,
+      model: getImageModel(),
+      n: 1,
+      prompt,
+      resolution: request.resolution as ImageResolution,
+      size: request.size,
+    },
+    apiKey,
+  );
   const taskId = await submitImageTask(body, apiKey);
 
   // 5. 写回任务记录
