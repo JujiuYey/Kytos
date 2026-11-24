@@ -135,7 +135,7 @@ export async function downloadTaskImages(
   );
 }
 
-export async function readOfficialReferenceImage(
+export async function readVisualReferenceImage(
   directoryName: string,
   image: { fileName: string; mimeType: string },
 ): Promise<string> {
@@ -144,7 +144,7 @@ export async function readOfficialReferenceImage(
     path.join(workspacePath, 'assets', directoryName, image.fileName),
   );
   if (imageData.byteLength > MAX_REFERENCE_IMAGE_SIZE) {
-    throw new Error(`正式角色视觉图片“${image.fileName}”超过 20 MB`);
+    throw new Error(`角色视觉参考图片“${image.fileName}”超过 20 MB`);
   }
   return `data:${image.mimeType};base64,${imageData.toString('base64')}`;
 }

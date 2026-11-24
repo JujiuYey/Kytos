@@ -11,6 +11,8 @@ import type {
 import {
   CHARACTER_REFERENCE_BOARD_SIZE,
   MAX_CHARACTER_ACTION_LENGTH,
+  MAX_CHARACTER_REFERENCE_BOARD_FEEDBACK_LENGTH,
+  MAX_CHARACTER_REFERENCE_IMAGES,
 } from '../../../shared/character-visual';
 import { createChatLanguageModel, getChatProviderOptions } from '../../providers/chat-provider';
 import { getCredentialValue } from '../credentials';
@@ -45,7 +47,7 @@ import {
 } from './store';
 import { buildCharacterActionPrompt, resolveChatModel } from './prompts';
 import { buildCharacterActionInstructions } from './instructions';
-import { downloadTaskImages, readOfficialReferenceImage } from './assets';
+import { downloadTaskImages, readVisualReferenceImage } from './assets';
 import type { LegacyActionRecord, LegacyReferenceBoardRecord } from './types';
 
 function validateGenerateRequest(
@@ -87,7 +89,7 @@ export async function generateCharacterAction(
     throw new Error('动作参考图必须是当前角色的正式视觉');
   }
   const { directoryName, image } = reference;
-  const referenceDataUrl = await readOfficialReferenceImage(directoryName, image);
+  const referenceDataUrl = await readVisualReferenceImage(directoryName, image);
   const apiKey = await getCredentialValue('apimart');
   const body = buildGptImage2RequestBody({
     imageUrls: [referenceDataUrl],
@@ -199,17 +201,26 @@ export async function getCharacterVisualAssetTask(
 export async function generateCharacterReferenceBoard(
   request: GenerateCharacterReferenceBoardRequest,
 ): Promise<CharacterVisualAssetRecord> {
-  const anchorRole = (request as { anchorRole?: unknown }).anchorRole;
+  if (!isPlainObject(request)) {
+    throw new Error('参考图生成参数无效');
+  }
+  const anchorRole: unknown = request.anchorRole;
+  const { feedback } = request;
   if (
-    !isPlainObject(request) ||
     typeof request.name !== 'string' ||
     !request.name.trim() ||
     request.name.length > MAX_NAME_LENGTH ||
     typeof request.prompt !== 'string' ||
     !request.prompt.trim() ||
     request.prompt.length > MAX_PROMPT_LENGTH ||
+    (feedback !== undefined &&
+      (!isPlainObject(feedback) ||
+        typeof feedback.text !== 'string' ||
+        !feedback.text.trim() ||
+        feedback.text.length > MAX_CHARACTER_REFERENCE_BOARD_FEEDBACK_LENGTH ||
+        anchorRole !== undefined)) ||
     !Array.isArray(request.referenceAssets) ||
-    request.referenceAssets.length < 1 ||
+    (request.referenceAssets.length < 1 && !feedback) ||
     !isVisualResolution(request.resolution) ||
     (request.size !== undefined && !isVisualSize(request.size)) ||
     (anchorRole !== undefined &&
@@ -220,13 +231,28 @@ export async function generateCharacterReferenceBoard(
     throw new Error('参考图生成参数无效');
   }
   const store = await loadVisualStore();
+  const revision = feedback
+    ? findVisualAsset(store, validateVisualAssetSelection(feedback.source))
+    : null;
+  if (
+    revision &&
+    (revision.selection.kind !== 'sheet' ||
+      revision.record.source !== 'generated' ||
+      revision.record.status !== 'completed')
+  ) {
+    throw new Error('请选择已生成的角色锚点图片');
+  }
   const parsedReferenceAssets = request.referenceAssets.map(validateVisualAssetSelection);
   const publicReferenceAssets = [
     ...new Map(parsedReferenceAssets.map(asset => [selectionKey(asset), asset])).values(),
   ];
-  const references = publicReferenceAssets.map(referenceAsset =>
-    findVisualAsset(store, referenceAsset),
-  );
+  const revisionKey = revision ? selectionKey(revision.selection) : null;
+  const referenceAssets = revision
+    ? publicReferenceAssets
+        .filter(asset => selectionKey(asset) !== revisionKey)
+        .slice(0, MAX_CHARACTER_REFERENCE_IMAGES - 1)
+    : publicReferenceAssets;
+  const references = referenceAssets.map(referenceAsset => findVisualAsset(store, referenceAsset));
   if (
     references.some(
       reference =>
@@ -239,13 +265,19 @@ export async function generateCharacterReferenceBoard(
   }
 
   const referenceImageUrls = await Promise.all(
-    references.map(({ directoryName, image }) => readOfficialReferenceImage(directoryName, image)),
+    (revision ? [revision, ...references] : references).map(({ directoryName, image }) =>
+      readVisualReferenceImage(directoryName, image),
+    ),
   );
   const apiKey = await getCredentialValue('apimart');
+  const adjustment = feedback
+    ? `\n\n以第一张图片为上一版，按以下意见重新生成，并保留未要求修改的角色特征：\n${feedback.text.trim()}`
+    : '';
+  const prompt = request.prompt.trim().slice(0, MAX_PROMPT_LENGTH - adjustment.length) + adjustment;
   const body = buildGptImage2RequestBody({
     imageUrls: referenceImageUrls,
     n: 1,
-    prompt: request.prompt.trim(),
+    prompt,
     resolution: request.resolution as GptImage2Resolution,
     size: request.size ?? CHARACTER_REFERENCE_BOARD_SIZE,
   });
@@ -262,14 +294,9 @@ export async function generateCharacterReferenceBoard(
     name: request.name.trim(),
     originalName: null,
     progress: 0,
-    prompt: request.prompt.trim(),
+    prompt,
     referenceAssets: references.map(reference => reference.selection),
-    referenceImage: publicReferenceAssets[0]
-      ? {
-          fileName: publicReferenceAssets[0].fileName,
-          taskId: publicReferenceAssets[0].taskId,
-        }
-      : null,
+    referenceImage: referenceAssets[0] ?? null,
     resolution: request.resolution,
     size: request.size ?? CHARACTER_REFERENCE_BOARD_SIZE,
     source: 'generated',

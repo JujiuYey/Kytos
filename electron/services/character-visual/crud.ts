@@ -3,9 +3,9 @@ import type { SaveFileRequest, SavedFileResult } from '../../../shared/desktop';
 import { isPlainObject } from 'es-toolkit';
 import type {
   CharacterAnchorRole,
-  CharacterVisualAssetSelection,
   CharacterVisualSource,
   CharacterVisualWorkspaceState,
+  DeleteCharacterVisualAssetRequest,
   RenameCharacterVisualAssetRequest,
   SaveCharacterVisualAssetRequest,
   SaveCharacterVisualResult,
@@ -255,15 +255,15 @@ export async function setCharacterVisualAssetOfficial(
 }
 
 export async function deleteCharacterVisualAsset(
-  request: CharacterVisualAssetSelection,
+  request: DeleteCharacterVisualAssetRequest,
 ): Promise<CharacterVisualWorkspaceState> {
   const selection = validateVisualAssetSelection(request);
   const store = await loadVisualStore();
   const { directoryName, record, selection: legacySelection } = findVisualAsset(store, selection);
+  const key = legacySelectionKey(legacySelection);
   if (
-    store.officialAssets.some(
-      asset => legacySelectionKey(asset) === legacySelectionKey(legacySelection),
-    )
+    request.allowOfficial !== true &&
+    store.officialAssets.some(asset => legacySelectionKey(asset) === key)
   ) {
     throw new Error('正式资产不能删除，请先移出正式资产');
   }
@@ -271,6 +271,7 @@ export async function deleteCharacterVisualAsset(
   const remainingImages = record.images.filter(item => item.fileName !== selection.fileName);
   const nextStore: import('./types').StoredVisualWorkspace = {
     ...store,
+    officialAssets: store.officialAssets.filter(asset => legacySelectionKey(asset) !== key),
     anchorBindings: store.anchorBindings.filter(
       item => selectionKey(item) !== selectionKey(selection),
     ),
@@ -295,6 +296,7 @@ export async function deleteCharacterVisualAsset(
         }),
   };
 
+  syncLegacySelections(nextStore);
   await saveVisualStore(nextStore);
   try {
     await deleteAssetFile(directoryName, selection.fileName);

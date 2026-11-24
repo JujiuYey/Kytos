@@ -25,6 +25,7 @@ export interface CharacterWorkspaceReferenceOption {
 }
 
 export interface UseCharacterWorkspaceOptions {
+  allowOfficialDelete?: boolean;
   busy: ComputedRef<boolean>;
   onWorkspaceApplied?: (
     workspace: CharacterAnchorWorkspaceState,
@@ -469,7 +470,11 @@ export function useCharacterWorkspace(
   }
 
   function requestDelete(record: CharacterAnchorRecord, image: CharacterVisualImage): void {
-    if (selectingFileName.value || deletingFileName.value) {
+    if (
+      selectingFileName.value ||
+      deletingFileName.value ||
+      (options.allowOfficialDelete && operationDisabled.value)
+    ) {
       return;
     }
     deleteTarget.value = { image, record };
@@ -489,13 +494,18 @@ export function useCharacterWorkspace(
   }
 
   async function deleteAsset(): Promise<void> {
-    if (!deleteTarget.value || deletingFileName.value) {
+    if (
+      !deleteTarget.value ||
+      deletingFileName.value ||
+      (options.allowOfficialDelete && operationDisabled.value)
+    ) {
       return;
     }
     const { image, record } = deleteTarget.value;
     deletingFileName.value = image.fileName;
     try {
       const workspace = await characterAnchorApi.deleteAnchor({
+        allowOfficial: options.allowOfficialDelete,
         fileName: image.fileName,
         taskId: record.id,
       });

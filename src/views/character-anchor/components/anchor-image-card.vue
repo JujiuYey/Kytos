@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import dayjs from 'dayjs';
-import { Check, Clock3, Crop, Pencil, Trash2 } from '@lucide/vue';
+import { Check, Clock3, Crop, Ellipsis, Pencil, RefreshCw, Trash2 } from '@lucide/vue';
 import { Image as AiImage } from '@/components/ai-elements/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -18,10 +25,13 @@ import { SagStatusBadge } from '@/components/sag/status-badge';
 import type { CharacterAnchorBinding, CharacterAnchorRecord, CharacterVisualImage } from '@/types';
 
 const props = defineProps<{
+  allowOfficialDelete?: boolean;
+  generationActionsDisabled?: boolean;
   deletingFileName: string;
   image: CharacterVisualImage;
   imageIndex: number;
   isSelected: boolean;
+  showRegenerate?: boolean;
   anchorRole: CharacterAnchorBinding['role'];
   record: CharacterAnchorRecord;
   renamingFileName: string;
@@ -31,6 +41,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'delete'): void;
   (event: 'edit'): void;
+  (event: 'regenerate'): void;
   (event: 'official', official: boolean): void;
   (event: 'role', role: CharacterAnchorBinding['role']): void;
   (event: 'rename'): void;
@@ -55,7 +66,10 @@ const isRenameDisabled = computed(
     Boolean(props.deletingFileName),
 );
 const isDeleteDisabled = computed(
-  () => props.isSelected || Boolean(props.deletingFileName) || Boolean(props.selectingFileName),
+  () =>
+    (props.isSelected && !props.allowOfficialDelete) ||
+    props.generationActionsDisabled ||
+    isRenameDisabled.value,
 );
 const isOfficialSaving = computed(() => props.selectingFileName === props.image.fileName);
 const anchorRoleOptions = [
@@ -129,7 +143,7 @@ function formatDate(value: string): string {
       </div>
     </div>
 
-    <div class="flex min-w-0 items-center justify-between gap-3">
+    <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
       <Button
         size="sm"
         :variant="props.isSelected ? 'secondary' : 'outline'"
@@ -139,6 +153,38 @@ function formatDate(value: string): string {
         {{ isOfficialSaving ? '保存中' : props.isSelected ? '移出正式资产' : '设为正式资产' }}
       </Button>
       <div class="flex shrink-0 items-center gap-1.5">
+        <DropdownMenu v-if="props.allowOfficialDelete" :modal="false">
+          <DropdownMenuTrigger as-child>
+            <Button
+              size="icon"
+              variant="ghost"
+              class="size-8 text-muted-foreground"
+              :aria-label="`${imageName}的更多操作`"
+            >
+              <Ellipsis data-icon="inline-start" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                v-if="props.showRegenerate"
+                :disabled="props.generationActionsDisabled || isRenameDisabled"
+                @select="emit('regenerate')"
+              >
+                <RefreshCw />
+                重新生成
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                :disabled="isDeleteDisabled"
+                @select="emit('delete')"
+              >
+                <Trash2 />
+                删除图片
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <TooltipProvider :delay-duration="300">
           <Tooltip>
             <TooltipTrigger as-child>
@@ -172,7 +218,7 @@ function formatDate(value: string): string {
             <TooltipContent>重命名图片</TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <TooltipProvider :delay-duration="300">
+        <TooltipProvider v-if="!props.allowOfficialDelete" :delay-duration="300">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button

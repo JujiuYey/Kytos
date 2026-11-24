@@ -31,11 +31,14 @@ interface GalleryTaskEntry extends GalleryEntryBase {
 type GalleryEntry = GalleryImageEntry | GalleryTaskEntry;
 
 const props = defineProps<{
+  allowOfficialDelete?: boolean;
+  generationActionsDisabled?: boolean;
   deletingFileName: string;
   anchorBindings: CharacterAnchorBinding[];
   officialAssets: CharacterAnchorSelection[];
   pollingState: GenerationTaskPollingState;
   records: CharacterAnchorRecord[];
+  showRegenerate?: boolean;
   renamingFileName: string;
   selectingFileName: string;
 }>();
@@ -43,6 +46,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'delete', record: CharacterAnchorRecord, image: CharacterVisualImage): void;
   (event: 'edit', record: CharacterAnchorRecord, image: CharacterVisualImage): void;
+  (event: 'regenerate', record: CharacterAnchorRecord, image: CharacterVisualImage): void;
   (
     event: 'official',
     record: CharacterAnchorRecord,
@@ -138,10 +142,14 @@ function getAnchorRole(entry: GalleryImageEntry): CharacterAnchorBinding['role']
             :image-index="entry.imageIndex"
             :is-selected="isSelected(entry)"
             :record="entry.record"
+            :allow-official-delete="props.allowOfficialDelete"
+            :generation-actions-disabled="props.generationActionsDisabled"
+            :show-regenerate="props.showRegenerate && entry.record.source === 'generated'"
             :renaming-file-name="renamingFileName"
             :selecting-file-name="selectingFileName"
             @delete="emit('delete', entry.record, entry.image)"
             @edit="emit('edit', entry.record, entry.image)"
+            @regenerate="emit('regenerate', entry.record, entry.image)"
             @official="official => emit('official', entry.record, entry.image, official)"
             @role="role => emit('role', entry.record, entry.image, role)"
             @rename="emit('rename', entry.record, entry.image)"

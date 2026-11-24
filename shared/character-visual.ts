@@ -100,6 +100,7 @@ export interface GenerateCharacterActionPromptRequest {
 
 export interface GenerateCharacterReferenceBoardRequest {
   anchorRole?: Exclude<CharacterAnchorRole, 'unassigned' | 'standard'>;
+  feedback?: { source: CharacterVisualAssetSelection; text: string };
   name: string;
   prompt: string;
   referenceAssets: CharacterVisualAssetSelection[];
@@ -107,8 +108,14 @@ export interface GenerateCharacterReferenceBoardRequest {
   size?: CharacterVisualSize;
 }
 
+export const MAX_CHARACTER_REFERENCE_BOARD_FEEDBACK_LENGTH = 1000;
+
 export interface RenameCharacterVisualAssetRequest extends CharacterVisualAssetSelection {
   name: string;
+}
+
+export interface DeleteCharacterVisualAssetRequest extends CharacterVisualAssetSelection {
+  allowOfficial?: boolean;
 }
 
 export interface SetCharacterVisualAssetOfficialRequest extends CharacterVisualAssetSelection {
@@ -142,7 +149,7 @@ export interface SaveCharacterVisualResult {
 
 export interface CharacterVisualAssetApi {
   deleteCharacterVisualAsset: (
-    request: CharacterVisualAssetSelection,
+    request: DeleteCharacterVisualAssetRequest,
   ) => Promise<CharacterVisualWorkspaceState>;
   generateCharacterAction: (
     request: GenerateCharacterActionRequest,

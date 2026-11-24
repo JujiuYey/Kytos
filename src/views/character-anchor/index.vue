@@ -11,6 +11,7 @@ import { SagPage } from '@/components/sag/sag-page';
 import { characterAnchorApi } from '@/lib/character-anchor-api';
 import type {
   CharacterAnchorRecord,
+  CharacterVisualImage,
   CharacterVisualResolution,
   CharacterVisualSize,
 } from '@/types';
@@ -18,12 +19,14 @@ import type { GeneratedAnchorRole } from './components/character-anchor-generato
 import { useCharacterWorkspace } from './composables/useCharacterWorkspace';
 import AnchorGallery from './components/anchor-gallery.vue';
 import AnchorPageHeader from './components/anchor-page-header.vue';
+import AnchorRegenerateDialog from './components/anchor-regenerate-dialog.vue';
 import CharacterAnchorGeneratorPanel from './components/character-anchor-generator-panel.vue';
 import AnchorAssetRenameDialog from './components/anchor-asset-rename-dialog.vue';
 import AnchorUploadDialog from './components/anchor-upload-dialog.vue';
 
 const isSubmitting = ref(false);
-const busy = computed(() => isSubmitting.value);
+const isRegenerating = ref(false);
+const busy = computed(() => isSubmitting.value || isRegenerating.value);
 
 const {
   activeRecord,
@@ -63,6 +66,7 @@ const {
   uploadDialogOpen,
   handleUploaded,
 } = useCharacterWorkspace({
+  allowOfficialDelete: true,
   busy,
   onWorkspaceApplied: () => {
     resumeActivePolling();
@@ -80,6 +84,17 @@ const anchorRecords = computed(() =>
 const assetCount = computed(() =>
   anchorRecords.value.reduce((total, record) => total + record.images.length, 0),
 );
+const deleteDescription = computed(() => {
+  const target = deleteTarget.value;
+  const isOfficial =
+    target &&
+    officialAssets.value.some(
+      asset => asset.taskId === target.record.id && asset.fileName === target.image.fileName,
+    );
+  return isOfficial
+    ? '图片将从作品工作区永久删除，同时清除它的正式资产状态和锚点职责。'
+    : '图片将从作品工作区永久删除，此操作不可恢复。';
+});
 
 const anchorRoleLabels = {
   standard: '标准参考图',
@@ -138,10 +153,7 @@ const standardReference = computed<StandardReferenceOption | undefined>(() => {
 
 const isAnchorGenerateDisabled = computed(
   () =>
-    isInitializing.value ||
-    busy.value ||
-    Boolean(activeRecord.value) ||
-    !selectedCharacterId.value ||
+    operationDisabled.value ||
     !keyConfigured.value ||
     !standardReference.value ||
     selectedAnchorRoles.value.length === 0,
@@ -203,6 +215,75 @@ function openAnchorGenerator(): void {
 
 function closeAnchorGenerator(): void {
   anchorGeneratorOpen.value = false;
+}
+
+const regenerateDialogOpen = ref(false);
+const regenerateTarget = ref<{ record: CharacterAnchorRecord; image: CharacterVisualImage } | null>(
+  null,
+);
+const regenerateError = ref('');
+const regenerateReferences = computed(() => {
+  const target = regenerateTarget.value;
+  if (!target) return [];
+  const originalReferences = target.record.referenceAssets.filter(reference =>
+    referenceOptions.value.some(
+      ({ selection }) =>
+        selection.taskId === reference.taskId && selection.fileName === reference.fileName,
+    ),
+  );
+  if (originalReferences.length) return originalReferences;
+  const standard = anchorBindings.value.find(
+    binding =>
+      binding.role === 'standard' &&
+      (binding.taskId !== target.record.id || binding.fileName !== target.image.fileName),
+  );
+  return standard ? [{ taskId: standard.taskId, fileName: standard.fileName }] : [];
+});
+const regenerateUnavailableReason = computed(() => {
+  if (isRegenerating.value) return '';
+  if (!keyConfigured.value) return '重新生成需要配置 APIMart API Key。';
+  if (operationDisabled.value) return '请等待当前操作完成。';
+  return '';
+});
+
+function openRegenerateDialog(record: CharacterAnchorRecord, image: CharacterVisualImage): void {
+  if (record.source !== 'generated' || operationDisabled.value) return;
+  regenerateTarget.value = { record, image };
+  regenerateError.value = '';
+  regenerateDialogOpen.value = true;
+}
+
+async function regenerateAnchor(feedback: string): Promise<void> {
+  const target = regenerateTarget.value;
+  if (!target || !feedback || isRegenerating.value || regenerateUnavailableReason.value) return;
+  isRegenerating.value = true;
+  regenerateError.value = '';
+  errorMessage.value = '';
+  try {
+    const record = await characterAnchorApi.generateReferenceBoard({
+      feedback: {
+        source: { taskId: target.record.id, fileName: target.image.fileName },
+        text: feedback,
+      },
+      name: target.record.name,
+      prompt:
+        target.record.prompt ||
+        `生成角色锚点图「${target.record.name}」，保持参考图中的角色身份和画风。`,
+      referenceAssets: regenerateReferences.value,
+      resolution: target.record.resolution,
+      size: target.record.size,
+    });
+    records.value = [record, ...records.value.filter(item => item.id !== record.id)].sort(
+      (left, right) => right.createdAt.localeCompare(left.createdAt),
+    );
+    regenerateDialogOpen.value = false;
+    toast.success('已提交重新生成任务');
+    startPolling(record.id);
+  } catch (error: unknown) {
+    regenerateError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    isRegenerating.value = false;
+  }
 }
 
 async function generateAnchorBoard(): Promise<void> {
@@ -332,16 +413,20 @@ onMounted(() => {
     >
       <div class="flex min-h-0 min-w-0 lg:flex">
         <AnchorGallery
+          allow-official-delete
+          :generation-actions-disabled="operationDisabled"
           :deleting-file-name="deletingFileName"
           :anchor-bindings="anchorBindings"
           :official-assets="officialAssets"
           :polling-state="pollingState"
           :records="anchorRecords"
+          show-regenerate
           :renaming-file-name="renamingFileName"
           :selecting-file-name="selectingFileName"
           class="min-h-0 min-w-0 flex-1"
           @delete="requestDelete"
           @edit="editImage"
+          @regenerate="openRegenerateDialog"
           @official="selectAsset"
           @rename="requestRename"
           @role="setAnchorRole"
@@ -377,10 +462,19 @@ onMounted(() => {
       @rename="renameAsset"
     />
 
+    <AnchorRegenerateDialog
+      v-model:open="regenerateDialogOpen"
+      :error="regenerateError"
+      :image-name="regenerateTarget?.image.name || regenerateTarget?.record.name || '角色锚点'"
+      :loading="isRegenerating"
+      :unavailable-reason="regenerateUnavailableReason"
+      @regenerate="regenerateAnchor"
+    />
+
     <SagConfirmDialog
       v-model:open="deleteDialogOpen"
       :title="`删除“${deleteTarget?.image.name || deleteTarget?.record.name || '这张图片'}”？`"
-      description="图片将从作品工作区永久删除，此操作不可恢复。"
+      :description="deleteDescription"
       :confirm-text="deletingFileName ? '删除中' : '确定删除'"
       :loading="Boolean(deletingFileName)"
       @confirm="deleteAsset"

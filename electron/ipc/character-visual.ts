@@ -2,7 +2,7 @@
 import { ipcMain } from 'electron';
 import type { CharacterScopeRequest } from '../../shared/character-library';
 import type {
-  CharacterVisualAssetSelection,
+  DeleteCharacterVisualAssetRequest,
   GenerateCharacterActionPromptRequest,
   GenerateCharacterActionRequest,
   GenerateCharacterReferenceBoardRequest,
@@ -28,7 +28,7 @@ import type { TrustedSenderGuard } from './trusted-sender';
 export function registerCharacterVisualIpc(assertTrustedSender: TrustedSenderGuard): void {
   ipcMain.handle(
     'character-visual:delete',
-    async (event, request: CharacterVisualAssetSelection) => {
+    async (event, request: DeleteCharacterVisualAssetRequest) => {
       assertTrustedSender(event);
       return deleteCharacterVisualAsset(request);
     },

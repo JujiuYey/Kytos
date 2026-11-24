@@ -1,5 +1,5 @@
 import type {
-  CharacterVisualAssetSelection,
+  DeleteCharacterVisualAssetRequest,
   GenerateCharacterActionPromptRequest,
   GenerateCharacterActionRequest,
   GenerateCharacterReferenceBoardRequest,
@@ -11,7 +11,7 @@ import type {
 import type { CharacterScopeRequest } from '@/types';
 
 export const characterAnchorApi = {
-  deleteAnchor(request: CharacterVisualAssetSelection) {
+  deleteAnchor(request: DeleteCharacterVisualAssetRequest) {
     return window.desktop.character.assets.deleteCharacterVisualAsset(request);
   },
   generateAction(request: GenerateCharacterActionRequest) {

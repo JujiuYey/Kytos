@@ -69,6 +69,7 @@ export type {
   CharacterVisualSource,
   CharacterVisualTaskStatus,
   CharacterVisualWorkspaceState,
+  DeleteCharacterVisualAssetRequest,
   GenerateCharacterActionRequest,
   GenerateCharacterActionPromptRequest,
   GenerateCharacterReferenceBoardRequest,
@@ -78,6 +79,7 @@ export type {
   SetCharacterVisualAssetOfficialRequest,
   UploadCharacterVisualAssetRequest,
 } from '../../shared/character-visual';
+export { MAX_CHARACTER_REFERENCE_BOARD_FEEDBACK_LENGTH } from '../../shared/character-visual';
 export {
   CHARACTER_DRAFT_FIELDS,
   CHARACTER_SEED_FIELDS,
