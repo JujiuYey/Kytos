@@ -1,31 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Cpu, Image as ImageIcon, Zap } from '@lucide/vue';
+import { Cpu, Zap } from '@lucide/vue';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { SagStatusBadge } from '@/components/sag/status-badge';
 import { useAppStore } from '@/stores/app';
-import {
-  CHAT_MODELS,
-  CHAT_MODEL_DEFINITIONS,
-  IMAGE_MODEL_DEFINITIONS,
-  IMAGE_MODELS,
-  isChatModel,
-  isDeepSeekModel,
-  isImageModel,
-} from '@/types';
+import { CHAT_MODELS, CHAT_MODEL_DEFINITIONS, isChatModel, isDeepSeekModel } from '@/types';
+import ImageModelSetting from './image-model-setting.vue';
 
 const appStore = useAppStore();
-
-const imageModel = computed({
-  get: () => appStore.settings.imageModel,
-  set: (value: string | number) => {
-    if (isImageModel(value)) {
-      appStore.updateSettings({ imageModel: value });
-    }
-  },
-});
-const imageModelDefinition = computed(() => IMAGE_MODEL_DEFINITIONS[imageModel.value]);
 
 const generalModel = computed({
   get: () => appStore.settings.generalModel,
@@ -59,30 +42,7 @@ const fastModelDefinition = computed(() => CHAT_MODEL_DEFINITIONS[fastModel.valu
       <p class="mt-1 text-sm text-muted-foreground">为不同任务选择默认模型。</p>
     </div>
     <div class="divide-y rounded-md border">
-      <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
-        <div class="flex min-w-0 items-start gap-3">
-          <ImageIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-          <div>
-            <h3 class="text-sm font-medium">生图模型</h3>
-            <p class="mt-1.5 text-sm leading-5 text-muted-foreground">
-              用于角色锚点、表情和插画生成。GPT-Image-2.6 里 Sunburst 偏细节与一致性，Flare 偏速度。
-            </p>
-          </div>
-        </div>
-        <div class="w-full shrink-0 space-y-2 sm:w-64">
-          <Label for="image-model">模型</Label>
-          <Select v-model="imageModel">
-            <SelectTrigger id="image-model" class="w-full">
-              <span class="truncate">{{ imageModelDefinition.label }}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="model in IMAGE_MODELS" :key="model" :value="model">
-                {{ IMAGE_MODEL_DEFINITIONS[model].label }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <ImageModelSetting />
 
       <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex min-w-0 items-start gap-3">
