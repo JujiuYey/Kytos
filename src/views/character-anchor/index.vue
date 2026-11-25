@@ -225,12 +225,15 @@ const regenerateError = ref('');
 const regenerateReferences = computed(() => {
   const target = regenerateTarget.value;
   if (!target) return [];
-  const originalReferences = target.record.referenceAssets.filter(reference =>
-    referenceOptions.value.some(
-      ({ selection }) =>
-        selection.taskId === reference.taskId && selection.fileName === reference.fileName,
-    ),
-  );
+  // record 是响应式代理，它的元素不能直接过 IPC（会报“无法克隆”），要取出字段组成新对象
+  const originalReferences = target.record.referenceAssets
+    .filter(reference =>
+      referenceOptions.value.some(
+        ({ selection }) =>
+          selection.taskId === reference.taskId && selection.fileName === reference.fileName,
+      ),
+    )
+    .map(({ fileName, taskId }) => ({ fileName, taskId }));
   if (originalReferences.length) return originalReferences;
   const standard = anchorBindings.value.find(
     binding =>
